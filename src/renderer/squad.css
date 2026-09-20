@@ -1,0 +1,75 @@
+.task-view.with-squad { position: relative; }
+.squad-toggle { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border-radius: 7px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.squad-toggle:hover, .squad-toggle[aria-expanded="true"] { background: var(--selected); color: var(--primary); }
+.squad-toggle b { min-width: 18px; padding: 1px 4px; background: var(--primary); color: var(--primary-text); border-radius: 4px; font-size: 10px; font-weight: 600; text-align: center; }
+.squad-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 28px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; text-align: left; }
+.squad-summary:hover { background: var(--hover); }
+.squad-summary > span { display: flex; align-items: center; gap: 7px; }
+.squad-summary strong { color: var(--text); font-weight: 500; }
+.squad-summary .squad-alert { color: var(--warning); }
+.squad-panel { display: flex; flex-direction: column; flex-shrink: 0; width: clamp(360px, 38%, 470px); min-height: 0; border-left: 1px solid var(--line); background: var(--floating); animation: squad-reveal 230ms var(--motion-ease); }
+.squad-panel-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.squad-panel-header h2 { display: flex; align-items: center; gap: 9px; font-size: 16px; letter-spacing: -.02em; }
+.squad-panel-header h2 svg { color: var(--primary); }
+.squad-overview { flex-shrink: 0; padding: 18px 20px; background: var(--settings-sidebar); border-bottom: 1px solid var(--line); }
+.squad-overview-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.squad-overview-line strong { font-size: 13px; font-weight: 550; }
+.squad-ultra { flex-shrink: 0; color: var(--warning); background: var(--warning-soft); padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.squad-overview p { margin-top: 9px; color: var(--sidebar-text); font-size: 12px; line-height: 1.75; }
+.squad-counts { display: flex; align-items: center; flex-wrap: wrap; gap: 13px; margin-top: 13px; font-size: 11px; color: var(--sidebar-text); font-variant-numeric: tabular-nums; }
+.squad-counts > span { display: flex; align-items: center; gap: 5px; }
+.squad-counts .squad-needs-input { color: var(--warning); }
+.squad-roster { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; }
+.squad-roster h3 { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 5px; }
+.squad-roster h3 > span { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.squad-member { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.squad-member-heading { display: flex; align-items: center; gap: 9px; padding: 3px 0; width: 100%; text-align: left; }
+.squad-member-mark { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px; background: var(--focus-soft); color: var(--primary); font-weight: 600; font-size: 15px; }
+.squad-member-waiting .squad-member-mark, .squad-member-queued .squad-member-mark { color: var(--warning); background: var(--warning-soft); }
+.squad-member-failed .squad-member-mark { color: var(--danger); background: var(--danger-soft); }
+.squad-member-identity { flex: 1; min-width: 0; }
+.squad-member-identity strong { display: block; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.squad-member-identity small { display: block; margin-top: 1px; font-size: 10px; color: var(--muted); }
+.squad-state { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; white-space: nowrap; color: var(--muted); }
+.squad-state.running, .squad-state.completed { color: var(--success); }
+.squad-state.waiting, .squad-state.queued { color: var(--warning); }
+.squad-state.failed { color: var(--danger); }
+.squad-state .status-dot { width: 5px; height: 5px; }
+.squad-member-chevron { color: var(--muted); transition: transform 180ms var(--motion-ease); }
+.squad-member-heading[aria-expanded="true"] .squad-member-chevron { transform: rotate(180deg); }
+.squad-member-brief { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; margin: 10px 0 8px; font-size: 12px; line-height: 1.7; color: var(--text); }
+.squad-member-meta { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.squad-member-meta > span { display: inline-flex; align-items: center; gap: 4px; }
+.squad-member-details { padding-top: 13px; }
+.squad-live-tool { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; color: var(--muted); font-size: 10px; }
+.squad-live-tool code { color: var(--primary); background: var(--focus-soft); padding: 2px 5px; border-radius: 4px; }
+.squad-result h4 { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+.squad-result p { max-height: 210px; overflow-y: auto; overscroll-behavior: contain; font-size: 12px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.squad-member-error { padding: 9px 10px; margin-bottom: 10px; background: var(--danger-soft); color: var(--danger); border-radius: 6px; font-size: 12px; overflow-wrap: anywhere; }
+.squad-member-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 13px; }
+.squad-member-actions .text-button { font-size: 11px; padding: 4px 0; }
+.squad-member-actions .squad-stop { color: var(--danger); }
+.squad-resume { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.squad-resume .field { gap: 6px; font-size: 12px; margin: 0; }
+.squad-resume textarea { width: 100%; font-size: 12px; }
+.squad-resume > div { display: flex; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 10px; }
+.squad-resume .button { padding: 6px 9px; font-size: 11px; }
+.squad-empty { padding: 27px 5px; text-align: center; }
+.squad-empty > svg { color: var(--muted); margin-bottom: 10px; }
+.squad-empty strong { display: block; font-size: 13px; font-weight: 500; }
+.squad-empty p { max-width: 30ch; margin: 9px auto 0; font-size: 12px; line-height: 1.8; color: var(--muted); }
+.squad-history { margin-top: 24px; }
+.squad-history-heading { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 0 5px; font-size: 12px; }
+.squad-history-heading > span { display: flex; align-items: center; gap: 8px; }
+.squad-history-heading b { color: var(--muted); font-weight: 400; font-size: 11px; }
+.squad-history-heading > svg { color: var(--muted); transform: rotate(-90deg); transition: transform 180ms var(--motion-ease); }
+.squad-history-heading[aria-expanded="true"] > svg { transform: none; }
+.squad-panel-footer { display: flex; flex-shrink: 0; padding: 13px 20px; border-top: 1px solid var(--line); }
+.squad-panel-footer .button { width: 100%; justify-content: center; font-size: 12px; }
+.effort-squad-note { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--warning); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+@keyframes squad-reveal { from { transform: translateX(16px); opacity: .65; } to { transform: none; opacity: 1; } }
+@media (max-width: 1200px) { .squad-panel { position: absolute; inset: 0 0 0 auto; z-index: 7; width: min(420px, 88%); box-shadow: -10px 0 30px rgba(0, 0, 0, .4); }.squad-toggle { padding: 6px; }.squad-overview, .squad-roster { padding: 16px; } }
+@media (max-width: 960px) { .squad-toggle > span { display: none; }.squad-summary { padding-inline: 18px; }.squad-summary > span:last-child { font-size: 10px; } }
+html[data-motion="reduced"] .squad-panel { animation: none; }
+html[data-motion="reduced"] .squad-member-chevron, html[data-motion="reduced"] .squad-history-heading > svg { transition: none; }
+@media (prefers-reduced-motion: reduce) { .squad-panel { animation: none; }.squad-member-chevron, .squad-history-heading > svg { transition: none; } }

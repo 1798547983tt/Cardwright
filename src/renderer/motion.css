@@ -1,0 +1,69 @@
+/* Cardwright motion layer. 0.9 quieted the workbench (§6.5): what is left here either belongs to the card studio's
+   archive style or tells the user something is happening. Animate only transform / opacity / filter; no backdrop-filter.
+   Decorative loops pause while the window is inactive and disappear under reduced motion. */
+
+/* ---------- entrance & transitions ---------- */
+.page-enter { animation: quiet-page-in .2s var(--motion-ease) both; }
+.glitch-in { animation: hud-glitch .5s steps(2) both; }
+:is(.workbench-panel, .squad-panel, .diff-panel) { animation: hud-slide-in .35s var(--motion-ease) both; }
+:is(.popover, .context-menu, .slash-suggestions) { animation: quiet-pop .14s var(--motion-ease) both; }
+.modal { animation: hud-modal .24s var(--motion-ease) both; }
+.modal-backdrop { animation: hud-fade .2s ease both; }
+.toast { animation: hud-toast .3s var(--motion-ease) both; }
+.desk-panel { animation: quiet-panel-in .18s var(--motion-ease) both; }
+
+/* ---------- buttons ---------- */
+:is(.button, .send-button) { transition: transform var(--motion-fast) ease, filter var(--motion-fast) ease, background-color var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease; }
+:is(.button, .send-button):active:not(:disabled) { transform: translateY(1px) scale(.99); }
+
+/* ---------- live states ---------- */
+.status-diamond.running { animation: hud-diamond 1.2s ease-in-out infinite; }
+.portrait { transition: transform .25s var(--motion-ease); }
+button.portrait:hover { transform: translateY(-2px) scale(1.03); }
+button.portrait:hover .portrait-corners { animation: hud-corners .6s ease-in-out infinite alternate; }
+.hazard-head { animation: hud-stripes 1.6s linear infinite; }
+.status-tag.truncated { animation: hud-blink 2.4s ease-in-out infinite; }
+.working-cells i { animation: hud-working 1s ease-in-out infinite; }
+.working-cells i:nth-child(2) { animation-delay: .15s; } .working-cells i:nth-child(3) { animation-delay: .3s; }
+
+/* ---------- boot sequence (off by default since 0.9; the setting turns it back on) ---------- */
+.boot-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #07080a; color: #e8ebee; cursor: pointer; transition: opacity .45s ease, visibility .45s; }
+.boot-overlay.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
+.boot-core { display: grid; justify-items: center; gap: 18px; }
+.boot-mark { animation: hud-mark-in .7s cubic-bezier(.2, .9, .2, 1.2) both, hud-flicker 1.1s steps(1) .25s both; filter: drop-shadow(0 0 40px rgba(242, 226, 55, .45)); }
+.boot-text { text-align: center; animation: hud-clip-in .6s .35s var(--motion-ease) both; }
+.boot-text b { display: block; font: 600 22px var(--font-display); letter-spacing: .5em; margin-right: -.5em; }
+.boot-text small { font: 13px var(--font-code); letter-spacing: .18em; color: #8b95a1; }
+.boot-bar { width: 260px; height: 3px; background: #1d2126; overflow: hidden; }
+.boot-bar i { display: block; height: 100%; background: #f2e237; transform-origin: left; animation: hud-fill 1.05s .2s cubic-bezier(.7, 0, .2, 1) both; }
+.boot-scan { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 0, rgba(242, 226, 55, .12) 48%, rgba(242, 226, 55, .35) 50%, transparent 52%) no-repeat; background-size: 100% 220px; animation: hud-scan-v 1.3s linear both; }
+.boot-skip { position: absolute; bottom: 64px; font: 12px var(--font-code); color: #5c6570; letter-spacing: .15em; }
+
+/* ---------- pause & reduced motion ---------- */
+html[data-window="inactive"] :is(.send-button, .status-diamond, .portrait, .hazard-head, .status-tag.truncated, .working-cells i, .spinning),
+html[data-window="inactive"] .portrait::after { animation-play-state: paused !important; }
+html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-motion="reduced"] *::after { animation: none !important; transition: none !important; }
+html[data-motion="reduced"] .boot-overlay { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-motion="system"] *, html[data-motion="system"] *::before, html[data-motion="system"] *::after { animation: none !important; transition: none !important; }
+  html[data-motion="system"] .boot-overlay { display: none !important; }
+}
+
+@keyframes quiet-page-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes quiet-panel-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+@keyframes quiet-pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes hud-glitch { 0% { text-shadow: 3px 0 var(--info), -3px 0 var(--danger); transform: translateX(2px); } 50% { text-shadow: -2px 0 var(--info), 2px 0 var(--accent); transform: translateX(-2px); } 100% { text-shadow: none; transform: none; } }
+@keyframes hud-slide-in { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes hud-modal { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes hud-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hud-toast { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes hud-diamond { 0%, 100% { box-shadow: 0 0 0 0 var(--glow-info); } 50% { box-shadow: 0 0 0 5px transparent; } }
+@keyframes hud-corners { from { inset: 5px; } to { inset: 2px; } }
+@keyframes hud-stripes { to { background-position: 40px 0; } }
+@keyframes hud-blink { 0%, 100% { opacity: 1; } 50% { opacity: .62; } }
+@keyframes hud-working { 0%, 100% { opacity: .3; transform: scaleY(.7); } 50% { opacity: 1; transform: none; } }
+@keyframes hud-mark-in { from { transform: scale(.4) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes hud-flicker { 0%, 12%, 24%, 100% { opacity: 1; } 6%, 18% { opacity: .35; } }
+@keyframes hud-clip-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes hud-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes hud-scan-v { from { background-position: 0 -220px; } to { background-position: 0 100vh; } }

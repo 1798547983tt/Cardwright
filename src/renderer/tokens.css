@@ -1,0 +1,94 @@
+/* Cardwright 0.9 workbench tokens (DESIGN.md「Workbench design system (0.9)」, prototype A「静室 · 三栏」).
+   The semantic names from 0.7.1 are kept so every existing component recolors with the new palette; the chamfer
+   variables resolve to `none`, which removes the HUD's cut corners without touching each rule. The card studio sets
+   its own variables inside `.card-studio`, so it keeps the 卷宗 look (ADR 0013). */
+@font-face { font-family: 'Chakra Petch'; src: url('./assets/fonts/ChakraPetch-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Chakra Petch'; src: url('./assets/fonts/ChakraPetch-Medium.ttf') format('truetype'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Chakra Petch'; src: url('./assets/fonts/ChakraPetch-SemiBold.ttf') format('truetype'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Chakra Petch'; src: url('./assets/fonts/ChakraPetch-Bold.ttf') format('truetype'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Share Tech Mono'; src: url('./assets/fonts/ShareTechMono-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+
+:root {
+  color-scheme: dark;
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --font-code: 'Cascadia Code', 'Cascadia Mono', Consolas, monospace;
+  --font-mono: 'Cascadia Code', 'Cascadia Mono', Consolas, monospace;
+  --font-chat: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+
+  /* 0.9 palette */
+  --accent: #d4b856; --accent-ink: #14161a; --accent-text: #d4b856; --accent-soft: rgba(212, 184, 86, .12);
+  --info: #4fb8d1; --info-soft: rgba(79, 184, 209, .12);
+  --glow: transparent; --glow-info: transparent;
+  --grid-line: transparent; --grain-opacity: 0; --beam: transparent;
+  --rail: #141618; --rail-line: #24282e; --rail-text: #e4e7eb; --rail-muted: #9aa1ab; --rail-hover: #1c1f23; --rail-active: #242830;
+  --panel: #181b20; --panel-2: #1e2228; --panel-3: #252a31; --dim: #636b76;
+  /* No chamfers in the workbench; `none` keeps the old clip-path rules harmless. */
+  --cut: none; --cut-s: none; --cut-xs: none;
+  --radius: 6px; --radius-chip: 4px; --radius-menu: 8px;
+
+  --canvas: #111316;
+  --sidebar: var(--rail); --nav-text: var(--rail-text); --nav-muted: var(--rail-muted); --nav-line: var(--rail-line); --nav-hover: var(--rail-hover); --nav-active: var(--rail-active); --nav-accent: var(--accent);
+  --text: #e4e7eb; --sidebar-text: #c4c9d0; --muted: #9aa1ab;
+  --line: #2a2f37; --line-strong: #3a4149;
+  --hover: #1e2228; --selected: #252a31;
+  --input: #1e2228; --floating: #1e2228; --button: #1e2228;
+  --primary: #d4b856; --primary-hover: #e0c76e; --primary-text: #14161a;
+  --link: #4fb8d1; --focus: #d4b856; --focus-soft: rgba(212, 184, 86, .2);
+  --selection: rgba(212, 184, 86, .28); --composer-focus: #d4b856;
+  --inactive-dot: #4a525c; --scrollbar: #3a4149;
+  --stats-panel: #181b20; --stat-tile: #1e2228; --stat-label: #9aa1ab;
+  --heat-1: #2e2a1c; --heat-2: #5b5131; --heat-3: #9a8744; --heat-4: #d4b856;
+  --effort: #d4b856; --effort-soft: rgba(212, 184, 86, .12); --effort-rail: #252a31; --effort-start: #9a8744; --effort-end: #d4b856;
+  --settings-sidebar: #16181c; --settings-active: #252a31; --settings-input: #1e2228; --segmented-active: #2d333b; --toggle-off: #3a4149;
+  --user-message: #1e2228; --code-bg: #0e1013;
+  --success: #4fba6e; --success-soft: rgba(79, 186, 110, .12);
+  --warning: #e8943a; --warning-soft: rgba(232, 148, 58, .12);
+  --approval-bg: rgba(232, 148, 58, .08); --approval-line: rgba(232, 148, 58, .5);
+  --danger: #e25252; --danger-soft: rgba(226, 82, 82, .12);
+  --permission-ask: #4fb8d1; --permission-ask-soft: rgba(79, 184, 209, .12);
+  --permission-edit: #e8943a; --permission-edit-soft: rgba(232, 148, 58, .12);
+  --permission-plan: #9a82d6; --permission-plan-soft: rgba(154, 130, 214, .12);
+  --permission-full: #e25252; --permission-full-soft: rgba(226, 82, 82, .12);
+  --backdrop: rgba(8, 9, 11, .66);
+  --shadow-popover: 0 14px 32px rgba(0, 0, 0, .5), 0 0 0 1px #2a2f37;
+  --shadow-modal: 0 26px 70px rgba(0, 0, 0, .6), 0 0 0 1px #3a4149;
+  --motion-fast: 140ms; --motion-medium: 200ms; --motion-slow: 240ms;
+  --motion-ease: cubic-bezier(.2, .8, .3, 1);
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --accent: #8a7420; --accent-ink: #ffffff; --accent-text: #8a7420; --accent-soft: rgba(138, 116, 32, .1);
+  --info: #0b7c9e; --info-soft: rgba(11, 124, 158, .1);
+  --rail: #1a1c1f; --rail-line: #2f343b; --rail-text: #eceef0; --rail-muted: #9aa1ab; --rail-hover: #262a30; --rail-active: #32373f;
+  --panel: #faf9f6; --panel-2: #ffffff; --panel-3: #eceae4; --dim: #8a9099;
+
+  --canvas: #f3f2ee;
+  --text: #1a1c1f; --sidebar-text: #c4c9d0; --muted: #5a6068;
+  --line: #d8d5cc; --line-strong: #b8b4a9;
+  --hover: #eceae4; --selected: #e4e1d8;
+  --input: #ffffff; --floating: #ffffff; --button: #ffffff;
+  --primary: #8a7420; --primary-hover: #715f1a; --primary-text: #ffffff;
+  --link: #0b7c9e; --focus: #8a7420; --focus-soft: rgba(138, 116, 32, .18);
+  --selection: rgba(138, 116, 32, .22); --composer-focus: #8a7420;
+  --inactive-dot: #b8b4a9; --scrollbar: #b8b4a9;
+  --stats-panel: #faf9f6; --stat-tile: #ffffff; --stat-label: #5a6068;
+  --heat-1: #efe9cf; --heat-2: #d9c98a; --heat-3: #b39a45; --heat-4: #8a7420;
+  --effort: #8a7420; --effort-soft: rgba(138, 116, 32, .1); --effort-rail: #e4e1d8; --effort-start: #b39a45; --effort-end: #8a7420;
+  --settings-sidebar: #eceae4; --settings-active: #e4e1d8; --settings-input: #ffffff; --segmented-active: #ffffff; --toggle-off: #b8b4a9;
+  --user-message: #ffffff; --code-bg: #1a1c1f;
+  --success: #1d8a4b; --success-soft: rgba(29, 138, 75, .1);
+  --warning: #b06800; --warning-soft: rgba(176, 104, 0, .1);
+  --approval-bg: rgba(176, 104, 0, .07); --approval-line: rgba(176, 104, 0, .45);
+  --danger: #c62828; --danger-soft: rgba(198, 40, 40, .1);
+  --permission-ask: #0b7c9e; --permission-ask-soft: rgba(11, 124, 158, .1);
+  --permission-edit: #b06800; --permission-edit-soft: rgba(176, 104, 0, .1);
+  --permission-plan: #6a58b0; --permission-plan-soft: rgba(106, 88, 176, .1);
+  --permission-full: #c62828; --permission-full-soft: rgba(198, 40, 40, .1);
+  --backdrop: rgba(26, 28, 31, .5);
+  --shadow-popover: 0 14px 30px rgba(26, 28, 31, .16), 0 0 0 1px #d8d5cc;
+  --shadow-modal: 0 24px 64px rgba(26, 28, 31, .24), 0 0 0 1px #b8b4a9;
+}
+html[data-font="serif"] { --font-chat: 'Georgia', 'Noto Serif CJK SC', 'SimSun', serif; }
+html[data-font="mono"] { --font-chat: var(--font-mono); }
