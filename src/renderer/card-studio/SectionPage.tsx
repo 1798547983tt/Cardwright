@@ -107,6 +107,7 @@ export function SectionPage({ card, sectionId, conversation }: { card: CardProje
   const scroller = useRef<HTMLDivElement>(null);
   const [editing, setEditing] = useState(false);
   const [starting, setStarting] = useState<PlanMode | null>(null);
+  // The studio only navigates to sections a board has (CardStudio's openSection), so an unknown id here is a programming error.
   const board = boardOf(sectionId);
   const section = sectionOf(sectionId);
   const input = progressInputOf(card, data.tasks);

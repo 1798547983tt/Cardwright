@@ -19,6 +19,12 @@ test('the queue takes unsent dispatches of the chosen boards, in planning order'
   assert.deepEqual(runQueue(dispatches, 'greet'), ['e']);
 });
 
+test('a dispatch aimed at a section no board has stays out of the queue instead of throwing', () => {
+  const dispatches = [dispatch('a', 'lore-people'), dispatch('x', 'lore-other'), dispatch('y', '随便什么'), dispatch('b', 'greet')];
+  assert.deepEqual(runQueue(dispatches, 'all'), ['a', 'b']);
+  assert.deepEqual(runQueue(dispatches, 'lore'), ['a']);
+});
+
 test('three failures in a row of the same tool count; a success or another tool breaks the streak', () => {
   assert.deepEqual(toolFailureStreak([tool('powershell', 'failed', 't'), tool('powershell', 'failed', 't'), tool('powershell', 'failed', 't')]), { name: 'powershell', count: 3 });
   assert.equal(toolFailureStreak([tool('powershell', 'failed', 't'), tool('read', 'failed', 't'), tool('powershell', 'failed', 't'), tool('powershell', 'failed', 't')]), null);

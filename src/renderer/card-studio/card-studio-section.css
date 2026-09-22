@@ -45,8 +45,12 @@
 .cs-stage-scroll > * { max-width: 780px; margin-left: auto; margin-right: auto; }
 
 .cs-refusal, .cs-fresh { display: grid; gap: 16px; align-content: start; }
-.cs-refusal-tag { justify-self: start; font: 11px var(--cs-mono); letter-spacing: .16em; color: var(--cs-err); padding: 2px 8px; border: 1px solid rgba(212, 84, 95, .45); }
-.cs-refusal h2, .cs-fresh h2 { font: 600 22px var(--cs-serif); letter-spacing: .06em; }
+.cs-refusal-tag, .cs-page-error-tag { justify-self: start; font: 11px var(--cs-mono); letter-spacing: .16em; color: var(--cs-err); padding: 2px 8px; border: 1px solid rgba(212, 84, 95, .45); }
+.cs-refusal h2, .cs-fresh h2, .cs-page-error h2 { font: 600 22px var(--cs-serif); letter-spacing: .06em; }
+/* Error card (0.9.1): takes the place of a page under the top bar, which stays usable with 返回工作台. */
+.cs-page-error { display: grid; gap: 14px; align-content: start; max-width: 640px; margin: 0 auto; padding: 72px 40px; }
+.cs-page-error-message { overflow: hidden; padding-left: 12px; font: 12.5px/1.7 var(--cs-mono); color: var(--cs-text-2); white-space: nowrap; text-overflow: ellipsis; border-left: 1px solid var(--cs-err); }
+.cs-page-error-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .cs-refusal p, .cs-fresh p { max-width: 580px; color: var(--cs-text-2); }
 .cs-refusal .cs-btn { justify-self: start; }
 .cs-fresh-plan, .cs-fresh-dispatches { display: grid; gap: 14px; }

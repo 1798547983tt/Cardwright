@@ -65,6 +65,9 @@ const bridge: Bridge = {
   createSchedule: input => invoke('createSchedule', input), updateSchedule: (id, changes) => invoke('updateSchedule', id, changes),
   pickSkillFolder: () => invoke('pickSkillFolder'), refreshSkills: () => invoke('refreshSkills'),
   exportData: () => invoke('exportData'), openPath: path => invoke('openPath', path), window: action => invoke('window', action),
+  reportRendererError: report => invoke('reportRendererError', report), openLogFolder: () => invoke('openLogFolder'), copyText: text => invoke('copyText', text),
+  // Only the desktop process can switch this on, and only for a start with CARDWRIGHT_SMOKE_RENDER_FAULT=1.
+  ...(process.argv.includes('--cardwright-smoke-render-fault') ? { smokeRenderFault: true } : {}),
   createCardProject: input => invoke('createCardProject', input), defaultCardFolder: name => invoke('defaultCardFolder', name), pickCardFolder: () => invoke('pickCardFolder'),
   removeCardProject: id => invoke('removeCardProject', id), refreshCardProject: id => invoke('refreshCardProject', id), openCardFolder: (id, path) => invoke('openCardFolder', id, path),
   startCardConversation: input => invoke('startCardConversation', input), markDispatchDone: (id, dispatchId) => invoke('markDispatchDone', id, dispatchId), saveCardSettings: (id, changes) => invoke('saveCardSettings', id, changes), cardPromptOverrides: () => invoke('cardPromptOverrides'), readCardPromptOverride: id => invoke('readCardPromptOverride', id), saveCardPromptOverride: (id, text) => invoke('saveCardPromptOverride', id, text), restoreCardPromptOverride: id => invoke('restoreCardPromptOverride', id),

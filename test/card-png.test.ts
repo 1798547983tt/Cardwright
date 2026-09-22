@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
 import { existsSync, readFileSync } from 'node:fs';
 import { pngChunks, readCardFromPng, stripCardFromPng, writeCardIntoPng, writeCheckedCardPng } from '../src/core/card-studio/png.ts';
+import { RE0_CARD, RE0_PNG } from './reference-cards.ts';
 
-const RE0_PNG = 'E:/Cardwright/参考资料/完整的卡/png格式的卡/Re0：从零开始的异世界生活 (1).png';
 const SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
 function crc32(buffer: Buffer): number {
@@ -77,7 +77,7 @@ test('the reference PNG holds the same card as the JSON export', { skip: existsS
   assert.equal(read.mismatch, false);
   const card = read.card as Record<string, Record<string, Record<string, unknown[]>>>;
   assert.equal(card.data.character_book.entries.length, 290);
-  const json = JSON.parse(readFileSync('E:/Cardwright/参考资料/完整的卡/json格式的卡/Re0：从零开始的异世界生活.json', 'utf8').replace(/^\uFEFF/, '')) as Record<string, unknown>;
+  const json = JSON.parse(readFileSync(RE0_CARD, 'utf8').replace(/^\uFEFF/, '')) as Record<string, unknown>;
   assert.deepEqual(read.card, json, 'the PNG and the JSON carry the same card');
 });
 

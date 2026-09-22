@@ -8,8 +8,7 @@ import { importCard } from '../src/core/card-studio/components.ts';
 import { runChecks } from '../src/core/card-studio/checks.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-
-const RE0_CARD = 'E:/Cardwright/参考资料/完整的卡/json格式的卡/Re0：从零开始的异世界生活.json';
+import { RE0_CARD } from './reference-cards.ts';
 
 const entry = (id: number, comment: string, content: string, over: Record<string, unknown> = {}, extensions: Record<string, unknown> = {}) => ({
   id, keys: [], secondary_keys: [], comment, content, constant: true, selective: true, insertion_order: 10, enabled: true,
@@ -108,6 +107,31 @@ test('the report counts entries and estimates the always-on budget', async () =>
   assert.ok(report.stats.constantChars > 100);
   assert.ok(report.stats.constantTokens > 50);
   assert.ok(report.findings.some(item => item.code === 'budget' && item.level === 'info'));
+  await clean(root);
+});
+
+test('entries no section takes are counted as 未分类 and reported as information that does not block the export', async () => {
+  const root = await project([
+    entry(1, '地点总览', '<地点总览>\n王都｜城市｜首都\n</地点总览>'),
+    entry(2, '杂项·二百', '排序 200、位置 0 的条目。', { insertion_order: 200 }),
+    entry(3, '杂项·一百', '排序 100、位置 4 的条目。', { insertion_order: 100, position: 'after_char' }, { position: 4 }),
+  ]);
+  const report = await runChecks(root);
+  assert.equal(report.stats.sections['lore-other'], 2);
+  assert.equal(report.stats.sections['lore-overview'], 1);
+  const unclassified = report.findings.filter(item => item.code === 'lore-unclassified');
+  assert.equal(unclassified.length, 1);
+  assert.equal(unclassified[0].level, 'info');
+  assert.equal(unclassified[0].message, '有 2 条世界书条目没有归入任何分区（世界书/未分类），会照常导出。');
+  assert.equal(report.ok, true, 'information never blocks the export');
+  await clean(root);
+});
+
+test('a card whose entries all have a section gets no 未分类 note', async () => {
+  const root = await project([entry(1, '地点总览', '<地点总览>\n王都｜城市｜首都\n</地点总览>')]);
+  const report = await runChecks(root);
+  assert.equal(report.stats.sections['lore-other'], undefined);
+  assert.ok(!report.findings.some(item => item.code === 'lore-unclassified'));
   await clean(root);
 });
 

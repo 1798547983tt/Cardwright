@@ -7,8 +7,8 @@ import { tmpdir } from 'node:os';
 import { createCardFolder, readCardFile } from '../src/core/card-studio/card-project.ts';
 import { buildCardFromProject, buildLorebookFromProject, createComponent, importCard, importLorebook, readProject } from '../src/core/card-studio/components.ts';
 import { buildCard, splitCard } from '../src/shared/card-studio/card-file.ts';
+import { RE0_CARD } from './reference-cards.ts';
 
-const RE0_CARD = 'E:/Cardwright/参考资料/完整的卡/json格式的卡/Re0：从零开始的异世界生活.json';
 const exists = (path: string) => existsSync(path);
 
 async function project(): Promise<string> {

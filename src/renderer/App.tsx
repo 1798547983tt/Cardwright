@@ -21,6 +21,9 @@ import { applyAppUpdate, appUpdateRevision, type AppUpdate } from '../shared/app
 import { workbenchSnapshot } from '../shared/card-studio/view';
 import { CardStudio } from './card-studio/CardStudio';
 import { StudioTransition, type TransitionDirection, type TransitionOrigin } from './card-studio/StudioTransition';
+import { ErrorBoundary, SmokeFault, smokeFaults } from './ErrorBoundary';
+import { setDiagnosticPage } from './diagnostics';
+import { pageLabel } from '../shared/diagnostics';
 
 // Navigation follows metadata, not streamed bodies, so rows do not re-render on every token.
 const NavigationSurface = memo(function NavigationSurface({ value, children }: { value: AppContextValue; children: ReactNode }) {
@@ -134,6 +137,9 @@ export function App() {
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
   }, [navigate, settings]);
   const pageKey = `${mode}:${mode === 'code' ? selectedId ?? 'home' : mode === 'settings' ? settingTab : ''}`;
+  // Where an error happened, for the diagnostics; the studio names its own pages while it is open.
+  const workbenchPage = pageLabel({ area: 'workbench', mode, task: !!selectedId && !!workbench?.tasks.some(task => task.id === selectedId) });
+  useEffect(() => { if (!studioOpen) setDiagnosticPage(workbenchPage); }, [studioOpen, workbenchPage]);
   const firstPage = useRef(true);
   useEffect(() => { if (firstPage.current) { firstPage.current = false; return; } if (live) playCue('page'); }, [pageKey]);
   // The side panel: the composer's commands and the conversation's 路径:行号 links both ask for it through the context.
@@ -158,10 +164,11 @@ export function App() {
   const navigationContext = useMemo(() => navigationData && ({ data: navigationData, api, t, run, settings, navigate, notify: setToast, openStudio }), [navigationData, api, t, run, settings, navigate, openStudio]);
   const openSearch = useCallback(() => setSearch(true), []);
   if (!api) return <div className="startup"><Mark size={56} /><h1>Cardwright</h1><p>Open Cardwright as a desktop application to connect to your local agent workspace.</p><p>请启动 Cardwright 桌面应用，连接本地 Agent 工作区。</p></div>;
-  if (!context || !data || !workbench || !studioContext || !navigationContext) return <div className="startup"><Mark size={56} /><h1>Cardwright</h1>{fatal ? <><p role="alert">{fatal}</p><button className="button" onClick={() => location.reload()}>Retry / 重试</button></> : <><LoaderCircle size={22} className="spinning" /><p>Opening your workspace… / 正在打开工作区…</p></>}</div>;
+  if (!context || !data || !workbench || !studioContext || !navigationContext) return <div className="startup"><Mark size={56} /><h1>Cardwright</h1>{fatal ? <><p role="alert">{fatal}</p><button className="button" onClick={() => void api.window('reload').catch(() => location.reload())}>Retry / 重试</button></> : <><LoaderCircle size={22} className="spinning" /><p>Opening your workspace… / 正在打开工作区…</p></>}</div>;
   const selectedTask = workbench.tasks.find(task => task.id === selectedId);
   const searchTasks = search ? workbench.tasks.filter(task => !task.archived && task.title.toLowerCase().includes(query.toLowerCase())) : [];
   const reducedMotion = data.preferences.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const smoke = smokeFaults();
   const transitionLayer = transition && <StudioTransition key={transition.id} direction={transition.direction} origin={transition.origin} reduced={reducedMotion} language={data.preferences.language} onSwap={() => setStudioOpen(transition.direction === 'in')} onDone={finishTransition} />;
   const toastLayer = toast && <div className={`toast ${studioOpen ? 'studio-toast' : ''}`} role="status"><AlertCircle size={18} /><span>{toast}</span><IconButton label={t('Dismiss', '关闭')} onClick={() => setToast('')}><X size={16} /></IconButton></div>;
   const windowTitle = mode === 'settings' ? t('Studio settings', '工作室设置') : mode === 'tasks' ? t('Agents & schedules', 'Agent 与计划') : selectedTask?.title || t('Workspace', '工作台');
@@ -184,14 +191,17 @@ export function App() {
       <UpgradeNotice />
       {workbench.interactions.some(interaction => interaction.taskId !== selectedId || mode !== 'code') && <div className="pending-interactions" role="status"><span>{t('Waiting for your input', '等待你的回应')}</span>{workbench.interactions.filter((interaction, index, all) => (interaction.taskId !== selectedId || mode !== 'code') && all.findIndex(item => item.taskId === interaction.taskId) === index).map(interaction => <button key={interaction.taskId} onClick={() => navigate(interaction.taskId)}>{workbench.tasks.find(task => task.id === interaction.taskId)?.title || t('Open task', '打开任务')}</button>)}</div>}
       <div className="page-enter workspace-page" key={pageKey}>
-        {mode === 'tasks' ? <Schedules projectId={projectId} />
-          : mode === 'settings' ? <Settings initialTab={settingTab} onClose={() => setMode('code')} />
-          : <><div className="workspace-body">{selectedTask ? <TaskView task={selectedTask} onPanel={tab => view({ kind: 'panel', tab })} /> : <Home />}</div><Composer key={selectedId || 'new'} task={selectedTask} projectId={projectId} setProjectId={setProjectId} /><Statusline task={selectedTask} /></>}
+        <ErrorBoundary kind="workbench" page={workbenchPage} t={t} onBack={() => navigate(null)}>
+          {mode === 'tasks' ? <Schedules projectId={projectId} />
+            : mode === 'settings' ? <Settings initialTab={settingTab} onClose={() => setMode('code')} />
+            : <><div className="workspace-body">{selectedTask ? <TaskView task={selectedTask} onPanel={tab => view({ kind: 'panel', tab })} /> : <Home />}</div><Composer key={selectedId || 'new'} task={selectedTask} projectId={projectId} setProjectId={setProjectId} /><Statusline task={selectedTask} /></>}
+          {smoke && <SmokeFault where="workbench" />}
+        </ErrorBoundary>
       </div>
     </main>
     {panel && selectedTask && mode === 'code' && <SidePanel task={selectedTask} state={panel} onState={setPanel} onClose={() => setPanel(null)} />}
     {search && <Modal title={t('Find a task', '查找任务')} onClose={() => setSearch(false)} className="search-modal"><div className="search-field"><Search size={20} /><input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder={t('Search task names…', '搜索任务名称…')} aria-label={t('Search tasks', '搜索任务')} /><kbd>Ctrl K</kbd></div><div className="search-results">{searchTasks.length ? searchTasks.map(task => <button key={task.id} onClick={() => { navigate(task.id); setSearch(false); }}><span className={`status-diamond ${task.truncation ? 'truncated' : task.status}`} /><div><strong>{task.title}</strong><small>{data.projects.find(p => p.id === task.projectId)?.name} · {new Date(task.updatedAt).toLocaleDateString()}</small></div></button>) : <p className="muted">{t('No matching tasks.', '没有匹配的任务。')}</p>}</div></Modal>}
     {bootMounted && data.preferences.bootSequence === true && <BootSequence language={data.preferences.language} reducedMotion={data.preferences.reducedMotion} onDone={() => { setLive(true); setTimeout(() => setBootMounted(false), 600); }} />}
   </div></AppContext.Provider>;
-  return <>{page}{toastLayer}{transitionLayer}</>;
+  return <>{page}{toastLayer}{transitionLayer}{smoke && <SmokeFault where="app" />}</>;
 }

@@ -1,5 +1,6 @@
 import type { AttachmentInfo, DeliverySummary, ModelPricing, StudioBridge, StudioState } from './studio-types.ts';
 import type { AppUpdate } from './app-updates.ts';
+import type { RendererErrorReport } from './diagnostics.ts';
 import type { HooksConfig } from '../core/hooks-config.ts';
 import type { CardRun, CardRunScope, CardRunSettings, CardSettings, PromptOverrideDetail, PromptOverrideItem, CardMeta, CardPieceImport, CardPreview, CardPieceSummary, CardCheckReport, CardComponentResult, CardComponentSummary, CardExportResult, CardImportPreview, CardImportReport, CardProjectView, CardStudioSnapshot, CardTaskInfo, CoverSource, NewCardComponent, NewCardProject, PlanMode, SourceImportReport, SourceRecord, StartCardConversation } from './card-studio/types.ts';
 export type PermissionMode = 'ask' | 'edit' | 'full';
@@ -206,7 +207,16 @@ export interface Bridge extends StudioBridge {
   testHook(event: string, command: string, timeout?: number, projectId?: string): Promise<{ decision: 'allow' | 'deny'; reason?: string; messages: string[] }>;
   exportData(): Promise<string | null>;
   openPath(path: string): Promise<void>;
-  window(action: 'minimize' | 'maximize' | 'close'): Promise<void>;
+  /** `reload` reloads the interface from the desktop process; the page itself cannot navigate. */
+  window(action: 'minimize' | 'maximize' | 'close' | 'reload'): Promise<void>;
+  /** Writes an interface error to <资料目录>/logs/renderer.log and returns the diagnostic text an error card copies. */
+  reportRendererError(report: RendererErrorReport): Promise<string>;
+  /** Opens <资料目录>/logs, creating it first. */
+  openLogFolder(): Promise<void>;
+  /** The system clipboard, written by the desktop process: the permission handler refuses the page's own clipboard writes. */
+  copyText(text: string): Promise<void>;
+  /** True only when the app was started with CARDWRIGHT_SMOKE_RENDER_FAULT=1, so the packaged smoke can make a page fail. */
+  smokeRenderFault?: boolean;
   // Card studio
   createCardProject(input: NewCardProject): Promise<{ card: CardProjectView; reused: boolean }>;
   defaultCardFolder(name: string): Promise<string>;

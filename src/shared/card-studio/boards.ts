@@ -20,9 +20,17 @@ export const BOARDS: readonly StudioBoard[] = [
 ];
 
 export const SECTION_IDS: readonly string[] = BOARDS.flatMap(board => board.sections.map(section => section.id));
+/** Where an imported world book entry no section takes is kept (世界书/未分类). It has no board section, no page and no prompt. */
+export const UNCLASSIFIED_SECTION = 'lore-other';
 
+/** The board of a section, or undefined: section ids also come from card data (checks, dispatches, conversations). */
+export function findBoard(sectionId: string): StudioBoard | undefined {
+  return BOARDS.find(item => item.sections.some(section => section.id === sectionId));
+}
+
+/** For ids the code itself names; an unknown one is a programming error. */
 export function boardOf(sectionId: string): StudioBoard {
-  const board = BOARDS.find(item => item.sections.some(section => section.id === sectionId));
+  const board = findBoard(sectionId);
   if (!board) throw new Error(`Unknown card studio section: ${sectionId}`);
   return board;
 }
@@ -31,9 +39,11 @@ export function sectionOf(sectionId: string): StudioSection | undefined {
   return BOARDS.flatMap(board => board.sections).find(section => section.id === sectionId);
 }
 
-/** 「世界书 · 人设」 for multi-section boards, 「规划」 for single-section boards. */
+/** 「世界书 · 人设」 for multi-section boards, 「规划」 for single-section boards. Never throws: 未分类 has its own label, any other unknown id is shown as it is. */
 export function sectionLabel(sectionId: string): string {
-  const board = boardOf(sectionId);
+  if (sectionId === UNCLASSIFIED_SECTION) return '世界书 · 未分类';
+  const board = findBoard(sectionId);
+  if (!board) return sectionId;
   return board.sections.length > 1 ? `${board.name} · ${sectionOf(sectionId)!.name}` : board.name;
 }
 

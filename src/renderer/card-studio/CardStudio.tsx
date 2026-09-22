@@ -2,7 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ArrowLeft, Copy, Minus, X } from 'lucide-react';
 import { useApp } from '../context';
 import { installClickSounds } from '../sound';
-import { boardOf, sectionLabel } from '../../shared/card-studio/boards';
+import { findBoard, sectionLabel } from '../../shared/card-studio/boards';
+import { pageLabel } from '../../shared/diagnostics';
+import { setDiagnosticPage } from '../diagnostics';
+import { ErrorBoundary, SmokeFault, smokeFaults } from '../ErrorBoundary';
 import type { CardProjectView } from '../../shared/card-studio/types';
 import { Library } from './Library';
 import { ProjectHome } from './ProjectHome';
@@ -70,7 +73,8 @@ export function CardStudio({ onExit }: { onExit: (origin: HTMLElement | null) =>
     view, draft, composerText,
     openLibrary: () => setView({ page: 'library' }),
     openProject: projectId => { setView({ page: 'project', projectId }); void api.refreshCardProject(projectId).catch(() => undefined); },
-    openSection: (projectId, sectionId, conversation) => setView({ page: 'section', projectId, sectionId, conversation }),
+    // A section id from card data that no board has (a hand-edited dispatch, a newer version's section) opens the project home.
+    openSection: (projectId, sectionId, conversation) => setView(findBoard(sectionId) ? { page: 'section', projectId, sectionId, conversation } : { page: 'project', projectId }),
     startDraft: (projectId, sectionId, value) => setDrafts(current => ({ ...current, [key(projectId, sectionId)]: value })),
     updateDraft: (projectId, sectionId, text) => setDrafts(current => { const existing = current[key(projectId, sectionId)]; return existing ? { ...current, [key(projectId, sectionId)]: { ...existing, text } } : current; }),
     clearDraft: (projectId, sectionId) => setDrafts(current => { const next = { ...current }; delete next[key(projectId, sectionId)]; return next; }),
@@ -79,8 +83,12 @@ export function CardStudio({ onExit }: { onExit: (origin: HTMLElement | null) =>
   }), [view, draft, composerText, api]);
 
   const card: CardProjectView | undefined = view.page === 'library' ? undefined : cards.find(item => item.projectId === view.projectId);
-  const light = previewColor ?? (view.page === 'section' ? boardOf(view.sectionId).color : DEFAULT_LIGHT);
+  const light = previewColor ?? (view.page === 'section' ? findBoard(view.sectionId)?.color ?? DEFAULT_LIGHT : DEFAULT_LIGHT);
   const pageKey = view.page === 'library' ? 'library' : view.page === 'project' ? `project:${view.projectId}` : `section:${view.projectId}:${view.sectionId}`;
+  // The page as the diagnostics name it: 「制卡工坊 · 拼装」, never the card's name.
+  const page = pageLabel(view.page === 'library' || !card ? { area: 'studio', page: 'library' } : view.page === 'project' ? { area: 'studio', page: 'project' } : { area: 'studio', page: 'section', sectionId: view.sectionId });
+  useEffect(() => { setDiagnosticPage(page); }, [page]);
+  const smoke = smokeFaults();
   return <StudioContext.Provider value={navigation}>
     <div ref={root} className="card-studio" style={{ '--board': light } as CSSProperties}>
       <header className="cs-top">
@@ -99,9 +107,13 @@ export function CardStudio({ onExit }: { onExit: (origin: HTMLElement | null) =>
         </span>
       </header>
       <div className="cs-page" key={pageKey}>
-        {view.page === 'library' || !card ? <Library />
-          : view.page === 'project' ? <ProjectHome card={card} />
-          : <SectionPage card={card} sectionId={view.sectionId} conversation={view.conversation} />}
+        {/* A page that fails shows its error card here; the top bar with 返回工作台 stays usable. */}
+        <ErrorBoundary kind="studio" page={page} t={t} onBack={navigation.openLibrary}>
+          {view.page === 'library' || !card ? <Library />
+            : view.page === 'project' ? <ProjectHome card={card} />
+            : <SectionPage card={card} sectionId={view.sectionId} conversation={view.conversation} />}
+          {smoke && <SmokeFault where="studio" />}
+        </ErrorBoundary>
       </div>
     </div>
   </StudioContext.Provider>;

@@ -2,9 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildCard, emptyCardEnvelope, isCardJson, isLorebookJson, splitCard } from '../src/shared/card-studio/card-file.ts';
+import { RE0_BOOK, RE0_CARD } from './reference-cards.ts';
 
-const RE0_CARD = 'E:/Cardwright/参考资料/完整的卡/json格式的卡/Re0：从零开始的异世界生活.json';
-const RE0_BOOK = 'E:/Cardwright/参考资料/世界书部分/完整的世界书/Re0：从零开始的异世界生活世界书.json';
 const readJson = (path: string) => JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, '')) as Record<string, unknown>;
 const exists = (path: string) => { try { readFileSync(path); return true; } catch { return false; } };
 

@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { ArrowRight, Zap } from 'lucide-react';
 import { useApp } from '../context';
-import { BOARDS, boardOf, sectionLabel, type StudioBoard } from '../../shared/card-studio/boards';
+import { BOARDS, findBoard, sectionLabel, type StudioBoard } from '../../shared/card-studio/boards';
 import { formatDispatch } from '../../shared/card-studio/dispatch';
 import { boardStats, dispatchCounts, nextStep, sectionState } from '../../shared/card-studio/progress';
 import { RUN_BOARDS, runIsOpen, runQueue } from '../../shared/card-studio/run';
@@ -59,7 +59,7 @@ export function ProjectHome({ card }: { card: CardProjectView }) {
       <header className="cs-desk-head">
         <span className="cs-kicker">DOSSIER · {t('Card project', '卡项目')}</span>
         <h1>{card.name}</h1>
-        <button type="button" className="cs-next" onClick={() => step.kind === 'dispatch' ? openDispatch(step.dispatch) : studio.openSection(card.projectId, step.sectionId)} onPointerEnter={() => studio.preview(boardOf(step.sectionId).color)} onPointerLeave={() => studio.preview(null)}>
+        <button type="button" className="cs-next" onClick={() => step.kind === 'dispatch' ? openDispatch(step.dispatch) : studio.openSection(card.projectId, step.sectionId)} onPointerEnter={() => studio.preview(findBoard(step.sectionId)?.color ?? null)} onPointerLeave={() => studio.preview(null)}>
           <span className="cs-next-label">{t('Next', '下一步')}</span>
           <b>{stepTitle}</b>
           {step.sectionId === 'lore-people' && people && <small>{t(`Written ${people.written} of ${people.total}`, `已写 ${people.written} / 名单 ${people.total}`)}</small>}

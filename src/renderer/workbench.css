@@ -235,3 +235,14 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; }
 .chapter-rail button:hover i { background: var(--accent); }
 .chapter-rail span { display: none; white-space: nowrap; font-size: 12px; }
 .chapter-rail button:hover span, .chapter-rail button:focus-visible span { display: inline; padding: 2px 8px; color: var(--text); background: var(--floating); border: 1px solid var(--line); border-radius: var(--radius-chip); box-shadow: var(--shadow-popover); }
+
+/* Error card (0.9.1): takes the place of a page that failed to render; the sidebar and the title bar stay usable. */
+.error-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; width: min(560px, calc(100% - 48px)); margin: 64px auto; padding: 18px 20px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--danger); border-radius: var(--radius); }
+.error-card > svg { margin-top: 2px; color: var(--danger); }
+.error-card h2 { margin: 0; font: 600 15px/1.4 var(--font-display); }
+.error-card-message { margin: 6px 0 0; overflow: hidden; font: 12.5px/1.6 var(--font-code); color: var(--muted); white-space: nowrap; text-overflow: ellipsis; }
+.error-card-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.error-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+/* The whole-window fallback has nothing left to sit on, so the card gets the canvas to itself. */
+.error-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; color: var(--text); background: var(--canvas); }
+.error-screen .error-card { margin: 0; }

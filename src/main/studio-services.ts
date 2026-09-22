@@ -33,7 +33,7 @@ export class StudioServices extends EventEmitter {
   constructor(readonly dataDir: string, private harness: Harness, readonly helperPath: string, imageToPng: (buffer: Buffer) => Buffer) {
     super();
     this.attachments = new AttachmentService(dataDir, imageToPng); this.checkpoints = new CheckpointService(dataDir); this.integrations = new SquadIntegrationService(dataDir, { checkpoints: this.checkpoints });
-    this.terminal = new TerminalService(helperPath); this.updates = new UpdateService(dataDir, '0.9.0');
+    this.terminal = new TerminalService(helperPath); this.updates = new UpdateService(dataDir, '0.9.1');
     let saved: Partial<StudioState> = {};
     try { saved = JSON.parse(readFileSync(join(dataDir, 'studio.json'), 'utf8')); if (!saved || typeof saved !== 'object' || Array.isArray(saved)) throw new Error('Invalid studio settings.'); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error('Unable to read studio.json. The original file has been preserved for recovery.', { cause: error }); }

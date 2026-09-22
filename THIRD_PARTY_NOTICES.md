@@ -12,7 +12,7 @@ Version 0.7.1 bundles two fonts from the official Google Fonts repository (githu
 
 ## Pi
 
-Source reviewed: E:/Cardwright/pi-0.85.1.
+Source reviewed: the pi 0.85.1 source release.
 Runtime packages: @earendil-works/pi-coding-agent, @earendil-works/pi-ai, @earendil-works/pi-agent-core, version 0.85.1.
 
 MIT License

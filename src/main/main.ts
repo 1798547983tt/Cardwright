@@ -1,6 +1,7 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, Notification, safeStorage, shell, Tray } from 'electron';
 import { join, resolve, sep } from 'node:path';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { homedir, release as osRelease, version as osVersion } from 'node:os';
 import { Harness } from './harness.ts';
 import { Vault } from './vault.ts';
 import { normalizeAvatar, prepareAvatar, previewAvatarSource } from './avatars.ts';
@@ -15,8 +16,12 @@ import { CardStudioService } from './card-studio.ts';
 import { handlePreviewScheme, PREVIEW_SCHEME, publishPreview, registerPreviewScheme } from './card-preview.ts';
 import { UpdateService } from './updates.ts';
 import { BrowserHost } from './browser.ts';
+import { appendRendererLog, LOG_FOLDER } from './renderer-log.ts';
+import { diagnosticText, windowsLabel } from '../shared/diagnostics.ts';
 
 const directory = __dirname;
+/** The packaged smoke's switch for one deliberate render error per page (0.9.1). Nothing inside the app turns it on. */
+const smokeRenderFault = process.env.CARDWRIGHT_SMOKE_RENDER_FAULT === '1';
 app.setName('Cardwright');
 registerPreviewScheme();
 if (process.env.CARDWRIGHT_DATA_DIR) app.setPath('userData', process.env.CARDWRIGHT_DATA_DIR);
@@ -49,6 +54,7 @@ async function initialize(): Promise<void> {
   setEcosystemApplicationRoot(app.getAppPath());
   if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows credential encryption is unavailable. Cardwright cannot save gateway credentials.');
   const dataDirectory = app.getPath('userData');
+  const logDirectory = join(dataDirectory, LOG_FOLDER);
   const vault = new Vault(dataDirectory, { encrypt: value => safeStorage.encryptString(value), decrypt: value => safeStorage.decryptString(value) });
   harness = new Harness(dataDirectory, join(directory, 'worker.mjs'), vault, { paused: true });
   const service = harness;
@@ -73,7 +79,7 @@ async function initialize(): Promise<void> {
   window = new BrowserWindow({
     width: 1512, height: 1000, minWidth: 900, minHeight: 640, frame: false, show: false,
     backgroundColor: '#0d0f12', title: 'Cardwright', icon: join(directory, 'icon.png'),
-    webPreferences: { preload: join(directory, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, spellcheck: false },
+    webPreferences: { preload: join(directory, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, spellcheck: false, ...(smokeRenderFault ? { additionalArguments: ['--cardwright-smoke-render-fault'] } : {}) },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', event => event.preventDefault());
@@ -244,7 +250,19 @@ async function initialize(): Promise<void> {
     if (action === 'minimize') window?.minimize();
     else if (action === 'maximize') { if (window?.isMaximized()) window.unmaximize(); else window?.maximize(); }
     else if (action === 'close') window?.close();
+    else if (action === 'reload') window?.webContents.reload();
   });
+  // Interface errors (0.9.1): the record is returned even when the log cannot be written, so the card can still copy it.
+  handle('reportRendererError', async report => {
+    const text = diagnosticText(report, { version: app.getVersion(), windows: windowsLabel(osVersion(), osRelease()), home: homedir(), at: new Date() });
+    await appendRendererLog(logDirectory, text).catch(() => undefined);
+    return text;
+  });
+  handle('openLogFolder', async () => {
+    await mkdir(logDirectory, { recursive: true });
+    const error = await shell.openPath(logDirectory); if (error) throw new Error(error);
+  });
+  handle('copyText', async text => { clipboard.writeText(String(text)); });
   handle('createCardProject', async input => cardStudio.create(input));
   handle('defaultCardFolder', async name => cardStudio.defaultFolder(String(name ?? '')));
   handle('pickCardFolder', async () => {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dispatchKey, formatDispatch, messageStartsDispatch, parseDispatches } from '../src/shared/card-studio/dispatch.ts';
-import { sectionFromTarget, sectionLabel, targetOf } from '../src/shared/card-studio/boards.ts';
+import { boardOf, findBoard, sectionFromTarget, sectionLabel, targetOf } from '../src/shared/card-studio/boards.ts';
 
 const fence = '```';
 const block = (target: string, title: string, requires: string, body: string) => `${fence}派单\n目标: ${target}\n标题: ${title}\n前置: ${requires}\n---\n${body}\n${fence}`;
@@ -48,6 +48,20 @@ test('maps single-section boards, spaced targets and unknown targets', () => {
   assert.equal(targetOf('greet'), '开场白');
   assert.equal(sectionLabel('regex-status'), '正则 · 状态栏');
   assert.equal(sectionLabel('plan'), '规划');
+});
+
+test('sectionLabel never throws: unclassified entries have a label of their own, other ids come back as they are', () => {
+  assert.equal(sectionLabel('lore-other'), '世界书 · 未分类');
+  assert.equal(sectionLabel('随便什么'), '随便什么');
+  assert.equal(sectionLabel(''), '');
+});
+
+test('findBoard looks a section up without throwing; boardOf still throws on an id no board has', () => {
+  assert.equal(findBoard('lore-people')?.id, 'lore');
+  assert.equal(findBoard('build')?.id, 'build');
+  assert.equal(findBoard('lore-other'), undefined, 'unclassified entries have no section page of their own');
+  assert.equal(findBoard('随便什么'), undefined);
+  assert.throws(() => boardOf('随便什么'), /Unknown card studio section: 随便什么/);
 });
 
 test('formats a dispatch that parses back to the same fields', () => {

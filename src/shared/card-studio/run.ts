@@ -1,4 +1,4 @@
-import { boardOf } from './boards.ts';
+import { findBoard } from './boards.ts';
 import { componentName } from './components.ts';
 import { stripMarkers } from './markers.ts';
 import { projectRelativePath } from './view.ts';
@@ -28,10 +28,13 @@ export function runIsOpen(run: Pick<CardRun, 'status'> | undefined): boolean {
   return !!run && (run.status === 'running' || run.status === 'pausing' || run.status === 'paused');
 }
 
-/** The dispatches a run will send: still unsent, aimed at a section of the chosen boards, in planning order. */
+/** The dispatches a run will send: still unsent, aimed at a section of the chosen boards, in planning order. A section no board has is skipped. */
 export function runQueue(dispatches: readonly CardDispatch[], scope: CardRunScope): string[] {
   const boards: readonly string[] = scope === 'all' ? RUN_BOARDS : [scope];
-  return dispatches.filter(item => item.status === 'todo' && item.sectionId && boards.includes(boardOf(item.sectionId).id)).map(item => item.id);
+  return dispatches.filter(item => {
+    const board = item.status === 'todo' && item.sectionId ? findBoard(item.sectionId) : undefined;
+    return !!board && boards.includes(board.id);
+  }).map(item => item.id);
 }
 
 /** The longest run of failures of one tool, in call order, when it reaches the limit. */

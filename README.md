@@ -18,7 +18,7 @@ Cardwright 是面向 Windows 本地项目的 Agent 工作台：连接你自己�
 
 ### 安装
 
-从 [Releases](../../releases) 下载 `Cardwright-Setup-0.9.0.exe` 并安装。安装包没有代码签名，Windows 首次运行会提示「未知发布者」，可以选择「更多信息 → 仍要运行」。卸载时保留你的资料目录。
+从 [Releases](../../releases) 下载 `Cardwright-Setup-0.9.1.exe` 并安装。安装包没有代码签名，Windows 首次运行会提示「未知发布者」，可以选择「更多信息 → 仍要运行」。卸载时保留你的资料目录。
 
 也可以自己构建：
 
@@ -71,6 +71,8 @@ node scripts/package.mjs      # 便携版输出到 release/<版本>/Cardwright-w
 
 资料默认存在 `%APPDATA%\Cardwright`：设置、会话、检查点、附件和凭据。凭据用 Windows 的 `safeStorage` 加密。升级时如果数据结构变化，会先在 `backups/` 留一份原始备份。
 
+界面某一页出错时，那一页换成错误卡片，可以一键复制诊断信息；同一条记录也写进 `logs/renderer.log`，不含卡和对话的内容。「工作室设置 → 数据与导出」里可以打开日志文件夹，反馈问题时附上它。
+
 ### 许可
 
 MIT，见 [LICENSE](LICENSE)。第三方组件的许可声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
@@ -91,7 +93,7 @@ The interface stays quiet, deterministic rules are executed by the program, and 
 
 ### Install
 
-Download `Cardwright-Setup-0.9.0.exe` from [Releases](../../releases). The installer is not code-signed, so Windows shows an "unknown publisher" warning the first time; choose "More info → Run anyway". Uninstalling keeps your data directory.
+Download `Cardwright-Setup-0.9.1.exe` from [Releases](../../releases). The installer is not code-signed, so Windows shows an "unknown publisher" warning the first time; choose "More info → Run anyway". Uninstalling keeps your data directory.
 
 Or build it yourself:
 
@@ -143,6 +145,8 @@ Enter from the bottom of the sidebar. A card project is a local folder and appea
 ### Data
 
 Everything lives in `%APPDATA%\Cardwright`: settings, sessions, checkpoints, attachments and credentials. Credentials are encrypted with Windows `safeStorage`. If the data shape changes across versions, the original file is copied into `backups/` first.
+
+When a page of the interface fails, an error card takes its place and copies the diagnostics in one click; the same record goes into `logs/renderer.log`, without card or conversation content. Studio settings → Data & export opens the log folder; attach it when you report a problem.
 
 ### Licence
 

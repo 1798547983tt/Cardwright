@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { evaluateSchema, parseInitialVariables, schemaSource, validateInSandbox, validateInitialVariables } from '../src/core/card-studio/variables.ts';
+import { RE0_CARD } from './reference-cards.ts';
 
-const RE0_CARD = 'E:/Cardwright/参考资料/完整的卡/json格式的卡/Re0：从零开始的异世界生活.json';
 const NL = String.fromCharCode(10);
 const sampleSchema = [
   "import { registerMvuSchema } from 'https://testingcf.jsdelivr.net/gh/StageDog/tavern_resource/dist/util/mvu_zod.js';",

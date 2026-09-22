@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { readCardFile } from './card-project.ts';
 import { buildCardFromProject, readProject, WRAPPED_SECTIONS, type LoreComponent, type ProjectComponents } from './components.ts';
 import { splitCard } from '../../shared/card-studio/card-file.ts';
+import { UNCLASSIFIED_SECTION } from '../../shared/card-studio/boards.ts';
 import { checkRegexParams, compileRegex, regexHits, sampleOutputFrom } from './regex.ts';
 import { parseInitialVariables, validateInSandbox, type SandboxOptions } from './variables.ts';
 
@@ -385,6 +386,8 @@ export async function runChecks(root: string, options: { sandbox?: SandboxOption
     checkKeys(entry, findings);
     if (entry.params.constant && !entry.params.disable) { constantChars += entry.content.length; constantTokens += estimateTokens(entry.content); }
   }
+  const unclassified = sections[UNCLASSIFIED_SECTION] ?? 0;
+  if (unclassified) findings.push({ level: 'info', code: 'lore-unclassified', message: `有 ${unclassified} 条世界书条目没有归入任何分区（世界书/未分类），会照常导出。` });
   checkCollisions(project.lore, findings);
   await checkTemplates(root, project, findings);
   checkPlotIndex(project, findings);
