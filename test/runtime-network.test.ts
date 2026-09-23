@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createServer, type RequestListener } from 'node:http';
+import v8 from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { brokeredFetch, withNetworkPolicy } from '../src/runtime/network-broker.ts';
 
 async function endpoint(handler: RequestListener) {
@@ -55,5 +57,24 @@ test('concurrent worker policies remain isolated in async scopes', async () => {
     assert.equal(allowed.status, 'fulfilled'); assert.equal(denied.status, 'rejected');
     if (allowed.status === 'fulfilled') assert.equal(await allowed.value.text(), 'isolated');
     assert.equal(await (await native(server.url)).text(), 'isolated');
+  } finally { await server.close(); }
+});
+
+test('an abort still reaches a brokered stream after a garbage collection', async () => {
+  // undici makes a cloned Request's signal follow the original only through a weak reference, and the broker's own
+  // Request objects are dropped once the response arrives. After a collection, withdrawing a turn mid-stream never
+  // reached the model request, and the turn ran on until the worker was killed.
+  v8.setFlagsFromString('--expose-gc');
+  const gc = runInNewContext('gc') as () => void;
+  const server = await endpoint((_request, response) => { response.writeHead(200, { 'content-type': 'text/event-stream' }); response.write('data: first\n\n'); });
+  try {
+    const controller = new AbortController();
+    const response = await brokeredFetch(fetch, { origins: () => [server.url], approve: async () => false }, server.url, { signal: controller.signal });
+    const reader = response.body!.getReader();
+    await reader.read();
+    for (let round = 0; round < 3; round++) { gc(); await new Promise(resolve => setTimeout(resolve, 20)); }
+    controller.abort();
+    const outcome = await Promise.race([reader.read().then(() => 'still streaming', () => 'stopped'), new Promise(resolve => setTimeout(resolve, 2000, 'still streaming'))]);
+    assert.equal(outcome, 'stopped');
   } finally { await server.close(); }
 });

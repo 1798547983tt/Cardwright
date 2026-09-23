@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { AppSnapshot, Bridge } from '../shared/types.ts';
+import type { PetTarget } from '../shared/pets.ts';
 import { studioBridge } from './studio-preload.ts';
 import { applyAppUpdate, appUpdateRevision, type AppUpdate } from '../shared/app-updates.ts';
 
@@ -36,6 +37,11 @@ const bridge: Bridge = {
   subscribe: listener => {
     listeners.add(listener); return () => { listeners.delete(listener); };
   },
+  onOpen: listener => {
+    const handler = (_event: unknown, target: PetTarget) => listener(target);
+    ipcRenderer.on('cardwright:open', handler);
+    return () => { ipcRenderer.removeListener('cardwright:open', handler); };
+  },
   subscribeUpdates: listener => {
     updateListeners.add(listener);
     if (current) listener({ type: 'snapshot', snapshot: current, revision: appUpdateRevision(current) });
@@ -61,17 +67,19 @@ const bridge: Bridge = {
   saveWebdav: (config, password) => invoke('saveWebdav', config, password), previewBackup: source => invoke('previewBackup', source), pushBackup: () => invoke('pushBackup'), pullBackup: () => invoke('pullBackup'),
   openExternal: url => invoke('openExternal', url),
   saveGateway: (gateway, key) => invoke('saveGateway', gateway, key), removeGateway: id => invoke('removeGateway', id),
-  testGateway: id => invoke('testGateway', id), diff: id => invoke('diff', id), mergeTask: id => invoke('mergeTask', id),
+  testGateway: id => invoke('testGateway', id), selfTestGateway: (input, key) => invoke('selfTestGateway', input, key), diff: id => invoke('diff', id), mergeTask: id => invoke('mergeTask', id),
   createSchedule: input => invoke('createSchedule', input), updateSchedule: (id, changes) => invoke('updateSchedule', id, changes),
   pickSkillFolder: () => invoke('pickSkillFolder'), refreshSkills: () => invoke('refreshSkills'),
   exportData: () => invoke('exportData'), openPath: path => invoke('openPath', path), window: action => invoke('window', action),
   reportRendererError: report => invoke('reportRendererError', report), openLogFolder: () => invoke('openLogFolder'), copyText: text => invoke('copyText', text),
+  appearance: () => invoke('appearance'), themeBackground: id => invoke('themeBackground', id), petSprite: id => invoke('petSprite', id), petNotice: id => invoke('petNotice', id),
+  installPet: from => invoke('installPet', from), openAppearanceFolder: kind => invoke('openAppearanceFolder', kind),
   // Only the desktop process can switch this on, and only for a start with CARDWRIGHT_SMOKE_RENDER_FAULT=1.
   ...(process.argv.includes('--cardwright-smoke-render-fault') ? { smokeRenderFault: true } : {}),
   createCardProject: input => invoke('createCardProject', input), defaultCardFolder: name => invoke('defaultCardFolder', name), pickCardFolder: () => invoke('pickCardFolder'),
   removeCardProject: id => invoke('removeCardProject', id), refreshCardProject: id => invoke('refreshCardProject', id), openCardFolder: (id, path) => invoke('openCardFolder', id, path),
   startCardConversation: input => invoke('startCardConversation', input), markDispatchDone: (id, dispatchId) => invoke('markDispatchDone', id, dispatchId), saveCardSettings: (id, changes) => invoke('saveCardSettings', id, changes), cardPromptOverrides: () => invoke('cardPromptOverrides'), readCardPromptOverride: id => invoke('readCardPromptOverride', id), saveCardPromptOverride: (id, text) => invoke('saveCardPromptOverride', id, text), restoreCardPromptOverride: id => invoke('restoreCardPromptOverride', id),
-  setCardConversationWeb: (taskId, enabled) => invoke('setCardConversationWeb', taskId, enabled), requestCardHandoff: taskId => invoke('requestCardHandoff', taskId), consumeCardHandoff: taskId => invoke('consumeCardHandoff', taskId), startCardRun: (id, scope, settings) => invoke('startCardRun', id, scope, settings), pauseCardRun: id => invoke('pauseCardRun', id), resumeCardRun: id => invoke('resumeCardRun', id), stopCardRun: id => invoke('stopCardRun', id), dismissCardRun: id => invoke('dismissCardRun', id), readCardPrompt: (id, sectionId, mode) => invoke('readCardPrompt', id, sectionId, mode),
+  setCardConversationWeb: (taskId, enabled) => invoke('setCardConversationWeb', taskId, enabled), requestCardHandoff: taskId => invoke('requestCardHandoff', taskId), consumeCardHandoff: taskId => invoke('consumeCardHandoff', taskId), withdrawCardMessage: (taskId, messageId) => invoke('withdrawCardMessage', taskId, messageId), startCardRun: (id, scope, settings) => invoke('startCardRun', id, scope, settings), pauseCardRun: id => invoke('pauseCardRun', id), resumeCardRun: id => invoke('resumeCardRun', id), stopCardRun: id => invoke('stopCardRun', id), dismissCardRun: id => invoke('dismissCardRun', id), readCardPrompt: (id, sectionId, mode) => invoke('readCardPrompt', id, sectionId, mode),
   pickCardSources: id => invoke('pickCardSources', id), importCardSources: (id, paths) => invoke('importCardSources', id, paths),
   resplitCardSource: (id, name, mode) => invoke('resplitCardSource', id, name, mode), readCardSources: id => invoke('readCardSources', id),
   pickCardImportFile: () => invoke('pickCardImportFile'),

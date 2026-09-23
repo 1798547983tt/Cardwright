@@ -29,6 +29,15 @@
   --font-ui: var(--cs-sans); --font-chat: var(--cs-sans);
 }
 
+/* 主题 (ADR 0018, Q21): the dossier keeps its skeleton and its ink. Under a theme with an accent of its own (红粉白, a
+   theme pack) only the gold leans towards that accent; the board light does the same in CardStudio.tsx. */
+html[data-studio-tint] :is(.card-studio, .studio-modal, .studio-transition, .studio-entry) {
+  --cs-gold: color-mix(in srgb, #9c7f4f 55%, var(--theme-accent));
+  --cs-gold-2: color-mix(in srgb, #c2a36b 55%, var(--theme-accent));
+  --cs-gold-line: color-mix(in srgb, var(--cs-gold) 55%, transparent);
+  --cs-gold-faint: color-mix(in srgb, var(--cs-gold) 20%, transparent);
+}
+
 /* ---------- shell ---------- */
 /* overflow: clip, not hidden: the glow below is wider than the window, and a hidden box can still be scrolled by focus()
    or scrollIntoView() — opening a dialog during the entrance transition used to shift the whole studio 144px sideways. */

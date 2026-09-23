@@ -110,6 +110,21 @@ test('each preview document carries its own policy: no network, and scripts only
   for (const document of [frontend, text]) assert.doesNotMatch(document.csp, /connect-src|https?:/, 'nothing reaches the network');
 });
 
+// Handoff §5.2: without the fence a replacement is message text, and SillyTavern sanitizes it (knowledge base 30, §5):
+// classes get custom-, the replacement's own <style> is scoped to .mes_text, scripts and unknown tags go. The preview
+// shows it the same way, so an unfenced front-end looks as broken here as it will there.
+test('message text is sanitized the way SillyTavern sanitizes it before it is shown', () => {
+  const text = previewDocument({ kind: 'html', html: '<section class="cw-update fa-star"><style>:root { --ink: red; } .cw-update summary { color: var(--ink); }</style><summary>回执</summary><script>go()</script></section>' }, 'n0nce');
+  const body = text.html.slice(text.html.indexOf('<body>'));
+  const template = /<template id="cardwright-message">([\s\S]*?)<\/template>/.exec(body);
+  assert.ok(template, 'the message waits in an inert template, where its styles do not apply and its scripts do not run');
+  assert.ok(template[1].includes('<section class="cw-update fa-star">'));
+  assert.match(body, /<div class="mes_text"><\/div>/, 'nothing reaches the message box unsanitized');
+  const sanitizer = [...body.matchAll(/<script nonce="n0nce">([\s\S]*?)<\/script>/g)].map(match => match[1]).join('\n');
+  for (const rule of ["'custom-'", "'fa-'", "'note-'", "'monospace'", "'.mes_text '", 'CSSStyleSheet', 'HTMLUnknownElement'])
+    assert.ok(sanitizer.includes(rule), `the sanitizer handles ${rule}`);
+});
+
 test("the window's own policy admits frames from the preview scheme only, and still runs no inline script", async () => {
   const page = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const policy = /Content-Security-Policy" content="([^"]+)"/.exec(page)?.[1] ?? '';

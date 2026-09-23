@@ -2,6 +2,7 @@ import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { sha256String, stableJson } from 'pi-webdav-sync/src/manifest.ts';
 import { validateGatewayEffort } from '../shared/effort.ts';
+import { BUILT_IN_THEMES, THEME_ID } from '../shared/themes.ts';
 import { gatewayModels, normalizeGatewayModels, resolveGatewayModel } from '../shared/gateway-models.ts';
 import type { AgentRole, AppSnapshot, BackupPreview, Gateway, McpServerConfig, MemoryItem, Preferences, SearchConfig } from '../shared/types.ts';
 
@@ -49,6 +50,8 @@ function flag(value: unknown, label: string): boolean { if (typeof value !== 'bo
 function number(value: unknown, min: number, max: number, label: string): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) throw new Error(`Invalid backup ${label}.`); return value;
 }
+/** 跟随系统, a built-in theme or a theme pack's id; a pack missing on this computer keeps the current theme on restore. */
+function themeId(value: unknown): string { if (typeof value !== 'string' || !(value === 'system' || BUILT_IN_THEMES.some(theme => theme.id === value) || THEME_ID.test(value))) throw new Error('Invalid backup theme.'); return value; }
 function choice<T extends string>(value: unknown, values: readonly T[], label: string): T { if (!values.includes(value as T)) throw new Error(`Invalid backup ${label}.`); return value as T; }
 function list(value: unknown, max: number, label: string): unknown[] { if (!Array.isArray(value) || value.length > max) throw new Error(`Invalid backup ${label}.`); return value; }
 function identifier(value: unknown, label: string): string {
@@ -73,7 +76,7 @@ export function validateBackupData(input: unknown): BackupData {
   if (data.version !== 1) throw new Error('Unsupported backup format version.');
   const pref = object(data.preferences, 'preferences'); keys(pref, ['name', 'theme', 'language', 'font', 'reducedMotion', 'notifications', 'instructions', 'maxConcurrent', 'defaultGatewayId', 'defaultModelId', 'defaultContextWindow', 'defaultThinking'], 'preferences');
   const preferences: SafePreferences = {
-    name: text(pref.name, 100, 'name'), theme: choice(pref.theme, ['system', 'light', 'dark'], 'theme'), language: choice(pref.language, ['en', 'zh'], 'language'),
+    name: text(pref.name, 100, 'name'), theme: themeId(pref.theme), language: choice(pref.language, ['en', 'zh'], 'language'),
     font: choice(pref.font, ['sans', 'serif', 'mono'], 'font'), reducedMotion: flag(pref.reducedMotion, 'reduced motion'), notifications: flag(pref.notifications, 'notifications'),
     instructions: text(pref.instructions, 100_000, 'instructions'), maxConcurrent: number(pref.maxConcurrent, 1, 32, 'concurrency'),
     defaultGatewayId: text(pref.defaultGatewayId, 100, 'default model'), defaultThinking: choice(pref.defaultThinking, ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'], 'thinking'),

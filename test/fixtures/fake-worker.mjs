@@ -1,7 +1,9 @@
 // IPC-only test fixture. It never imports a model provider or makes network requests.
-import { rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 let init;
+/** A worker the harness has to stop the hard way: it never reports done, so nothing of a new session was written. */
+let exitOnCancel = false;
 /** A slow turn keeps running for a moment; follow-up messages that arrive meanwhile are handled before it ends. */
 let slow = false;
 const followUps = [];
@@ -21,6 +23,13 @@ function reply(text) {
 function finish(text = 'Fixture completed.') {
   reply(text);
   send({ type: 'done', sessionFile: `${init.sessionDir}/fixture.jsonl` });
+}
+/** The model is still writing its first reply: pi holds the user entry in memory and writes the session only at the reply's end. */
+function unsaved(messageId) {
+  exitOnCancel = true;
+  event({ type: 'session_entry', entryId: 'fixture-unsaved-entry', messageId });
+  event({ type: 'message_start', message: { role: 'assistant' } });
+  event({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: '正在写……' } });
 }
 function toolRecord(name, path, failed = false) {
   const id = `${name}-${Math.random()}`;
@@ -43,6 +52,7 @@ function runScript(command) {
   else if (command.includes('RUN:toolfail')) { for (let index = 0; index < 3; index++) toolRecord('powershell', undefined, true); finish('命令一直失败。'); }
   else if (command.includes('RUN:big')) { event({ type: 'context_usage', tokens: 150000, window: 200000, percent: 75 }); finish('已交付。'); }
   else if (command.includes('RUN:hold')) event({ type: 'tool_execution_start', toolCallId: 'holding-tool', toolName: 'fixture_hold', args: {} });
+  else if (command.includes('RUN:unsaved')) unsaved(turnId);
   else if (command.includes('RUN:error')) send({ type: 'error', message: '网关返回 502。' });
   else if (command.includes('RUN:approve')) {
     approval = `${init.taskId}-approve`;
@@ -62,8 +72,14 @@ function runScript(command) {
 process.on('message', message => {
   if (message.type === 'init') {
     init = message;
-    send({ type: 'ready' });
+    // As the real worker (src/runtime/conversation-history.ts): a cursor must point into the saved session file.
+    if (typeof init.sessionLeafId === 'string' && !(init.sessionFile && existsSync(init.sessionFile) && readFileSync(init.sessionFile, 'utf8').includes(`"id":"${init.sessionLeafId}"`))) {
+      send({ type: 'error', message: 'The selected conversation version is missing a saved entry.' });
+      return;
+    }
+    send({ type: 'ready', sessionFile: init.sessionFile ?? `${init.sessionDir}/fixture.jsonl` });
   } else if (message.type === 'cancel') {
+    if (exitOnCancel) process.exit(0);
     event({ type: 'run_cancelled' });
     send({ type: 'done' });
   } else if (message.type === 'prompt') {
@@ -85,7 +101,8 @@ process.on('message', message => {
     }
     else if (command === 'hold') {
       event({ type: 'tool_execution_start', toolCallId: 'holding-tool', toolName: 'fixture_hold', args: {} });
-    } else if (command === 'error') {
+    } else if (command === 'unsaved') unsaved(message.messageId);
+    else if (command === 'error') {
       event({ type: 'tool_execution_start', toolCallId: 'failing-tool', toolName: 'fixture_error', args: {} });
       send({ type: 'error', message: `Fixture failed: ${init.apiKey}` });
     } else if (command === 'crash') {

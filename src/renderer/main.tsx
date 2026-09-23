@@ -12,6 +12,7 @@ import './pages.css';
 import './motion.css';
 import './card-studio/card-studio.css';
 import './card-studio/card-studio-section.css';
+import './appearance.css';
 
 installErrorLogging();
 // The page itself cannot navigate, so 重新加载 asks the desktop process to reload the window.

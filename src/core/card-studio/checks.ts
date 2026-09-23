@@ -5,8 +5,9 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readCardFile } from './card-project.ts';
-import { buildCardFromProject, readProject, WRAPPED_SECTIONS, type LoreComponent, type ProjectComponents } from './components.ts';
+import { buildCardFromProject, readProject, regexReplacement, WRAPPED_SECTIONS, type LoreComponent, type ProjectComponents } from './components.ts';
 import { splitCard } from '../../shared/card-studio/card-file.ts';
+import { frontendDocument, frontendFenceProblem, frontendQuality } from '../../shared/card-studio/frontend.ts';
 import { UNCLASSIFIED_SECTION } from '../../shared/card-studio/boards.ts';
 import { checkRegexParams, compileRegex, regexHits, sampleOutputFrom } from './regex.ts';
 import { parseInitialVariables, validateInSandbox, type SandboxOptions } from './variables.ts';
@@ -267,6 +268,14 @@ function checkRegexComponents(project: ProjectComponents, sample: string | null,
     }
     if (!item.body.trim() && item.params.promptOnly !== true) {
       findings.push({ level: 'warning', code: 'regex-empty', path: item.bodyPath, message: `「${label}」的替换内容是空的。只改提示词的正则才用空替换。` });
+    }
+    // 前端围栏 and 前端质量检查: judged on what the export writes, after the app has fenced the bare documents.
+    if (item.params.promptOnly !== true) {
+      const replacement = regexReplacement(item);
+      const fence = frontendFenceProblem(replacement);
+      if (fence) findings.push({ level: 'error', code: 'frontend-fence', path: item.bodyPath, message: `「${label}」${fence}` });
+      const document = frontendDocument(replacement);
+      if (document) for (const finding of frontendQuality(document)) findings.push({ ...finding, path: item.bodyPath, message: `「${label}」${finding.message}` });
     }
   }
 }

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowRight, Check, ChevronRight, Copy, LoaderCircle, MessageSquarePlus, RotateCcw, Terminal } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, Copy, LoaderCircle, MessageSquarePlus, Pencil, RotateCcw, Terminal, Undo2 } from 'lucide-react';
 import { useApp } from '../context';
 import { Modal } from '../primitives';
 import { groupConversation, ToolRecord } from '../Conversation';
@@ -11,8 +11,11 @@ import { sectionLabel } from '../../shared/card-studio/boards';
 import { dispatchKey, formatDispatch, type DispatchParse } from '../../shared/card-studio/dispatch';
 import { handoffOffer, type Handoff } from '../../shared/card-studio/handoff';
 import { ACCEPT_ALL_TEXT, isHandoffRequest, isKickoff, segmentReply, stripMarkers } from '../../shared/card-studio/markers';
-import { dispatchDone, nextDispatch, turnWrites } from '../../shared/card-studio/view';
-import { tokenCount, useCardActions } from './actions';
+import { dispatchDone, messageAction, nextDispatch, turnWrites } from '../../shared/card-studio/view';
+import { runOwns } from '../../shared/card-studio/run';
+import { RevisionBar } from '../RevisionBar';
+import { CodeBlock } from '../ReadingAids';
+import { tokenCount, undoTurnWrites, useCardActions } from './actions';
 import type { CardProjectView } from '../../shared/card-studio/types';
 import type { ChatMessage, Task } from '../../shared/types';
 import { useStudio } from './CardStudio';
@@ -24,12 +27,13 @@ function Markdown({ text }: { text: string }) {
   const { api, run } = useApp();
   return useMemo(() => <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ children, href }) => href && /^https?:\/\//i.test(href)
     ? <a href={href} onClick={event => { event.preventDefault(); void run(() => api.openExternal(href)); }}>{children}</a>
-    : <span>{children}</span> }}>{text}</ReactMarkdown>, [text, api, run]);
+    : <span>{children}</span>,
+    pre: ({ children }) => <CodeBlock className="is-studio">{children}</CodeBlock> }}>{text}</ReactMarkdown>, [text, api, run]);
 }
 
 /** A dispatch in a reply: 复制 copies it; 去这个分区 opens a draft in the target section. Neither sends anything. */
 export function DispatchCard({ dispatch, card }: { dispatch: DispatchParse; card: CardProjectView }) {
-  const { t, notify } = useApp();
+  const { api, t, notify } = useApp();
   const studio = useStudio();
   if ('error' in dispatch) return <div className="cs-dispatch is-broken"><header><span className="cs-dispatch-no">{t('Dispatch', '派单')}</span><em>{dispatch.error}</em></header><pre>{dispatch.raw}</pre></div>;
   const parsed = dispatch;
@@ -53,7 +57,7 @@ export function DispatchCard({ dispatch, card }: { dispatch: DispatchParse; card
     {dispatch.requires && <p className="cs-dispatch-requires">{t('Requires', '前置')}：{dispatch.requires}</p>}
     <div className="cs-dispatch-body">{dispatch.body}</div>
     <footer>
-      <button type="button" className="cs-btn is-small" onClick={() => void navigator.clipboard.writeText(formatDispatch(dispatch)).then(() => notify(t('Dispatch copied', '已复制派单')), () => notify(t('Could not copy', '复制失败')))}><Copy size={13} />{t('Copy', '复制')}</button>
+      <button type="button" className="cs-btn is-small" onClick={() => void api.copyText(formatDispatch(dispatch)).then(() => notify(t('Dispatch copied', '已复制派单')), () => notify(t('Could not copy', '复制失败')))}><Copy size={13} />{t('Copy', '复制')}</button>
       <button type="button" className="cs-btn is-small is-primary" disabled={!dispatch.sectionId} onClick={go}>{t('Go to this section', '去这个分区')}<ArrowRight size={13} /></button>
     </footer>
   </article>;
@@ -99,17 +103,70 @@ function ConversationEnd({ task, card }: { task: Task; card: CardProjectView }) 
   </div>;
 }
 
-/** `started` marks the first message of a conversation that began with the kickoff, whose line an override may have changed. */
-function UserMessage({ message, started }: { message: ChatMessage; started?: 'scratch' | 'refine' }) {
-  const { t } = useApp();
+/**
+ * A message the user sent. `started` marks the first message of a conversation that began with the kickoff, whose line an
+ * override may have changed. 撤回 (Q16): while its turn runs, the latest message is withdrawn; once written, a message is
+ * edited into a new conversation version. The unsent draft is withdrawn from the composer.
+ */
+function UserMessage({ message, started, task, card, editSignal }: { message: ChatMessage; started?: 'scratch' | 'refine'; task: Task; card: CardProjectView; editSignal?: number }) {
+  const { api, t, run, notify } = useApp();
+  const studio = useStudio();
+  const [editing, setEditing] = useState(false); const [draft, setDraft] = useState(message.text);
+  const [asking, setAsking] = useState(false); const [busy, setBusy] = useState(false);
+  // A double Esc in the thread opens the latest written message for editing, as in the workbench.
+  useEffect(() => { if (editSignal && messageAction(task, message.id, { runOwned: runOwns(card.run, task.id) }) === 'edit') { setDraft(message.text); setEditing(true); } }, [editSignal]);
   const kickoff = started ?? isKickoff(message.text);
   if (isHandoffRequest(message.text)) return <div className="cs-kickoff is-handoff">{t('Asked the AI for a handoff summary', '已请 AI 写交接摘要')}<time>{clock(message.at)}</time></div>;
   if (kickoff) return <div className="cs-kickoff">{kickoff === 'refine' ? t('Planning started · refine this card', '已开始规划 · 完善优化卡') : t('Planning started · start from scratch', '已开始规划 · 从零开始制卡')}<time>{clock(message.at)}</time></div>;
-  return <article className="cs-msg is-user">
-    <header><b>{t('You', '你')}</b>{message.pending && <em>{t('Queued', '等待发送')}</em>}<time>{clock(message.at)}</time></header>
-    {segmentReply(message.text).map((segment, index) => segment.type === 'markdown' ? <div key={index} className="cs-user-text">{segment.text}</div>
+  const action = messageAction(task, message.id, { runOwned: runOwns(card.run, task.id) });
+  const writes = turnWrites(task.tools, message.turnId || message.id, card.path);
+
+  async function withdraw(undoWrites: boolean) {
+    setBusy(true);
+    const result = await run(() => api.withdrawCardMessage(task.id, message.id));
+    if (result) {
+      const waiting = studio.composerText(task.id).trim();
+      studio.setComposerText(task.id, waiting ? `${result.text}\n\n${waiting}` : result.text);
+      const undone = undoWrites ? await run(() => undoTurnWrites(api, t, task.id, result.turnId)) : undefined;
+      notify([t('Withdrawn; the text is back in the composer.', '已撤回，文字放回了输入框。'), undone].filter(Boolean).join(' '));
+    }
+    setBusy(false); setAsking(false);
+  }
+  async function regenerate() {
+    const text = draft.trim();
+    if (!text || busy) return;
+    setBusy(true);
+    const done = await run(async () => { await api.regenerate(task.id, message.id, text); return true; });
+    setBusy(false);
+    if (done) setEditing(false);
+  }
+
+  return <article className={`cs-msg is-user ${editing ? 'is-editing' : ''}`} data-message-id={message.id}>
+    <header><b>{t('You', '你')}</b>{message.pending && <em>{t('Queued', '等待发送')}</em>}<time>{clock(message.at)}</time>
+      {!editing && <span className="cs-msg-actions">
+        <button type="button" className="cs-icon" aria-label={t('Copy message', '复制消息')} title={t('Copy message', '复制消息')} onClick={() => void run(() => api.copyText(message.text), t('Message copied', '消息已复制'))}><Copy size={13} /></button>
+        {!action ? null : action === 'withdraw'
+          ? <button type="button" className="cs-icon" aria-label={t('Withdraw this message', '撤回这条消息')} title={t('Withdraw: stop this turn and put the text back', '撤回：停下这一轮，文字放回输入框')} disabled={busy} onClick={() => setAsking(true)}><Undo2 size={13} /></button>
+          : <button type="button" className="cs-icon" aria-label={t('Edit message & regenerate', '编辑消息并重新生成')} title={t('Edit message & regenerate', '编辑消息并重新生成')} disabled={busy} onClick={() => { setDraft(message.text); setEditing(true); }}><Pencil size={13} /></button>}
+      </span>}
+    </header>
+    {editing ? <form className="cs-edit" onSubmit={event => { event.preventDefault(); void regenerate(); }}>
+      <textarea aria-label={t('Edit your message', '编辑你的消息')} autoFocus value={draft} disabled={busy} rows={Math.min(12, Math.max(3, draft.split('\n').length))} onChange={event => setDraft(event.target.value)}
+        onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setEditing(false); } if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void regenerate(); } }} />
+      <p className="cs-note">{t('Creates a new conversation version from this message. Files already written stay as they are; use 撤销本轮 to take them back.', '从这条消息开一个新的对话版本。已经写进卡项目的文件保持现状，要退回用【撤销本轮】。')}</p>
+      <div className="cs-edit-actions"><span>Ctrl Enter</span><button type="button" className="cs-btn is-small" disabled={busy} onClick={() => setEditing(false)}>{t('Cancel', '取消')}</button><button className="cs-btn is-small is-primary" disabled={busy || !draft.trim()}>{busy ? <LoaderCircle size={13} className="spinning" /> : null}{t('Save & regenerate', '保存并重新生成')}</button></div>
+    </form> : segmentReply(message.text).map((segment, index) => segment.type === 'markdown' ? <div key={index} className="cs-user-text">{segment.text}</div>
       : segment.type === 'dispatch' ? <div key={index} className="cs-sent-block">{t('Dispatch sent', '已发送派单')}：{'error' in segment.dispatch ? segment.dispatch.error : `${segment.dispatch.sectionId ? sectionLabel(segment.dispatch.sectionId) : segment.dispatch.target} · ${segment.dispatch.title}`}</div>
       : <div key={index} className="cs-sent-block">{t('Handoff summary sent', '已发送交接摘要')}{segment.handoff ? `：${segment.handoff.first}` : ''}</div>)}
+    {asking && <Modal title={t('Withdraw this message?', '撤回这条消息？')} className="studio-modal small-modal" onClose={() => { if (!busy) setAsking(false); }}>
+      <p className="modal-intro">{t('The AI stops this turn. The message and this turn’s reply leave the conversation, and the text goes back to the composer.', 'AI 会停下这一轮，这条消息和这一轮的回复从对话里移走，文字放回输入框。')}{message.dispatchId ? t(' The dispatch it sent goes back to Not sent.', '它发出的派单回到「未派」。') : ''}</p>
+      {writes.length > 0 && <p className="modal-intro">{t(`This turn has already written ${writes.length} components: ${writes.map(item => item.name).join(', ')}. Withdrawing does not take files back by itself.`, `这一轮已经写入了 ${writes.length} 个组件：${writes.map(item => item.name).join('、')}。撤回不会自动退回文件。`)}</p>}
+      <div className="modal-actions">
+        <button type="button" className="cs-btn" disabled={busy} onClick={() => setAsking(false)}>{t('Cancel', '取消')}</button>
+        {writes.length > 0 && <button type="button" className="cs-btn" disabled={busy} onClick={() => void withdraw(true)}>{t('Withdraw and undo this turn', '撤回并撤销本轮写入')}</button>}
+        <button type="button" className="cs-btn is-danger" disabled={busy} onClick={() => void withdraw(false)}>{busy ? <LoaderCircle size={13} className="spinning" /> : <Undo2 size={13} />}{t('Withdraw', '撤回')}</button>
+      </div>
+    </Modal>}
   </article>;
 }
 
@@ -118,20 +175,7 @@ function WrittenThisTurn({ task, turn, card, canUndo }: { task: Task; turn: Turn
   const writes = turnWrites(task.tools, turn.id, card.path);
   const [confirm, setConfirm] = useState(false); const [busy, setBusy] = useState(false);
   if (!writes.length) return null;
-  async function undo() {
-    const checkpoint = (await api.checkpoints(task.id)).find(item => item.turnId === turn.id);
-    if (!checkpoint) throw new Error(t('This turn has no checkpoint, so it cannot be undone here.', '这一轮没有检查点，无法在这里撤销。'));
-    const review = await api.checkpointDiff(task.id, checkpoint.id) as { checkpointId: string; files: Array<{ path: string; afterHash: string | null }> };
-    const kept: string[] = [];
-    for (const file of review.files) {
-      try { await api.reviewAction(task.id, { checkpointId: review.checkpointId, path: file.path, action: 'revert', expectedHash: file.afterHash }); }
-      catch { kept.push(file.path); }
-    }
-    const reverted = review.files.length - kept.length;
-    notify(kept.length
-      ? t(`Reverted ${reverted} files. ${kept.length} changed again after this turn and were kept: ${kept.join(', ')}`, `已撤销 ${reverted} 个文件。有 ${kept.length} 个文件在本轮之后又改过，已保留：${kept.join('、')}`)
-      : t(`Reverted ${reverted} files from this turn.`, `已撤销本轮对 ${reverted} 个文件的改动。`));
-  }
+  async function undo() { notify(await undoTurnWrites(api, t, task.id, turn.id)); }
   return <section className="cs-writes">
     <header><span>{t('Written this turn', '本轮写入')}</span><em>{writes.length}</em>{canUndo && <button type="button" className="cs-undo" onClick={() => setConfirm(true)}><RotateCcw size={12} />{t('Undo this turn', '撤销本轮')}</button>}</header>
     {writes.map(write => <details key={write.name} className="cs-write">
@@ -145,8 +189,8 @@ function WrittenThisTurn({ task, turn, card, canUndo }: { task: Task; turn: Turn
   </section>;
 }
 
-function TurnView({ task, turn, card, last }: { task: Task; turn: Turn; card: CardProjectView; last: boolean }) {
-  const { t } = useApp();
+function TurnView({ task, turn, card, last, editSignal }: { task: Task; turn: Turn; card: CardProjectView; last: boolean; editSignal?: number }) {
+  const { api, t, run } = useApp();
   const studio = useStudio();
   const active = ['running', 'queued', 'waiting'].includes(task.status) || !!task.workerActive;
   const assistant = turn.entries.filter(entry => entry.type === 'message' && entry.item.role === 'assistant');
@@ -158,9 +202,11 @@ function TurnView({ task, turn, card, last }: { task: Task; turn: Turn; card: Ca
   const reply = finalMessage ? stripMarkers(finalMessage.text) : undefined;
   const truncatedHere = task.truncation && !active && (task.truncation.turnId ? task.truncation.turnId === turn.id : last);
   return <section className="cs-turn">
-    {turn.user && <UserMessage message={turn.user} started={task.card?.kickoff && turn.user.id === task.messages.find(message => message.role === 'user')?.id ? task.card.mode ?? 'scratch' : undefined} />}
+    {turn.user && <UserMessage message={turn.user} task={task} card={card} editSignal={editSignal} started={task.card?.kickoff && turn.user.id === task.messages.find(message => message.role === 'user')?.id ? task.card.mode ?? 'scratch' : undefined} />}
     {(turn.entries.length > 0 || (last && active)) && <article className="cs-msg is-ai">
-      <header><b>{t(`${sectionLabel(task.card!.sectionId)} AI`, `${sectionLabel(task.card!.sectionId)} AI`)}</b>{last && active && <em className="cs-working-label">{t('Working', '处理中')}</em>}{turn.entries[0] && <time>{clock(turn.entries[0].at)}</time>}</header>
+      <header><b>{t(`${sectionLabel(task.card!.sectionId)} AI`, `${sectionLabel(task.card!.sectionId)} AI`)}</b>{last && active && <em className="cs-working-label">{t('Working', '处理中')}</em>}{turn.entries[0] && <time>{clock(turn.entries[0].at)}</time>}
+        {reply && <span className="cs-msg-actions"><button type="button" className="cs-icon" aria-label={t('Copy response', '复制回复')} title={t('Copy response', '复制回复')} onClick={() => void run(() => api.copyText(reply.text), t('Response copied', '已复制回复'))}><Copy size={13} /></button></span>}
+      </header>
       {(tools.length > 0 || thinking > 0) && <details className="cs-process"><summary><ChevronRight size={13} />{t('Work log', '处理过程')}<small>{tools.length ? t(`${tools.length} tool calls`, `${tools.length} 次工具调用`) : t(`${thinking} reasoning steps`, `${thinking} 段思考`)}</small>{last && active && <LoaderCircle size={12} className="spinning" />}</summary>
         <div className="cs-process-body">{turn.entries.map(entry => entry.type === 'tool' ? <ToolRecord key={entry.item.id} tool={entry.item} /> : entry.item.thinking ? <details key={entry.item.id} className="cs-thinking"><summary>{t('Reasoning', '思考')}</summary><div>{entry.item.thinking}</div></details> : null)}</div>
       </details>}
@@ -189,9 +235,26 @@ export function SectionThread({ task, card, scroller }: { task: Task; card: Card
     if (element && element.scrollHeight - element.scrollTop - element.clientHeight < 160) element.scrollTop = element.scrollHeight;
   }, [task.messages, task.tools, approvals.length, scroller]);
   useEffect(() => { const element = scroller.current; if (element) element.scrollTop = element.scrollHeight; }, [task.id, scroller]);
+  // Esc stops this turn and a second Esc within a moment edits the latest message, as in the workbench; one-click
+  // making's conversations are stopped from its own bar.
+  const [editSignal, setEditSignal] = useState(0);
+  const lastEscape = useRef(0);
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return;
+      if (document.querySelector('[role="dialog"], .popover')) return;
+      if ((event.target as HTMLElement | null)?.closest('.cs-edit, input, select')) return;
+      const now = Date.now(); const again = now - lastEscape.current < 800; lastEscape.current = now;
+      if (again) { setEditSignal(value => value + 1); return; }
+      if (active && !runOwns(card.run, task.id)) void run(() => api.cancelTask(task.id));
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [task.id, active, card.run]);
   return <div className="cs-thread">
+    <RevisionBar task={task} className="cs-revisions" />
     {turns.length === 0 && <p className="cs-note cs-thread-empty">{t('This conversation has no messages yet.', '这个对话还没有消息。')}</p>}
-    {turns.map((turn, index) => <TurnView key={`${task.activeRevisionId || 'original'}-${turn.id}`} task={task} turn={turn} card={card} last={index === lastTurn} />)}
+    {turns.map((turn, index) => <TurnView key={`${task.activeRevisionId || 'original'}-${turn.id}`} task={task} turn={turn} card={card} last={index === lastTurn} editSignal={index === lastTurn ? editSignal : undefined} />)}
     {data.interactions.filter(interaction => interaction.taskId === task.id).map(interaction => <InteractionDialog key={interaction.id} interaction={interaction} inline />)}
     {approvals.map(approval => <section key={approval.id} className="cs-approval" aria-label={t('Approval required', '需要审批')}>
       <h4><Terminal size={15} />{t('Permission to continue', '允许继续执行')}</h4>

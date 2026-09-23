@@ -1,6 +1,7 @@
 import { build as bundle } from 'esbuild';
 import { build as frontend } from 'vite';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { deflateSync } from 'node:zlib';
 import { buildNative } from './build-native.mjs';
 
@@ -8,10 +9,12 @@ await mkdir('dist', { recursive: true });
 if (process.platform === 'win32') await buildNative();
 await bundle({ entryPoints: ['src/main/main.ts'], outfile: 'dist/main.cjs', platform: 'node', format: 'cjs', bundle: true, external: ['electron', '@earendil-works/pi-ai/compat'], sourcemap: true, logLevel: 'info' });
 await bundle({ entryPoints: ['src/main/preload.ts'], outfile: 'dist/preload.cjs', platform: 'node', format: 'cjs', bundle: true, external: ['electron'], sourcemap: true, logLevel: 'info' });
+// The floating desk pet's window has a bridge of its own (ADR 0018).
+await bundle({ entryPoints: ['src/main/pet-preload.ts'], outfile: 'dist/pet-preload.cjs', platform: 'node', format: 'cjs', bundle: true, external: ['electron'], sourcemap: true, logLevel: 'info' });
 await bundle({ entryPoints: ['src/runtime/worker.ts'], outfile: 'dist/worker.mjs', platform: 'node', format: 'esm', bundle: true, packages: 'external', sourcemap: true, logLevel: 'info' });
 // Self-contained so the card schema sandbox can run under Node's permission model with only its own file readable.
 await bundle({ entryPoints: ['src/core/card-studio/sandbox-entry.ts'], outfile: 'dist/card-sandbox.cjs', platform: 'node', format: 'cjs', bundle: true, sourcemap: false, logLevel: 'info' });
-await frontend({ base: './', build: { outDir: 'dist/renderer', emptyOutDir: true }, logLevel: 'info' });
+await frontend({ base: './', build: { outDir: 'dist/renderer', emptyOutDir: true, rolldownOptions: { input: { index: resolve('index.html'), pet: resolve('pet.html') } } }, logLevel: 'info' });
 
 // Original chamfered signal mark (same geometry as src/renderer/primitives.tsx Mark).
 // PNG/ICO encoding keeps packaging independent of image tools.

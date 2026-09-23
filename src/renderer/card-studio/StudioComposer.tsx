@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, ChevronDown, Globe, ShieldCheck, Square, SquareSlash, Users } from 'lucide-react';
+import { ArrowUp, ChevronDown, Eraser, Globe, ShieldCheck, Square, SquareSlash, Users } from 'lucide-react';
 import { useApp } from '../context';
 import { MenuItem, Popover } from '../primitives';
 import { ContextUsage } from '../ContextUsage';
@@ -64,6 +64,12 @@ export function StudioComposer({ card, sectionId, task }: { card: CardProjectVie
     if (task) studio.setComposerText(task.id, value);
     else if (draft) studio.updateDraft(card.projectId, sectionId, value);
     else studio.startDraft(card.projectId, sectionId, { title: '', text: value });
+  }
+  /** 撤回 of what is not sent yet (Q16 ①): the composer empties, and an unsent new conversation is dropped. */
+  function clear() {
+    if (task) studio.setComposerText(task.id, '');
+    else studio.clearDraft(card.projectId, sectionId);
+    textarea.current?.focus();
   }
   const slash = useStudioSlash({ card, sectionId, task, text, setText, root });
   async function send() {
@@ -134,6 +140,7 @@ export function StudioComposer({ card, sectionId, task }: { card: CardProjectVie
           : <span className="cs-model"><ModelPicker gatewayId={draftGatewayId} modelId={gateway?.modelId} onChange={(gatewayId, modelId) => setDraftModel({ gatewayId, modelId })} /></span>}
         {task && <ContextUsage task={task} />}
         <span className="cs-composer-actions">
+          {text && !sending && <button type="button" className="cs-icon" aria-label={t('Clear the composer', '清空输入框')} title={t('Clear: this text is not sent', '清空：这段文字不发送')} onClick={clear}><Eraser size={14} /></button>}
           {running && <button type="button" className="cs-btn is-small" onClick={() => void run(() => api.cancelTask(task!.id))}><Square size={12} />{t('Stop', '停止')}</button>}
           <button type="button" className="cs-btn is-primary cs-send" disabled={!text.trim() || sending || blocked} onClick={() => void send()}><ArrowUp size={15} />{running ? t('Queue', '排队发送') : t('Send', '发送')}</button>
         </span>

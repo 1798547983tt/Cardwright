@@ -1,5 +1,6 @@
 import type { AppSnapshot, Task, ToolCall } from '../types.ts';
 import { componentName } from './components.ts';
+import { isHandoffRequest } from './markers.ts';
 import type { ProgressInput } from './progress.ts';
 import type { CardDispatch, CardProjectView } from './types.ts';
 
@@ -72,6 +73,21 @@ export function turnWrites(tools: ToolCall[], turnId: string, root: string): Tur
     groups.set(name, group);
   }
   return [...groups.values()];
+}
+
+/**
+ * What a user message offers in the studio thread (撤回, Q16): the latest message is withdrawn while its turn runs; once
+ * the run has ended, any message the user wrote is edited into a new conversation version, as in the workbench. The app's
+ * own lines (the kickoff, the handoff request) offer neither, and one-click making's conversations are left to the run.
+ */
+export function messageAction(task: Task, messageId: string, options: { runOwned?: boolean } = {}): 'withdraw' | 'edit' | null {
+  const index = task.messages.findIndex(message => message.id === messageId && message.role === 'user');
+  if (index < 0 || options.runOwned) return null;
+  const message = task.messages[index];
+  const kickoff = task.card?.kickoff && task.messages.find(item => item.role === 'user')?.id === message.id;
+  if (kickoff || isHandoffRequest(message.text)) return null;
+  if (!(ACTIVE.has(task.status) || task.workerActive)) return 'edit';
+  return task.messages.slice(index + 1).some(item => item.role === 'user') ? null : 'withdraw';
 }
 
 export function conversationsOf(tasks: Task[], projectId: string, sectionId: string): Task[] {

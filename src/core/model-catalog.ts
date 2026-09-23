@@ -1,13 +1,40 @@
 import type { Gateway } from '../shared/types.ts';
 
-export function modelCatalogUrl(baseUrl: string, protocol: Gateway['protocol']): URL {
+/** An endpoint under the gateway's API root: `models`, `chat/completions`, `responses` or `messages`. */
+function gatewayUrl(baseUrl: string, protocol: Gateway['protocol'], endpoint: string): URL {
   const url = new URL(baseUrl.trim());
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error('Use an HTTP(S) gateway URL without credentials or query parameters.');
   if (!['openai-completions', 'openai-responses', 'anthropic-messages'].includes(protocol)) throw new Error('Unknown model protocol.');
   let path = url.pathname.replace(/\/+$/, '').replace(/\/(?:chat\/completions|responses|messages|models)$/, '');
   if (protocol === 'anthropic-messages' && !path.endsWith('/v1')) path += '/v1';
-  url.pathname = `${path}/models`;
+  url.pathname = `${path}/${endpoint}`;
   return url;
+}
+
+export function modelCatalogUrl(baseUrl: string, protocol: Gateway['protocol']): URL {
+  return gatewayUrl(baseUrl, protocol, 'models');
+}
+
+/**
+ * 一键自检's second step: one request that may produce a single token (sixteen for the Responses API, which has that
+ * floor), not streamed, to the model the user picked on the gateway the user entered. The reply text is returned.
+ */
+export async function tinyCompletion(input: { baseUrl: string; protocol: Gateway['protocol'] }, key: string, model: string): Promise<{ text: string }> {
+  const anthropic = input.protocol === 'anthropic-messages';
+  const url = gatewayUrl(input.baseUrl, input.protocol, input.protocol === 'openai-completions' ? 'chat/completions' : input.protocol === 'openai-responses' ? 'responses' : 'messages');
+  const headers: Record<string, string> = { 'content-type': 'application/json', ...(anthropic ? { 'anthropic-version': '2023-06-01', ...(key ? { 'x-api-key': key } : {}) } : key ? { Authorization: `Bearer ${key}` } : {}) };
+  const body = input.protocol === 'openai-completions' ? { model, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1, stream: false }
+    : input.protocol === 'openai-responses' ? { model, input: 'ping', max_output_tokens: 16, stream: false }
+    : { model, max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] };
+  const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(30_000) });
+  const raw = (await response.text()).slice(0, 4000);
+  if (!response.ok) throw new Error(`HTTP ${response.status}${raw ? `: ${raw.replace(/\s+/g, ' ').slice(0, 200)}` : ''}`);
+  let payload: Record<string, unknown>;
+  try { payload = JSON.parse(raw); } catch { throw new Error('The gateway did not answer with JSON.'); }
+  const part = (value: unknown): string => typeof value === 'string' ? value : Array.isArray(value) ? value.map(item => part((item as { text?: unknown; content?: unknown })?.text ?? (item as { content?: unknown })?.content)).join('') : '';
+  const choice = Array.isArray(payload.choices) ? (payload.choices[0] as { message?: { content?: unknown } } | undefined) : undefined;
+  const text = choice ? part(choice.message?.content) : typeof payload.output_text === 'string' ? payload.output_text : part(payload.output ?? payload.content);
+  return { text };
 }
 
 /** User-selected gateway only. Credentials never follow a redirect. */

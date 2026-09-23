@@ -96,3 +96,22 @@
   .gateway-model-detail-heading h4 { flex-basis: 100%; }
   .gateway-save-actions > span { max-width: 120px; }
 }
+
+/* 1.0.0 gateway presets (本地模型, 本地代理网关) and 一键自检. */
+.gateway-presets { display: grid; gap: 8px; margin-bottom: 14px; padding: 10px 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius); }
+.gateway-preset-choices { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gateway-preset-choices > span { font-size: 12px; color: var(--muted); margin-right: 2px; }
+.gateway-preset { padding: 5px 12px; font-size: 13px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-2); transition: border-color var(--motion-fast), background-color var(--motion-fast); }
+.gateway-preset:hover { border-color: var(--line-strong); }
+.gateway-preset.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.gateway-preset-addresses { display: flex; flex-wrap: wrap; gap: 6px; }
+.gateway-preset-addresses button { display: grid; gap: 1px; padding: 6px 10px; text-align: left; font-size: 12.5px; border: 1px solid var(--line); border-radius: var(--radius-chip); background: var(--panel-2); }
+.gateway-preset-addresses button small { font: 11px var(--font-code); color: var(--muted); }
+.gateway-preset-addresses button[aria-pressed="true"] { border-color: var(--accent); }
+.gateway-preset-note { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.gateway-self-test { display: grid; gap: 4px; margin: 8px 0; padding: 8px 12px; font-size: 12.5px; border-left: 2px solid var(--success); background: var(--success-soft); }
+.gateway-self-test.is-failed { border-left-color: var(--danger); background: var(--danger-soft); }
+.gateway-self-test p { display: flex; align-items: center; gap: 8px; margin: 0; min-width: 0; }
+.gateway-self-test p span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text); }
+.gateway-self-test p small { color: var(--muted); font: 11px var(--font-code); }
+.gateway-self-test svg { flex: none; }

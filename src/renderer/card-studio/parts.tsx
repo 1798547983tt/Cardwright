@@ -3,13 +3,9 @@ import { useApp } from '../context';
 import { CoverArt } from './CoverArt';
 import type { AppContextValue } from '../context';
 import type { CardProjectView, SectionState } from '../../shared/card-studio/types';
+import { stylePresetOf } from '../../shared/card-studio/style-presets';
 
 type T = AppContextValue['t'];
-
-/** Colors from the style preset drafts (handoff §7.2); 题材自定 has no fixed colors until its design book spec exists. */
-const PRESET_SWATCH: Record<string, string[] | undefined> = {
-  tactical: ['#101214', '#19a7e8', '#e9ecee'], gilded: ['#141a14', '#b8955a', '#efe6d2'], terminal: ['#f1f1ee', '#ffe100', '#121212'], cinema: ['#15110e', '#d8742f', '#efe4d6'],
-};
 
 export function kindLabel(card: Pick<CardProjectView, 'kind' | 'source'>, t: T): string {
   return card.kind === 'fan' ? t(`Fan card · ${card.source ?? ''}`, `同人 · 《${card.source ?? ''}》`) : t('Original card', '原创');
@@ -19,8 +15,9 @@ export function stateLabel(state: SectionState, t: T): string {
   return state === 'done' ? t('Done', '已完成') : state === 'active' ? t('In progress', '进行中') : t('Not started', '未开始');
 }
 
+/** The preset's page background, main colour and text; 题材自定 has no fixed colours until its design book spec exists. */
 export function Swatch({ card, t }: { card: Pick<CardProjectView, 'stylePreset'>; t: T }) {
-  const colors = card.stylePreset ? PRESET_SWATCH[card.stylePreset.id] : undefined;
+  const colors = card.stylePreset ? stylePresetOf(card.stylePreset.id)?.swatch : undefined;
   return <span className="cs-swatch">
     <span className="cs-swatch-chips" aria-hidden="true">{colors ? colors.map(color => <i key={color} style={{ background: color }} />) : <i className="is-empty" />}</span>
     <span className="cs-swatch-name">{card.stylePreset ? card.stylePreset.name : t('To be planned', '待规划')}</span>

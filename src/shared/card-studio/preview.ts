@@ -250,6 +250,48 @@ const STORAGE = [
   '})();',
 ].join('\n');
 
+/**
+ * SillyTavern's sanitizing of message text (1.19.0, knowledge base 30 §5): DOMPurify drops scripts and what embeds or
+ * navigates, unwraps tags it does not know, strips event handlers and prefixes every class with custom- (fa-, note- and
+ * monospace are spared); decodeStyleTags scopes each selector of the message's own <style> to `.mes_text ` and prefixes
+ * its class selectors the same way, so `:root` and `body` rules match nothing. The message waits in an inert template
+ * until this has run, so its styles never apply unsanitized.
+ */
+const SANITIZER = String.raw`(() => {
+  const source = document.getElementById('cardwright-message');
+  const box = document.querySelector('.mes_text');
+  if (!source || !box) return;
+  const fragment = document.importNode(source.content, true);
+  source.remove();
+  const drop = new Set(['SCRIPT', 'IFRAME', 'FRAME', 'FRAMESET', 'OBJECT', 'EMBED', 'APPLET', 'LINK', 'META', 'BASE', 'TITLE', 'NOSCRIPT']);
+  const spared = name => name.startsWith('fa-') || name.startsWith('note-') || name === 'monospace';
+  const topLevel = text => { const parts = []; let depth = 0, start = 0; for (let index = 0; index < text.length; index++) { const char = text[index]; if (char === '(' || char === '[') depth++; else if (char === ')' || char === ']') depth--; else if (char === ',' && depth === 0) { parts.push(text.slice(start, index)); start = index + 1; } } parts.push(text.slice(start)); return parts; };
+  const scope = selector => '.mes_text ' + selector.trim().split(' ').map(part => part.startsWith('.') ? '.custom-' + part.slice(1) : part).join(' ');
+  const rewrite = rules => [...rules].map(rule => {
+    if (rule instanceof CSSStyleRule) return topLevel(rule.selectorText).map(scope).join(', ') + ' { ' + rule.style.cssText + ' }';
+    if (rule instanceof CSSMediaRule) return '@media ' + rule.media.mediaText + ' { ' + rewrite(rule.cssRules) + ' }';
+    if (rule instanceof CSSSupportsRule) return '@supports ' + rule.conditionText + ' { ' + rewrite(rule.cssRules) + ' }';
+    return rule.cssText;
+  }).join('\n');
+  const clean = node => {
+    for (const child of [...node.children]) {
+      if (drop.has(child.tagName)) { child.remove(); continue; }
+      if (child.tagName === 'STYLE') {
+        let css = '';
+        try { const sheet = new CSSStyleSheet(); sheet.replaceSync(child.textContent || ''); css = rewrite(sheet.cssRules); } catch {}
+        child.textContent = css;
+        continue;
+      }
+      clean(child);
+      for (const attribute of [...child.attributes]) if (/^on/i.test(attribute.name)) child.removeAttribute(attribute.name);
+      if (child.hasAttribute('class')) child.setAttribute('class', (child.getAttribute('class') || '').split(/\s+/).filter(Boolean).map(name => spared(name) ? name : 'custom-' + name).join(' '));
+      if (child instanceof HTMLUnknownElement || child.tagName.includes('-')) child.replaceWith(...child.childNodes);
+    }
+  };
+  clean(fragment);
+  box.append(fragment);
+})();`;
+
 /** SillyTavern's default look for message text: its body, italic and quote colours. */
 const MESSAGE_STYLE = [
   ':root { color-scheme: dark; }',
@@ -288,7 +330,9 @@ export function previewDocument(segment: PreviewSegment, nonce: string): { html:
     html: [
       '<!DOCTYPE html>', '<html>', '<head>', '<meta charset="utf-8">', '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
       `<style>${MESSAGE_STYLE}</style>`, `<script nonce="${nonce}">${REPORTER}</script>`, '</head>', '<body>',
-      `<div class="mes_text">${segment.html}</div>`, '</body>', '</html>', '',
+      // A closing template tag in the message would end the template early; it is split so the parser keeps it as text.
+      '<div class="mes_text"></div>', `<template id="cardwright-message">${segment.html.replace(/<\/template/gi, '&lt;/template')}</template>`,
+      `<script nonce="${nonce}">${SANITIZER}</script>`, '</body>', '</html>', '',
     ].join('\n'),
   };
 }

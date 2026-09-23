@@ -79,6 +79,35 @@ test('the next dispatch is the first one not yet sent, and a conversation knows 
   assert.equal(dispatchDone(card, task('z', 'lore-people')), false);
 });
 
+test('a message offers 撤回 while its turn is in progress and 编辑并重新生成 once it is written (Q16)', async () => {
+  const view = await import('../src/shared/card-studio/view.ts') as Record<string, unknown>;
+  assert.equal(typeof view.messageAction, 'function', 'the studio thread asks which action a message offers');
+  const messageAction = view.messageAction as (task: Task, messageId: string, options?: { runOwned?: boolean }) => 'withdraw' | 'edit' | null;
+  const at = '2026-09-17T06:00:00.000Z';
+  const messages: Task['messages'] = [
+    { id: 'u1', turnId: 'u1', role: 'user', text: '写红孩儿。', at },
+    { id: 'a1', turnId: 'u1', role: 'assistant', text: '好。', at },
+    { id: 'u2', turnId: 'u2', role: 'user', text: '再写白骨夫人。', at },
+  ];
+  const running = task('r', 'lore-people', { status: 'running', messages });
+  assert.equal(messageAction(running, 'u2'), 'withdraw', 'the message whose turn is running');
+  assert.equal(messageAction(running, 'u1'), null, 'earlier messages wait for the run to end');
+  assert.equal(messageAction(running, 'a1'), null, 'replies are not withdrawn');
+  assert.equal(messageAction(running, 'u2', { runOwned: true }), null, 'one-click making owns its conversation; pause it first');
+  const queued = task('q', 'lore-people', { status: 'running', messages: [...messages, { id: 'u3', turnId: 'u3', role: 'user', text: '还有黄袍怪。', at, pending: true }] });
+  assert.equal(messageAction(queued, 'u3'), 'withdraw', 'a queued follow-up is the latest message');
+  assert.equal(messageAction(queued, 'u2'), null);
+  assert.equal(messageAction(task('w', 'lore-people', { status: 'completed', workerActive: true, messages }), 'u2'), 'withdraw', 'the worker is still winding down');
+  const done = task('d', 'lore-people', { status: 'completed', messages });
+  assert.equal(messageAction(done, 'u2'), 'edit');
+  assert.equal(messageAction(done, 'u1'), 'edit', 'as in the workbench, any written message can be edited into a new version');
+  assert.equal(messageAction(task('f', 'lore-people', { status: 'cancelled', messages }), 'u2'), 'edit', 'a stopped turn is finished too');
+  const kickoff = task('k', 'plan', { status: 'running', card: { sectionId: 'plan', kickoff: true, mode: 'scratch' }, messages: [{ id: 'k1', turnId: 'k1', role: 'user', text: '开场', at }] });
+  assert.equal(messageAction(kickoff, 'k1'), null, 'the kickoff line is the app’s, not the user’s');
+  const handoff = task('h', 'lore-people', { status: 'running', messages: [...messages.slice(0, 2), { id: 'h1', turnId: 'h1', role: 'user', text: '【换对话 · 请写交接摘要】\n请写。', at }] });
+  assert.equal(messageAction(handoff, 'h1'), null, 'the handoff request is the app’s too');
+});
+
 test('the workbench view hides card projects, card conversations and what belongs to them', async () => {
   const { workbenchSnapshot } = await import('../src/shared/card-studio/view.ts');
   const base = { publicationRevision: 1, preferences: {}, gateways: [], schedules: [], skills: [], version: '0.8.0', search: {}, ecosystem: {}, extensions: [] } as unknown as AppSnapshot;

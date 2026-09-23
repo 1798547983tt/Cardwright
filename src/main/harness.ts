@@ -21,19 +21,21 @@ import { MEMORY_CATEGORIES, ProjectMemory } from '../runtime/ecosystem-memory.ts
 import { discoverSkills, skillsForProject } from '../core/skills.ts';
 import { defaultEffortMap, effectiveEffort, validateGatewayEffort } from '../shared/effort.ts';
 import { gatewayModels, normalizeGatewayModels, resolveGatewayModel } from '../shared/gateway-models.ts';
-import { fetchModelCatalog } from '../core/model-catalog.ts';
-import { selectRevision, startRevision } from '../core/conversation-revisions.ts';
+import { fetchModelCatalog, modelCatalogUrl, tinyCompletion } from '../core/model-catalog.ts';
+import { assertWithdrawable, selectRevision, startRevision, withdrawTurn, type Withdrawal } from '../core/conversation-revisions.ts';
 import { mapLegacyUserMessages, type ConversationEntry } from '../runtime/conversation-history.ts';
 import type { StudioServices } from './studio-services.ts';
 import type { CardStudioService } from './card-studio.ts';
 import { sectionLabel } from '../shared/card-studio/boards.ts';
+import { BUILT_IN_THEMES, THEME_ID } from '../shared/themes.ts';
+import { PET_ID } from '../shared/pets.ts';
 import { budgetUsage, exceededBudget } from '../core/task-budget.ts';
 import { getEcosystemSkillPaths } from '../runtime/ecosystem-skills.ts';
 import { defaultEcosystem, extensionManifest } from '../core/ecosystem.ts';
 import { ConfigBackup, type BackupData } from './ecosystem-backup.ts';
 import type { Vault } from './vault.ts';
 import type { CardHandoffState, CardRun, CardSettings } from '../shared/card-studio/types.ts';
-import type { AppSnapshot, AgentRole, Approval, BrowserState, EcosystemConfig, FromWorker, Gateway, Interaction, McpServerConfig, MemoryItem, NewSchedule, NewTask, PermissionMode, Preferences, Project, Schedule, SearchConfig, SearchOutput, SkillInfo, Task, ThinkingLevel, ToWorker } from '../shared/types.ts';
+import type { AppSnapshot, AgentRole, Approval, BrowserState, EcosystemConfig, FromWorker, Gateway, GatewaySelfTest, Interaction, McpServerConfig, MemoryItem, NewSchedule, NewTask, PermissionMode, Preferences, Project, Schedule, SearchConfig, SearchOutput, SkillInfo, Task, ThinkingLevel, ToWorker } from '../shared/types.ts';
 
 const terminal = new Set(['idle', 'completed', 'failed', 'cancelled']);
 const permissions = new Set<PermissionMode>(['ask', 'edit', 'full']);
@@ -105,7 +107,7 @@ export class Harness extends EventEmitter {
   }
   publicView(): AppSnapshot {
     const ecosystem = { ...this.store.state.ecosystem, roles: this.roles(), mcpServers: this.store.state.ecosystem.mcpServers.map(s => ({ ...s, hasSecrets: this.vault.has(`mcp:${s.id}`) })), webdav: { ...this.store.state.ecosystem.webdav, hasPassword: this.vault.has('webdav:password') } };
-    return { ...this.store.state, storageError: this.store.lastSaveError?.message, tasks: this.store.state.tasks.map(task => ({ ...task, workerActive: this.workers.has(task.id) || this.retiring.has(task.id) || this.starting.has(task.id) })), studio: this.studio?.snapshot(), cardStudio: this.cardStudio?.snapshot(), ecosystem, extensions: extensionManifest(ecosystem, this.store.state.search), interactions: [...this.interactions.values()], search: { ...this.store.state.search, hasKey: this.vault.has('search:brave') }, gateways: this.store.state.gateways.map(g => ({ ...g, hasKey: this.vault.has(g.id) })), approvals: [...this.approvals.values()], skills: this.skills, browser: this.browserState, version: '0.9.1' };
+    return { ...this.store.state, storageError: this.store.lastSaveError?.message, tasks: this.store.state.tasks.map(task => ({ ...task, workerActive: this.workers.has(task.id) || this.retiring.has(task.id) || this.starting.has(task.id) })), studio: this.studio?.snapshot(), cardStudio: this.cardStudio?.snapshot(), ecosystem, extensions: extensionManifest(ecosystem, this.store.state.search), interactions: [...this.interactions.values()], search: { ...this.store.state.search, hasKey: this.vault.has('search:brave') }, gateways: this.store.state.gateways.map(g => ({ ...g, hasKey: this.vault.has(g.id) })), approvals: [...this.approvals.values()], skills: this.skills, browser: this.browserState, version: '1.0.0' };
   }
   snapshot(): AppSnapshot { return structuredClone(this.publicView()); }
   attachStudio(studio: StudioServices): void { this.studio = studio; }
@@ -394,13 +396,13 @@ export class Harness extends EventEmitter {
     }
     const attachments = this.studio ? await this.studio.inputs(attachmentIds) : [];
     if (this.studio?.directoryLocked(task.cwd)) throw new Error('Wait for checks or the reviewed file operation in this folder before sending a message.');
-    if (task.card && this.cardStudio) await this.cardStudio.beforePrompt(task, text.trim());
+    const startedDispatch = task.card && this.cardStudio ? await this.cardStudio.beforePrompt(task, text.trim()) : undefined;
     if (!active && !task.parentId) { this.budgetBaselines.set(task.id, budgetUsage(this.store.state.tasks.filter(item => item.id === task.id || item.parentId === task.id))); this.budgetStarts.set(task.id, Date.now()); this.budgetStopping.delete(task.id); }
     const submit = await this.hooks('UserPromptSubmit', task, { prompt: text.trim(), quiet: true });
     if (submit.decision === 'deny') { task.messages.push({ id: randomUUID(), role: 'system', text: `[UserPromptSubmit] ${(submit.reason || '钩子拦下了这条消息。').slice(0, 2_000)}`, at: stamp() }); this.changed(); throw new Error(submit.reason || '钩子拦下了这条消息。'); }
     if (submit.messages.length) text = [text.trim(), ...submit.messages.map(note => `[UserPromptSubmit] ${note}`)].join('\n\n');
     const messageId = randomUUID();
-    task.messages.push({ id: messageId, turnId: messageId, role: 'user', text: text.trim(), at: stamp(), pending: true, ...(attachments.length ? { attachments: attachments.map(({ storedPath: _path, ...info }) => info) } : {}) });
+    task.messages.push({ id: messageId, turnId: messageId, role: 'user', text: text.trim(), at: stamp(), pending: true, ...(attachments.length ? { attachments: attachments.map(({ storedPath: _path, ...info }) => info) } : {}), ...(startedDispatch ? { dispatchId: startedDispatch } : {}) });
     task.updatedAt = stamp();
     task.error = undefined;
     task.truncation = undefined;
@@ -797,6 +799,7 @@ export class Harness extends EventEmitter {
     const closed = () => { void (async () => {
       clearTimeout(timeout);
       const task = this.task(id);
+      this.forgetUnwrittenSession(task);
       if (this.studio && ['failed', 'cancelled'].includes(task.status)) {
         try { await this.studio.afterRun(task); }
         catch (error) { if (task.delivery) { task.delivery.verification = 'failed'; task.delivery.error = error instanceof Error ? error.message : String(error); } }
@@ -806,6 +809,15 @@ export class Harness extends EventEmitter {
     })(); };
     if (child.exitCode !== null || child.signalCode !== null) closed(); else child.once('exit', closed);
     if (graceful && child.connected) child.disconnect();
+  }
+  /**
+   * Pi writes a new session file only once its first reply is finished. A worker that stopped before then (stopped the hard
+   * way, crashed or refused) leaves cursors to entries that exist nowhere, which the next run would refuse: start afresh.
+   */
+  private forgetUnwrittenSession(task: Task): void {
+    if (!task.sessionFile || existsSync(task.sessionFile)) return;
+    task.sessionFile = undefined; task.sessionLeafId = undefined; task.branchBeforeEntryId = undefined;
+    for (const message of task.messages) delete message.sessionEntryId;
   }
   private fail(id: string, message: string): void {
     const task = this.task(id);
@@ -873,6 +885,36 @@ export class Harness extends EventEmitter {
     const task = this.task(id); if (this.workers.has(id) || !terminal.has(task.status)) throw new Error('Stop the current run before switching versions.');
     this.restoreMessageCursors(task); selectRevision(task, revisionId); task.updatedAt = stamp(); this.changed();
   }
+  /**
+   * 撤回 (Q16): stops the run the latest message belongs to, then takes the message out of the conversation and hands its
+   * text back. A message whose turn is already written is edited and regenerated instead.
+   */
+  async withdraw(id: string, userMessageId: string): Promise<Withdrawal> {
+    const task = this.task(id);
+    assertWithdrawable(task, userMessageId);
+    const running = this.workers.has(id) || this.starting.has(id) || !terminal.has(task.status);
+    if (!running && !this.retiring.has(id) && !task.messages.find(message => message.id === userMessageId)?.pending) throw new Error('这条消息已经写完了。要改它，请用【编辑并重新生成】。');
+    if (running) await this.cancelTask(id);
+    await this.stopped(id);
+    this.restoreMessageCursors(task);
+    const withdrawal = withdrawTurn(task, userMessageId);
+    task.updatedAt = stamp();
+    this.changed();
+    return withdrawal;
+  }
+  /** Resolves once no worker runs, starts or winds down for the task; cancelTask's kill timer bounds the wait. */
+  private async stopped(id: string): Promise<void> {
+    const end = Date.now() + 15_000;
+    while (this.workers.has(id) || this.starting.has(id)) {
+      if (Date.now() > end) throw new Error('这一轮还没有停下来，请稍后再试。');
+      await new Promise(done => setTimeout(done, 25));
+    }
+    await this.retiring.get(id)?.finished;
+  }
+  /** A theme is 跟随系统, a built-in one, or a theme pack whose folder is in the data folder (ADR 0018). */
+  private knownTheme(id: unknown): id is string {
+    return typeof id === 'string' && (id === 'system' || BUILT_IN_THEMES.some(theme => theme.id === id) || (THEME_ID.test(id) && existsSync(join(this.dataDir, 'themes', id, 'theme.json'))));
+  }
   savePreferences(changes: Partial<Preferences>): void {
     const { migrationNotice: _notice, ...allowed } = changes;
     const next = { ...this.store.state.preferences, ...allowed };
@@ -884,7 +926,10 @@ export class Harness extends EventEmitter {
     }
     next.avatars = validateAvatars(next.avatars);
     if (typeof next.soundEnabled !== 'boolean' || !Number.isInteger(next.soundVolume) || next.soundVolume < 0 || next.soundVolume > 100) throw new Error('Sound volume must be a whole number from 0 to 100, and sound must be on or off.');
-    if (!['system', 'light', 'dark'].includes(next.theme) || !['en', 'zh'].includes(next.language) || !['sans', 'serif', 'mono'].includes(next.font)) throw new Error('Unknown appearance setting.');
+    if (!this.knownTheme(next.theme) || !['en', 'zh'].includes(next.language) || !['sans', 'serif', 'mono'].includes(next.font)) throw new Error('Unknown appearance setting.');
+    if (next.petEnabled !== undefined && typeof next.petEnabled !== 'boolean') throw new Error('The desk pet is on or off.');
+    if (next.petId !== undefined && (typeof next.petId !== 'string' || !PET_ID.test(next.petId))) throw new Error('Unknown desk pet.');
+    if (next.petPosition !== undefined && !(typeof next.petPosition === 'object' && next.petPosition !== null && [next.petPosition.x, next.petPosition.y].every(value => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 100_000))) throw new Error('The desk pet’s position must be a point on the screen.');
     if (!permissions.has(next.defaultPermission) || !levels.has(next.defaultThinking)) throw new Error('Unknown task default.');
     if (!Number.isInteger(next.maxConcurrent) || next.maxConcurrent < 1 || next.maxConcurrent > 8) throw new Error('Concurrent agents must be between 1 and 8.');
     if (typeof next.name !== 'string' || next.name.length > 80 || typeof next.instructions !== 'string' || next.instructions.length > 40_000) throw new Error('Name or instructions are too long.');
@@ -1013,6 +1058,27 @@ export class Harness extends EventEmitter {
     }
     try { return await fetchModelCatalog(input, key); }
     catch (error) { let message = error instanceof Error ? error.message : String(error); if (key) message = message.split(key).join('[redacted]'); throw new Error(this.redactString(message)); }
+  }
+  /**
+   * 一键自检 (handoff §5.8): the gateway's model list, then one completion of a single token to the chosen model. Both
+   * steps run and report on their own, so a gateway without /models still shows whether it answers.
+   */
+  async selfTestGateway(input: { id?: string; baseUrl: string; protocol: Gateway['protocol']; modelId: string }, apiKey?: string): Promise<GatewaySelfTest> {
+    if (apiKey !== undefined && (typeof apiKey !== 'string' || apiKey.length > 8192)) throw new Error('Invalid API key.');
+    modelCatalogUrl(input.baseUrl, input.protocol);
+    if (typeof input.modelId !== 'string' || !input.modelId.trim() || input.modelId.length > 200) throw new Error('Choose a model to test.');
+    const saved = input.id ? this.store.state.gateways.find(gateway => gateway.id === input.id) : undefined;
+    let key = apiKey?.trim() || '';
+    if (!key && saved && new URL(saved.baseUrl).origin === new URL(input.baseUrl).origin) key = this.vault.get(saved.id);
+    const clean = (error: unknown) => { let message = error instanceof Error ? error.message : String(error); if (key) message = message.split(key).join('[redacted]'); return this.redactString(message); };
+    const steps: GatewaySelfTest['steps'] = [];
+    let started = Date.now();
+    try { const models = await fetchModelCatalog(input, key); steps.push({ step: 'models', ok: true, detail: `${models.length} models`, ms: Date.now() - started }); }
+    catch (error) { steps.push({ step: 'models', ok: false, detail: clean(error), ms: Date.now() - started }); }
+    started = Date.now();
+    try { const reply = await tinyCompletion(input, key, input.modelId.trim()); steps.push({ step: 'completion', ok: true, detail: clean(reply.text.slice(0, 40)), ms: Date.now() - started }); }
+    catch (error) { steps.push({ step: 'completion', ok: false, detail: clean(error), ms: Date.now() - started }); }
+    return { ok: steps.every(step => step.ok), steps };
   }
   diff(id: string) { const task = this.task(id); return getDiff(task.cwd, task.worktree?.baseCommit); }
   async mergeTask(id: string) {
@@ -1268,7 +1334,9 @@ export class Harness extends EventEmitter {
       const models = [...incoming, ...(existing ? gatewayModels(existing).filter(model => !incoming.some(item => item.id === model.id)) : [])];
       this.saveGateway({ ...gateway, models });
     }
-    this.savePreferences({ ...data.preferences, skillPaths: [...new Set([...this.store.state.preferences.skillPaths, ...data.importedSkillPaths.map(path => dirname(path))])] });
+    // A theme pack that is not installed here keeps the current theme rather than failing the restore.
+    const theme = this.knownTheme(data.preferences.theme) ? data.preferences.theme : this.store.state.preferences.theme;
+    this.savePreferences({ ...data.preferences, theme, skillPaths: [...new Set([...this.store.state.preferences.skillPaths, ...data.importedSkillPaths.map(path => dirname(path))])] });
     this.saveSearch({ ...data.search, enabled: data.search.provider === 'brave' ? this.vault.has('search:brave') && data.search.enabled : data.search.enabled });
     this.saveEcosystem({ memoryEnabled: data.ecosystem.memoryEnabled, cacheEnabled: data.ecosystem.cacheEnabled, showStatusline: data.ecosystem.showStatusline, compactTools: data.ecosystem.compactTools });
     for (const role of data.ecosystem.roles) if (!defaultEcosystem().roles.some(item => item.id === role.id)) this.saveAgentRole({ ...role, builtIn: false });

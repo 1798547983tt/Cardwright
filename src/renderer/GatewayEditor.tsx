@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, LoaderCircle, Plus, RefreshCw, Search, Star, Trash2 } from 'lucide-react';
-import type { Gateway, GatewayModel, ThinkingLevel } from '../shared/types';
+import { Activity, Check, ChevronDown, LoaderCircle, Plus, RefreshCw, Search, Star, Trash2, X } from 'lucide-react';
+import type { Gateway, GatewayModel, GatewaySelfTest, ThinkingLevel } from '../shared/types';
+import { GATEWAY_PRESETS, isLoopback, type GatewayPreset } from '../shared/gateway-presets';
 import { gatewayModels } from '../shared/gateway-models';
 import { useApp } from './context';
 import { Field, IconButton, Modal } from './primitives';
@@ -22,7 +23,10 @@ export function GatewayEditor({ gateway, onClose }: { gateway?: Gateway; onClose
   const [catalogOpen, setCatalogOpen] = useState(!gateway); const [query, setQuery] = useState(''); const [selectedCatalog, setSelectedCatalog] = useState<string[]>([]);
   const [manualId, setManualId] = useState(''); const [formError, setFormError] = useState('');
   const request = useRef(0); const active = models.find(model => model.id === selectedId);
-  const validConnection = /^https?:\/\/[^\s]+$/i.test(connection.baseUrl.trim()) && (!!key.trim() || !!gateway?.hasKey);
+  // Local services (本地模型, 本地代理网关) live on this computer; a model server rarely checks a key.
+  const [preset, setPreset] = useState<GatewayPreset | null>(null); const [selfTest, setSelfTest] = useState<GatewaySelfTest | null>(null); const [testing, setTesting] = useState(false);
+  const local = isLoopback(connection.baseUrl.trim());
+  const validConnection = /^https?:\/\/[^\s]+$/i.test(connection.baseUrl.trim()) && (!!key.trim() || !!gateway?.hasKey || local);
   const shownCatalog = catalog.filter(model => `${model.id} ${model.name || ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const existing = new Set(models.map(model => model.id));
   async function fetchModels() {
@@ -41,6 +45,17 @@ export function GatewayEditor({ gateway, onClose }: { gateway?: Gateway; onClose
   function updateModel<K extends keyof GatewayModel>(name: K, next: GatewayModel[K]) { setModels(current => current.map(model => model.id === selectedId ? { ...model, [name]: next } : model)); setFormError(''); }
   function removeModel(id: string) { const next = models.filter(model => model.id !== id); setModels(next); if (defaultId === id) setDefaultId(next[0]?.id || ''); if (selectedId === id) setSelectedId(next[0]?.id || ''); }
   function setMapping(level: ThinkingLevel, providerValue: string) { if (!active) return; const next = { ...active.effortMap }; if (providerValue.trim()) next[level] = providerValue.trim(); else delete next[level]; updateModel('effortMap', next); }
+  function usePreset(next: GatewayPreset) {
+    setPreset(next); setSelfTest(null);
+    setConnection(current => ({ ...current, name: current.name.trim() ? current.name : t(next.name.en, next.name.zh), protocol: next.protocol, baseUrl: next.addresses[0].url }));
+  }
+  /** 一键自检: the model list, then one completion of a single token to the default model. */
+  async function runSelfTest() {
+    const modelId = defaultId || models[0]?.id; if (!modelId || !validConnection) return;
+    setTesting(true); setSelfTest(null);
+    const result = await run(() => api.selfTestGateway({ ...(gateway ? { id: gateway.id } : {}), baseUrl: connection.baseUrl.trim(), protocol: connection.protocol, modelId }, key.trim() || (local && !gateway?.hasKey ? 'local' : undefined)));
+    if (result) setSelfTest(result); setTesting(false);
+  }
   async function save() {
     if (!models.length) { setFormError(t('Add at least one model before saving.', '至少添加一个模型后再保存。')); return; }
     const invalid = models.find(model => model.contextWindow < 1024 || model.contextWindow > 10000000 || model.maxTokens < 1 || model.maxTokens > model.contextWindow);
@@ -48,14 +63,20 @@ export function GatewayEditor({ gateway, onClose }: { gateway?: Gateway; onClose
     setBusy(true);
     const cleaned = models.map(model => { const effortMap = { ...model.effortMap }; if (connection.protocol === 'anthropic-messages' && !model.adaptiveThinking) for (const level of ['xhigh', 'max', 'ultra'] as const) delete effortMap[level]; return { ...model, effortMap }; });
     const selectedDefault = cleaned.find(model => model.id === defaultId) || cleaned[0]; const { id: modelId, name: _modelName, ...capabilities } = selectedDefault;
-    const result = await run(async () => { await api.saveGateway({ ...connection, name: connection.name.trim(), baseUrl: connection.baseUrl.trim(), modelId, ...capabilities, models: cleaned }, key || undefined); return true; }, t('Gateway saved', '网关已保存'));
+    // A local service without a key gets the placeholder “local”, which model servers accept and ignore.
+    const savedKey = key || (local && !gateway?.hasKey ? 'local' : undefined);
+    const result = await run(async () => { await api.saveGateway({ ...connection, name: connection.name.trim(), baseUrl: connection.baseUrl.trim(), modelId, ...capabilities, models: cleaned }, savedKey); return true; }, t('Gateway saved', '网关已保存'));
     setBusy(false); if (result) onClose();
   }
   return <Modal title={gateway ? t('Edit gateway', '编辑网关') : t('Connect a model gateway', '连接模型网关')} onClose={() => { if (!busy) onClose(); }} className="gateway-modal gateway-multi-modal">
     <p className="modal-intro">{t('One connection, multiple models. Add the models you want and configure each separately.', '一个连接，多个模型。添加需要的模型，再分别调整配置。')}</p>
     <form onSubmit={event => { event.preventDefault(); void save(); }}><fieldset disabled={busy} className="gateway-form-fields">
+      {!gateway && <section className="gateway-presets" aria-label={t('Presets', '预设')}>
+        <div className="gateway-preset-choices"><span>{t('Presets', '预设')}</span>{GATEWAY_PRESETS.map(item => <button key={item.id} type="button" className={`gateway-preset ${preset?.id === item.id ? 'active' : ''}`} aria-pressed={preset?.id === item.id} onClick={() => usePreset(item)}>{t(item.name.en, item.name.zh)}</button>)}{preset && <IconButton label={t('Clear the preset', '不用预设')} onClick={() => setPreset(null)}><X size={13} /></IconButton>}</div>
+        {preset && <><div className="gateway-preset-addresses" role="group" aria-label={t('Address', '地址')}>{preset.addresses.map(address => <button key={address.url} type="button" aria-pressed={connection.baseUrl === address.url} onClick={() => setConnection(current => ({ ...current, baseUrl: address.url }))}>{address.label}<small>{address.url}</small></button>)}</div><p className="gateway-preset-note">{t(preset.note.en, preset.note.zh)}</p></>}
+      </section>}
       <div className="form-grid"><Field label={t('Gateway name', '网关名称')}><input autoFocus required value={connection.name} onChange={event => setConnection(current => ({ ...current, name: event.target.value }))} placeholder={t('My gateway', '我的网关')} /></Field><Field label={t('API protocol', 'API 协议')}><select value={connection.protocol} onChange={event => setConnection(current => ({ ...current, protocol: event.target.value as Gateway['protocol'] }))}><option value="openai-completions">OpenAI Chat Completions</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option></select></Field></div>
-      <div className="form-grid gateway-connection-grid"><Field label="Base URL" hint={connection.protocol === 'anthropic-messages' ? t('Service origin without /v1.', '填写不含 /v1 的服务地址。') : t('API root, usually ending in /v1.', '填写 API 根路径，通常以 /v1 结尾。')}><input type="url" required value={connection.baseUrl} onChange={event => setConnection(current => ({ ...current, baseUrl: event.target.value }))} placeholder="https://your-gateway.example/v1" spellCheck={false} /></Field><Field label="API key" hint={gateway?.hasKey ? t('Leave blank to keep the saved key.', '留空则保留已保存的密钥。') : t('Shared by all models in this gateway.', '此网关下所有模型共用此密钥。')}><input type="password" required={!gateway?.hasKey} autoComplete="off" spellCheck={false} value={key} onChange={event => setKey(event.target.value)} placeholder={gateway?.hasKey ? '••••••••••••••••' : t('Enter your API key', '输入 API 密钥')} /></Field></div>
+      <div className="form-grid gateway-connection-grid"><Field label="Base URL" hint={connection.protocol === 'anthropic-messages' ? t('Service origin without /v1.', '填写不含 /v1 的服务地址。') : t('API root, usually ending in /v1.', '填写 API 根路径，通常以 /v1 结尾。')}><input type="url" required value={connection.baseUrl} onChange={event => setConnection(current => ({ ...current, baseUrl: event.target.value }))} placeholder="https://your-gateway.example/v1" spellCheck={false} /></Field><Field label="API key" hint={gateway?.hasKey ? t('Leave blank to keep the saved key.', '留空则保留已保存的密钥。') : t('Shared by all models in this gateway.', '此网关下所有模型共用此密钥。')}><input type="password" required={!gateway?.hasKey && !local} autoComplete="off" spellCheck={false} value={key} onChange={event => setKey(event.target.value)} placeholder={gateway?.hasKey ? '••••••••••••••••' : local ? t('Optional on this computer', '本机服务可以不填') : t('Enter your API key', '输入 API 密钥')} /></Field></div>
       <section className="gateway-model-section" aria-label={t('Gateway models', '网关模型')}>
         <div className="model-discovery-heading"><h3>{t('Models', '模型')} <span className="badge">{models.length}</span></h3><button type="button" className="button small" aria-expanded={catalogOpen} onClick={() => setCatalogOpen(!catalogOpen)}><Plus size={14} />{t('Add models', '添加模型')}<ChevronDown size={13} className={catalogOpen ? 'rotated' : ''} /></button></div>
         {catalogOpen && <div className="gateway-catalog">
@@ -77,8 +98,9 @@ export function GatewayEditor({ gateway, onClose }: { gateway?: Gateway; onClose
           </div>}
         </div> : <div className="gateway-model-empty">{t('Add models from the list above, or enter a model ID.', '从上方列表添加模型，也可以手动填写模型 ID。')}</div>}
       </section>
+      {selfTest && <div className={`gateway-self-test ${selfTest.ok ? 'is-ok' : 'is-failed'}`} role="status">{selfTest.steps.map(step => <p key={step.step}>{step.ok ? <Check size={13} /> : <X size={13} />}<b>{step.step === 'models' ? t('Model list', '模型列表') : t('One-token completion', '一次极短补全')}</b><span>{step.ok ? step.step === 'models' ? step.detail.replace(' models', t(' models', ' 个模型')) : t(`replied “${step.detail}”`, `回复了“${step.detail}”`) : step.detail}</span><small>{step.ms} ms</small></p>)}</div>}
       {formError && <p className="gateway-form-error" role="alert">{formError}</p>}
-      <div className="modal-actions gateway-save-actions"><span>{models.length} {t('models · one shared connection', '个模型 · 共用一个连接')}</span><button type="button" className="button" onClick={onClose}>{t('Cancel', '取消')}</button><button className="button primary" disabled={!models.length}>{busy ? t('Saving…', '保存中…') : t('Save gateway', '保存网关')}</button></div>
+      <div className="modal-actions gateway-save-actions"><span>{models.length} {t('models · one shared connection', '个模型 · 共用一个连接')}</span><button type="button" className="button" disabled={testing || !validConnection || !models.length} title={t('Lists the models, then sends one completion of a single token to the default model.', '先读模型列表，再给默认模型发一次只生成一个 Token 的补全。')} onClick={() => void runSelfTest()}>{testing ? <LoaderCircle size={14} className="spinning" /> : <Activity size={14} />}{t('Self-test', '一键自检')}</button><button type="button" className="button" onClick={onClose}>{t('Cancel', '取消')}</button><button className="button primary" disabled={!models.length}>{busy ? t('Saving…', '保存中…') : t('Save gateway', '保存网关')}</button></div>
     </fieldset></form>
   </Modal>;
 }

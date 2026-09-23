@@ -104,6 +104,43 @@ test('harness enforces concurrency and queued cancellation, then records real wo
   assert.deepEqual(assistant?.usage, { input: 11, output: 7, cacheRead: 3, cacheWrite: 0, cost: 0 });
 });
 
+test('a first turn stopped before its reply was finished leaves no session behind, and the next message starts a new one', async t => {
+  // Pi writes a session file only once the first reply is finished; a worker stopped the hard way before that left the
+  // task pointing into a file that was never written, and every later message failed.
+  const { root, harness } = await setup(t);
+  const target = await project(harness, root, 'unsaved');
+  const started = await harness.createTask({ projectId: target.id, isolated: false, prompt: 'unsaved' });
+  await until(() => current(harness, started.id).messages.some(message => message.role === 'assistant'), 'the reply being written');
+  assert.equal(current(harness, started.id).sessionLeafId, 'fixture-unsaved-entry');
+  await harness.cancelTask(started.id);
+  await until(() => current(harness, started.id).status === 'cancelled' && !current(harness, started.id).workerActive, 'the stopped worker');
+  const stopped = current(harness, started.id);
+  assert.deepEqual([stopped.sessionFile, stopped.sessionLeafId, stopped.messages[0].sessionEntryId], [undefined, undefined, undefined]);
+  await harness.prompt(started.id, 'complete');
+  await until(() => ['completed', 'failed'].includes(current(harness, started.id).status), 'the next message');
+  assert.equal(current(harness, started.id).status, 'completed', current(harness, started.id).error);
+});
+
+test('a task an older version left pointing into a session file that was never written recovers after one refused run', async t => {
+  const { root, directory, vault, harness } = await setup(t);
+  const target = await project(harness, root, 'stuck');
+  const created = await harness.createTask({ projectId: target.id, isolated: false, prompt: 'complete' });
+  await until(() => current(harness, created.id).status === 'completed' && !current(harness, created.id).workerActive, 'the first turn');
+  await harness.close();
+  harnesses.delete(root);
+  const state = JSON.parse(await readFile(join(directory, 'state.json'), 'utf8')) as { tasks: Task[] };
+  Object.assign(state.tasks.find(task => task.id === created.id)!, { sessionFile: join(directory, 'sessions', created.id, 'never-written.jsonl'), sessionLeafId: 'entry-only-in-memory' });
+  await writeFile(join(directory, 'state.json'), JSON.stringify(state));
+  const reopened = new Harness(directory, fakeWorker, vault);
+  harnesses.set(root, reopened);
+  await reopened.prompt(created.id, 'complete');
+  await until(() => current(reopened, created.id).status === 'failed' && !current(reopened, created.id).workerActive, 'the refused run');
+  assert.match(current(reopened, created.id).error ?? '', /missing a saved entry/);
+  await reopened.prompt(created.id, 'complete');
+  await until(() => ['completed', 'failed'].includes(current(reopened, created.id).status) && !current(reopened, created.id).workerActive, 'the next run');
+  assert.equal(current(reopened, created.id).status, 'completed', current(reopened, created.id).error);
+});
+
 test('a message that never went out stops showing as queued once its task is cancelled or interrupted', async t => {
   const { root, directory, vault, harness } = await setup(t);
   const holding = await project(harness, root, 'holding');
@@ -354,6 +391,25 @@ test('invalid gateway and task settings are rejected without saving secrets or c
   assert.throws(() => harness.savePreferences({ theme: 'unknown' as Preferences['theme'] }), /appearance/);
   assert.equal(harness.snapshot().preferences.maxConcurrent, 1);
   assert.equal(harness.snapshot().preferences.theme, 'system');
+});
+
+test('the theme is a built-in one or a theme pack in the data folder, and the pet settings are checked', async t => {
+  const { directory, harness } = await setup(t);
+  harness.savePreferences({ theme: 'sakura' });
+  assert.equal(harness.snapshot().preferences.theme, 'sakura');
+  assert.throws(() => harness.savePreferences({ theme: 'night-tea' }), /appearance/, 'a pack that is not installed');
+  await mkdir(join(directory, 'themes', 'night-tea'), { recursive: true });
+  await writeFile(join(directory, 'themes', 'night-tea', 'theme.json'), '{}');
+  harness.savePreferences({ theme: 'night-tea' });
+  assert.equal(harness.snapshot().preferences.theme, 'night-tea');
+  assert.throws(() => harness.savePreferences({ theme: '../escape' }), /appearance/);
+  assert.equal(harness.snapshot().preferences.petEnabled, undefined, 'the pet is off until the user turns it on');
+  harness.savePreferences({ petEnabled: true, petId: 'erii', petPosition: { x: 1640, y: 770 } });
+  assert.deepEqual([harness.snapshot().preferences.petEnabled, harness.snapshot().preferences.petId, harness.snapshot().preferences.petPosition], [true, 'erii', { x: 1640, y: 770 }]);
+  assert.throws(() => harness.savePreferences({ petPosition: { x: Number.NaN, y: 0 } }), /pet/i);
+  assert.throws(() => harness.savePreferences({ petPosition: 'top-left' as never }), /pet/i);
+  assert.throws(() => harness.savePreferences({ petId: '../erii' }), /pet/i);
+  assert.throws(() => harness.savePreferences({ petEnabled: 'yes' as never }), /pet/i);
 });
 
 test('multi-model selection is atomic and retains one shared gateway credential', async t => {

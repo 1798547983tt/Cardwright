@@ -8,6 +8,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { buildCard, emptyCardEnvelope, joinComponent, splitCard, splitComponent, type CardParts, type ComponentSplit } from '../../shared/card-studio/card-file.ts';
 import { bookEntryToParams, cardEntryToParams, defaultLoreParams, loreFileName, paramsToBookEntry, sectionOfParams, type LoreParams } from '../../shared/card-studio/lore.ts';
+import { withFrontendFence } from '../../shared/card-studio/frontend.ts';
 import { allocateUids, raiseNextUid, readCardFile } from './card-project.ts';
 import type { CardComponentResult, CardImportReport, NewCardComponent } from '../../shared/card-studio/types.ts';
 
@@ -143,13 +144,18 @@ async function readGreetings(root: string): Promise<GreetingComponent[]> {
   return greetings;
 }
 
+/** What a regex component writes into `replaceString`: the iframe front-ends get their 前端围栏 here, and only here. */
+export function regexReplacement(item: FileComponent): string {
+  return withFrontendFence(item.body);
+}
+
 function partsOf(project: ProjectComponents): CardParts {
   const toComponent = (item: FileComponent): ComponentSplit => ({ params: item.params, body: item.body });
   return {
     envelope: project.envelope,
     book: { name: project.book.name, extras: project.book.extras },
     lore: project.lore.map(item => ({ params: item.params, content: item.content })),
-    regex: project.regex.map(toComponent),
+    regex: project.regex.map(item => ({ params: item.params, body: regexReplacement(item) })),
     scripts: project.scripts.map(toComponent),
     greetings: {
       first: project.greetings.find(item => item.kind === 'first')?.text ?? '',
@@ -261,7 +267,7 @@ export interface PieceImport { kind: PieceKind; name: string; paramsPath: string
 export function buildPiece(project: ProjectComponents, kind: PieceKind, name: string): Record<string, unknown> {
   const piece = (kind === 'regex' ? project.regex : project.scripts).find(item => item.name === name);
   if (!piece) throw new Error(`没有找到${PIECE[kind].label}组件「${name}」。`);
-  return joinComponent({ params: piece.params, body: piece.body }, PIECE[kind].body);
+  return joinComponent({ params: piece.params, body: kind === 'regex' ? regexReplacement(piece) : piece.body }, PIECE[kind].body);
 }
 
 export function pieceFileName(kind: PieceKind, name: string, version: string, date: string): string {

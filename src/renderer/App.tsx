@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Search, X, AlertCircle, LoaderCircle } from 'lucide-react';
-import type { AppSnapshot } from '../shared/types';
+import type { AppearanceSnapshot, AppSnapshot } from '../shared/types';
 import { AppContext, type AppContextValue, type SettingsTab } from './context';
 import { IconButton, Mark, Modal } from './primitives';
 import { Home } from './Home';
@@ -19,11 +19,12 @@ import { watchWindowActivity } from './window-activity';
 import { preloadFonts } from './fonts';
 import { applyAppUpdate, appUpdateRevision, type AppUpdate } from '../shared/app-updates';
 import { workbenchSnapshot } from '../shared/card-studio/view';
-import { CardStudio } from './card-studio/CardStudio';
+import { CardStudio, type StudioTarget } from './card-studio/CardStudio';
 import { StudioTransition, type TransitionDirection, type TransitionOrigin } from './card-studio/StudioTransition';
 import { ErrorBoundary, SmokeFault, smokeFaults } from './ErrorBoundary';
 import { setDiagnosticPage } from './diagnostics';
 import { pageLabel } from '../shared/diagnostics';
+import { ThemeEntrance, useThemeApplication } from './ThemeLayer';
 
 // Navigation follows metadata, not streamed bodies, so rows do not re-render on every token.
 const NavigationSurface = memo(function NavigationSurface({ value, children }: { value: AppContextValue; children: ReactNode }) {
@@ -43,6 +44,7 @@ export function App() {
   const [search, setSearch] = useState(false); const [query, setQuery] = useState('');
   // The card studio is a separate mode: it starts closed on every launch and owns card projects and their conversations.
   const [studioOpen, setStudioOpen] = useState(false);
+  const [studioTarget, setStudioTarget] = useState<StudioTarget | null>(null);
   const [transition, setTransition] = useState<{ id: number; direction: TransitionDirection; origin: TransitionOrigin | null } | null>(null);
   const transitioning = useRef(false); const studioOpenRef = useRef(false); studioOpenRef.current = studioOpen;
   const [bootMounted, setBootMounted] = useState(true);
@@ -53,6 +55,13 @@ export function App() {
     const next = workbenchSnapshot(data, workbenchPrevious.current ?? undefined); workbenchPrevious.current = next; return next;
   }, [data]);
   const shell = useRef<HTMLDivElement>(null);
+  // 主题包 and 桌宠 packs; refreshed when the theme or the pet setting changes, and after the settings page installs one.
+  const [appearance, setAppearance] = useState<AppearanceSnapshot | null>(null);
+  const refreshAppearance = useCallback(() => { void api?.appearance().then(setAppearance, () => undefined); }, [api]);
+  useEffect(() => { refreshAppearance(); }, [refreshAppearance, data?.preferences.theme, data?.preferences.petEnabled]);
+  const themePacks = useMemo(() => appearance?.themes ?? [], [appearance]);
+  const theme = useThemeApplication(api, data?.preferences, themePacks);
+  const appearanceContext = useMemo(() => ({ snapshot: appearance, refresh: refreshAppearance }), [appearance, refreshAppearance]);
   const t = useCallback((en: string, zh: string) => data?.preferences.language === 'zh' ? zh : en, [data?.preferences.language]);
   useEffect(() => {
     if (!api) return;
@@ -81,14 +90,11 @@ export function App() {
   useEffect(() => { if (workbench && !projectId && workbench.projects.length) setProjectId(workbench.projects.find(project => project.kind !== 'card')?.id || ''); }, [workbench?.projects, projectId]);
   useEffect(() => {
     if (!data) return;
-    const prefs = data.preferences; const media = matchMedia('(prefers-color-scheme: dark)');
-    const update = () => { document.documentElement.dataset.theme = prefs.theme === 'system' ? media.matches ? 'dark' : 'light' : prefs.theme; };
-    update(); media.addEventListener('change', update);
+    const prefs = data.preferences;
     document.documentElement.lang = prefs.language === 'zh' ? 'zh-CN' : 'en';
     document.documentElement.dataset.motion = prefs.reducedMotion ? 'reduced' : 'system';
     document.documentElement.dataset.font = prefs.font;
     configureSound({ enabled: prefs.soundEnabled, volume: prefs.soundVolume });
-    return () => media.removeEventListener('change', update);
   }, [data?.preferences]);
   useEffect(() => { const root = shell.current; return root ? installClickSounds(root) : undefined; }, [!!data, studioOpen]);
   // Event cues compare consecutive snapshots: completion, new approvals and new truncations.
@@ -126,6 +132,14 @@ export function App() {
   const finishTransition = useCallback(() => { transitioning.current = false; setTransition(null); }, []);
   // Inside the studio, settings and workbench tasks leave the studio first.
   const studioSettings = useCallback((tab: SettingsTab = 'general') => { setSettingTab(tab); setMode('settings'); exitStudio(null); }, [exitStudio]);
+  // The desk pet's click (ADR 0018): what it reported, a task in the workbench or a conversation or card in the studio.
+  useEffect(() => api?.onOpen(target => {
+    if (target.kind === 'task') { if (studioOpenRef.current) exitStudio(null); navigate(target.taskId); }
+    else if (target.kind === 'card') {
+      setStudioTarget({ projectId: target.projectId, sectionId: target.sectionId, conversation: target.taskId, at: Date.now() });
+      if (!studioOpenRef.current) openStudio(null);
+    }
+  }), [api, navigate, openStudio, exitStudio]);
   const studioNavigate = useCallback((id: string | null) => { if (id && latestData.current?.tasks.find(task => task.id === id)?.card) return; navigate(id); exitStudio(null); }, [navigate, exitStudio]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -156,7 +170,7 @@ export function App() {
     setPanel(current => current?.panes.includes('browser') ? current : { panes: ['browser', current?.panes[1] ? current.panes[0] : null], target: current?.target });
   }, [browserCall]);
   const usage = useMemo(() => data ? { tasks: data.tasks, projects: data.projects } : undefined, [data?.tasks, data?.projects]);
-  const context = useMemo(() => workbench && ({ data: workbench, api, t, run, settings, navigate, notify: setToast, openStudio, usage, view }), [workbench, api, t, run, settings, navigate, openStudio, usage, view]);
+  const context = useMemo(() => workbench && ({ data: workbench, api, t, run, settings, navigate, notify: setToast, openStudio, usage, view, appearance: appearanceContext }), [workbench, api, t, run, settings, navigate, openStudio, usage, view, appearanceContext]);
   const studioContext = useMemo(() => data && ({ data, api, t, run, settings: studioSettings, navigate: studioNavigate, notify: setToast }), [data, api, t, run, studioSettings, studioNavigate]);
   const navigationKey = workbench?.tasks.map(task => JSON.stringify([task.id, task.title, task.projectId, task.parentId, task.cwd, task.status, task.archived, task.pinned, !!task.truncation, task.updatedAt.slice(0, 16)])).join('\n');
   const navigationTasks = useMemo(() => workbench?.tasks, [navigationKey]);
@@ -175,7 +189,7 @@ export function App() {
   // The transition and the toast stay outside both pages: swapping the page underneath them must not remount them,
   // or the 卷宗 animation starts over halfway through and the user sees it twice.
   const page = studioOpen
-    ? <AppContext.Provider key="studio" value={studioContext}><CardStudio onExit={exitStudio} /></AppContext.Provider>
+    ? <AppContext.Provider key="studio" value={studioContext}><CardStudio onExit={exitStudio} target={studioTarget} /></AppContext.Provider>
     : <AppContext.Provider key="workbench" value={context}><div ref={shell} className={`app-shell desk-shell ${live ? 'is-live' : ''} ${panel && selectedTask && mode === 'code' ? 'with-panel' : ''}`}>
     <div className="desk-titlebar">
       <span className="desk-titlebar-name">{windowTitle}</span>
@@ -201,6 +215,7 @@ export function App() {
     </main>
     {panel && selectedTask && mode === 'code' && <SidePanel task={selectedTask} state={panel} onState={setPanel} onClose={() => setPanel(null)} />}
     {search && <Modal title={t('Find a task', '查找任务')} onClose={() => setSearch(false)} className="search-modal"><div className="search-field"><Search size={20} /><input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder={t('Search task names…', '搜索任务名称…')} aria-label={t('Search tasks', '搜索任务')} /><kbd>Ctrl K</kbd></div><div className="search-results">{searchTasks.length ? searchTasks.map(task => <button key={task.id} onClick={() => { navigate(task.id); setSearch(false); }}><span className={`status-diamond ${task.truncation ? 'truncated' : task.status}`} /><div><strong>{task.title}</strong><small>{data.projects.find(p => p.id === task.projectId)?.name} · {new Date(task.updatedAt).toLocaleDateString()}</small></div></button>) : <p className="muted">{t('No matching tasks.', '没有匹配的任务。')}</p>}</div></Modal>}
+    <ThemeEntrance theme={theme} reduced={reducedMotion} />
     {bootMounted && data.preferences.bootSequence === true && <BootSequence language={data.preferences.language} reducedMotion={data.preferences.reducedMotion} onDone={() => { setLive(true); setTimeout(() => setBootMounted(false), 600); }} />}
   </div></AppContext.Provider>;
   return <>{page}{toastLayer}{transitionLayer}{smoke && <SmokeFault where="app" />}</>;

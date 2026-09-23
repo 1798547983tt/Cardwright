@@ -259,7 +259,7 @@ html[data-theme="light"] .composer-box:focus-within::before { border-color: #151
 .settings-search { border-radius: 0; clip-path: var(--cut-xs); background: var(--input); }
 .settings-sidebar nav section { margin-top: 18px; }
 .settings-sidebar nav h3 { font: 11px var(--font-code); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin: 0 8px 6px; }
-.settings-sidebar nav button { display: flex; align-items: center; gap: 9px; min-height: 36px; margin: 1px 0; padding: 7px 10px; border-radius: 0; border-left: 2px solid transparent; color: var(--sidebar-text); font-size: 13px; }
+.settings-sidebar nav button { display: flex; align-items: center; gap: 9px; min-height: 36px; margin: 1px 0; padding: 7px 10px; border-radius: 0; border-left: 2px solid transparent; color: var(--text-soft); font-size: 13px; }
 .settings-sidebar nav button em { font: normal 12px var(--font-code); color: var(--dim); min-width: 18px; }
 .settings-sidebar nav button:hover:not(.active) { background: var(--hover); color: var(--text); }
 .settings-sidebar nav button.active { background: var(--selected); color: var(--text); border-left-color: var(--accent); font-weight: 600; }

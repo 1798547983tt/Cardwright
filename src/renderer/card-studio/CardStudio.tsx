@@ -37,7 +37,10 @@ export function useStudio(): StudioNavigation {
   return value;
 }
 
-export function CardStudio({ onExit }: { onExit: (origin: HTMLElement | null) => void }) {
+/** Where the desk pet asks the studio to go (ADR 0018): a section's conversation, or the card's home. */
+export interface StudioTarget { projectId: string; sectionId?: string; conversation?: string; at: number }
+
+export function CardStudio({ onExit, target }: { onExit: (origin: HTMLElement | null) => void; target?: StudioTarget | null }) {
   const { data, api, t, run, notify } = useApp();
   const [view, setView] = useState<StudioView>({ page: 'library' });
   const currentView = useRef(view); currentView.current = view;
@@ -50,6 +53,11 @@ export function CardStudio({ onExit }: { onExit: (origin: HTMLElement | null) =>
   useEffect(() => (root.current ? installClickSounds(root.current) : undefined), []);
   useEffect(() => { if (view.page !== 'library' && !cards.some(card => card.projectId === view.projectId)) setView({ page: 'library' }); }, [cards, view]);
   useEffect(() => { setPreviewColor(null); }, [view]);
+  // The desk pet opens the conversation it reported, or the card it is making.
+  useEffect(() => {
+    if (!target) return;
+    setView(target.sectionId && findBoard(target.sectionId) ? { page: 'section', projectId: target.projectId, sectionId: target.sectionId, conversation: target.conversation } : { page: 'project', projectId: target.projectId });
+  }, [target]);
 
   const key = (projectId: string, sectionId: string) => `${projectId}:${sectionId}`;
   // §5.2: a handoff summary the app asked for becomes the draft of a new conversation in the same section. It stays a
@@ -90,7 +98,8 @@ export function CardStudio({ onExit }: { onExit: (origin: HTMLElement | null) =>
   useEffect(() => { setDiagnosticPage(page); }, [page]);
   const smoke = smokeFaults();
   return <StudioContext.Provider value={navigation}>
-    <div ref={root} className="card-studio" style={{ '--board': light } as CSSProperties}>
+    {/* A theme with its own accent tints the board light a little; without one the mix is the board colour itself. */}
+    <div ref={root} className="card-studio" style={{ '--board': `color-mix(in srgb, ${light} 72%, var(--theme-accent, ${light}))` } as CSSProperties}>
       <header className="cs-top">
         <span className="cs-mark" aria-hidden="true"><i /></span>
         <span className="cs-brand">{t('Card studio', '制卡工坊')}<small>CARD STUDIO</small></span>

@@ -8,7 +8,7 @@ import { importSources, readSourceManifest, resplitSource, type SourceImportRepo
 import { buildSectionPrompt, buildSquadMemberPrompt } from '../core/card-studio/prompts.ts';
 import { PromptOverrides } from '../core/card-studio/prompt-overrides.ts';
 import { CardRunner } from './card-runner.ts';
-import { buildCardFromProject, buildLorebookFromProject, buildPiece, createComponent, importCard, importLorebook, importPiece, pieceFileName, readProject, type FileComponent, type PieceImport, type PieceKind, type ProjectComponents } from '../core/card-studio/components.ts';
+import { buildCardFromProject, buildLorebookFromProject, buildPiece, createComponent, importCard, importLorebook, importPiece, pieceFileName, readProject, regexReplacement, type FileComponent, type PieceImport, type PieceKind, type ProjectComponents } from '../core/card-studio/components.ts';
 import { runChecks } from '../core/card-studio/checks.ts';
 import { searchSources } from '../core/card-studio/source-search.ts';
 import { bookName, diffFingerprints, exportReport, fingerprintProject, piecesFolderName, readCardMeta, writeCardMeta, type PieceFingerprint } from '../core/card-studio/export-report.ts';
@@ -20,8 +20,10 @@ import { coverDataUrl, decodeCardImage, decodeCover } from '../core/card-studio/
 import { SECTION_IDS } from '../shared/card-studio/boards.ts';
 import { dispatchKey, messageStartsDispatch, parseDispatches } from '../shared/card-studio/dispatch.ts';
 import { parsePeople } from '../shared/card-studio/design-book.ts';
+import { parseStylePreset } from '../shared/card-studio/style-presets.ts';
 import { KICKOFF, handoffRequestText, isHandoffRequest } from '../shared/card-studio/markers.ts';
 import { formatHandoff, handoffFromReply } from '../shared/card-studio/handoff.ts';
+import { runOwns } from '../shared/card-studio/run.ts';
 import type { CardCheckReport, CardComponentResult, CardComponentSummary, CardExportResult, CardImportPreview, CardImportReport, CardMeta, CardPieceSummary, CardPreview, CardPreviewState, CardProjectView, CardStudioSnapshot, CoverSource, NewCardComponent, NewCardProject, PlanMode, StartCardConversation } from '../shared/card-studio/types.ts';
 
 export type StartConversationInput = StartCardConversation;
@@ -163,20 +165,47 @@ export class CardStudioService {
     });
   }
 
-  /** Called before a message is sent in a card conversation: sending a dispatch starts it. */
-  async beforePrompt(task: Task, text: string): Promise<void> {
+  /** Called before a message is sent in a card conversation: sending a dispatch starts it. Returns the dispatch it started. */
+  async beforePrompt(task: Task, text: string): Promise<string | undefined> {
     const card = task.card;
-    if (!card) return;
+    if (!card) return undefined;
+    let started: string | undefined;
     try {
       await this.mutate(task.projectId, file => {
         const waiting = file.dispatches.filter(item => item.sectionId === card.sectionId && item.status === 'todo');
         // A conversation that finished its dispatch can take the next one (one-click making sends them into the same conversation).
         const target = waiting.find(item => item.id === card.dispatchId) ?? waiting.find(item => messageStartsDispatch(text, item));
         if (!target) return false;
-        target.status = 'active'; target.updatedAt = stamp(); card.dispatchId = target.id;
+        target.status = 'active'; target.updatedAt = stamp(); card.dispatchId = target.id; started = target.id;
         return true;
       });
     } catch { /* A broken registration file must not block the conversation; the library shows the error. */ }
+    return started;
+  }
+
+  /**
+   * 撤回 in a card conversation (Q16): the harness stops the turn and takes the message out; a dispatch the message
+   * started goes back to 未派. The app's own lines (the kickoff, the handoff request) and one-click making's
+   * conversations are not withdrawn here: stop them instead.
+   */
+  async withdraw(taskId: string, messageId: string): Promise<{ text: string; turnId: string }> {
+    const conversation = this.cardConversation(taskId);
+    const message = conversation.messages.find(item => item.id === messageId && item.role === 'user');
+    if (!message) throw new Error('找不到这条消息。');
+    const kickoff = conversation.card!.kickoff && conversation.messages.find(item => item.role === 'user')?.id === message.id;
+    if (kickoff || isHandoffRequest(message.text)) throw new Error('这条是应用发出的消息，不能撤回；要停下这一轮，请按【停止】。');
+    if (runOwns(this.cardProject(conversation.projectId).cardRun, taskId)) throw new Error('一键制作正在用这个对话。先停止一键制作，再撤回。');
+    const withdrawal = await this.harness.withdraw(taskId, messageId);
+    if (withdrawal.dispatchIds.length) {
+      await this.mutate(conversation.projectId, file => {
+        let changed = false;
+        for (const dispatch of file.dispatches.filter(item => withdrawal.dispatchIds.includes(item.id) && item.status === 'active')) {
+          dispatch.status = 'todo'; dispatch.updatedAt = stamp(); changed = true;
+        }
+        return changed;
+      });
+    }
+    return { text: withdrawal.text, turnId: withdrawal.turnId };
   }
 
   /** Called when a card conversation run ends: planning replies register their dispatches. */
@@ -541,7 +570,8 @@ export class CardStudioService {
     const components = await readProject(project.path);
     const data = (components.envelope.data && typeof components.envelope.data === 'object' ? components.envelope.data : {}) as Record<string, unknown>;
     const macros = { char: String(data.name ?? '').trim() || '角色卡', user: '玩家' };
-    const scripts = components.regex.map(item => joinComponent({ params: item.params, body: item.body }, 'replaceString') as PreviewRegex);
+    // The replacements as the exported card carries them, fence included, so the preview renders what SillyTavern will.
+    const scripts = components.regex.map(item => joinComponent({ params: item.params, body: regexReplacement(item) }, 'replaceString') as PreviewRegex);
     const state = (index: number, label: string, text: string): CardPreviewState => {
       const render = renderReply(text, scripts, macros);
       const urls = publish(`${projectId}:${kind}:${index}`, render.segments);
@@ -636,7 +666,8 @@ export class CardStudioService {
     const sources = (await readSourceManifest(project.path).catch(() => [])).length;
     return {
       projectId: project.id, path: project.path, cardId: file.cardId, name: file.name, kind: file.kind, ...(file.source ? { source: file.source } : {}),
-      coverStyle: file.coverStyle, ...(file.cover ? { cover: file.cover } : {}), stylePreset: file.stylePreset, origin: file.origin,
+      // Planning names the preset in the design book's 风格预设 section; that is what the card shows once it exists.
+      coverStyle: file.coverStyle, ...(file.cover ? { cover: file.cover } : {}), stylePreset: (design === undefined ? null : parseStylePreset(design)) ?? file.stylePreset, origin: file.origin,
       createdAt: file.createdAt, updatedAt: file.updatedAt, lastEditedAt: file.updatedAt, dispatches: file.dispatches,
       design: { exists: design !== undefined, people: design === undefined ? null : parsePeople(design) }, sources,
     };

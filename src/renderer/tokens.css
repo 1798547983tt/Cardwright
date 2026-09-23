@@ -30,6 +30,8 @@
   --canvas: #111316;
   --sidebar: var(--rail); --nav-text: var(--rail-text); --nav-muted: var(--rail-muted); --nav-line: var(--rail-line); --nav-hover: var(--rail-hover); --nav-active: var(--rail-active); --nav-accent: var(--accent);
   --text: #e4e7eb; --sidebar-text: #c4c9d0; --muted: #9aa1ab;
+  /* Soft text on panels (the settings navigation, the squad overview); --sidebar-text is for the rail, which stays dark. */
+  --text-soft: #c4c9d0;
   --line: #2a2f37; --line-strong: #3a4149;
   --hover: #1e2228; --selected: #252a31;
   --input: #1e2228; --floating: #1e2228; --button: #1e2228;
@@ -65,7 +67,7 @@ html[data-theme="light"] {
   --panel: #faf9f6; --panel-2: #ffffff; --panel-3: #eceae4; --dim: #8a9099;
 
   --canvas: #f3f2ee;
-  --text: #1a1c1f; --sidebar-text: #c4c9d0; --muted: #5a6068;
+  --text: #1a1c1f; --sidebar-text: #c4c9d0; --muted: #5a6068; --text-soft: #3f444b;
   --line: #d8d5cc; --line-strong: #b8b4a9;
   --hover: #eceae4; --selected: #e4e1d8;
   --input: #ffffff; --floating: #ffffff; --button: #ffffff;
@@ -89,6 +91,44 @@ html[data-theme="light"] {
   --backdrop: rgba(26, 28, 31, .5);
   --shadow-popover: 0 14px 30px rgba(26, 28, 31, .16), 0 0 0 1px #d8d5cc;
   --shadow-modal: 0 24px 64px rgba(26, 28, 31, .24), 0 0 0 1px #b8b4a9;
+}
+/* 红粉白 (1.0.0, ADR 0018): snow-white panes, a crimson rail like a miko's hakama, raspberry pink for the accent, and a
+   navy sash colour for links so they stay apart from the reds. Same variables as the light theme; layout untouched. */
+html[data-theme="sakura"] {
+  color-scheme: light;
+  --accent: #d0386a; --accent-ink: #ffffff; --accent-text: #b52a5a; --accent-soft: rgba(208, 56, 106, .1);
+  --theme-accent: #d0386a;
+  --info: #3e5f96; --info-soft: rgba(62, 95, 150, .1);
+  --rail: #8a1c2b; --rail-line: #a0303f; --rail-text: #fff3f4; --rail-muted: #efbcc3; --rail-hover: #9a2534; --rail-active: #ad3444;
+  /* On the crimson rail the raspberry accent would vanish; the rail's own accent is a light rose. */
+  --rail-accent: #ffd6e0; --rail-accent-soft: rgba(255, 255, 255, .12);
+  --panel: #fffafa; --panel-2: #ffffff; --panel-3: #f8e9ec; --dim: #a8878d;
+
+  --canvas: #fbf6f5;
+  --text: #2d1a1e; --sidebar-text: #f6d9dd; --muted: #6f565b; --text-soft: #5b454a;
+  --line: #efdadd; --line-strong: #dab5bb;
+  --hover: #f8e9ec; --selected: #f3dde1;
+  --input: #ffffff; --floating: #ffffff; --button: #ffffff;
+  --primary: #d0386a; --primary-hover: #b92c5b; --primary-text: #ffffff;
+  --link: #3e5f96; --focus: #d0386a; --focus-soft: rgba(208, 56, 106, .18);
+  --selection: rgba(208, 56, 106, .2); --composer-focus: #d0386a;
+  --inactive-dot: #dab5bb; --scrollbar: #dab5bb;
+  --stats-panel: #fffafa; --stat-tile: #ffffff; --stat-label: #6f565b;
+  --heat-1: #fbe3ea; --heat-2: #f2b3c6; --heat-3: #e0708f; --heat-4: #d0386a;
+  --effort: #d0386a; --effort-soft: rgba(208, 56, 106, .1); --effort-rail: #f3dde1; --effort-start: #e0708f; --effort-end: #d0386a;
+  --settings-sidebar: #f8e9ec; --settings-active: #f3dde1; --settings-input: #ffffff; --segmented-active: #ffffff; --toggle-off: #dab5bb;
+  --user-message: #fff0f3; --code-bg: #2a171b;
+  --success: #2d7d52; --success-soft: rgba(45, 125, 82, .1);
+  --warning: #985800; --warning-soft: rgba(152, 88, 0, .1);
+  --approval-bg: rgba(152, 88, 0, .07); --approval-line: rgba(152, 88, 0, .45);
+  --danger: #b3261e; --danger-soft: rgba(179, 38, 30, .1);
+  --permission-ask: #3e5f96; --permission-ask-soft: rgba(62, 95, 150, .1);
+  --permission-edit: #985800; --permission-edit-soft: rgba(152, 88, 0, .1);
+  --permission-plan: #7a52b3; --permission-plan-soft: rgba(122, 82, 179, .1);
+  --permission-full: #b3261e; --permission-full-soft: rgba(179, 38, 30, .1);
+  --backdrop: rgba(45, 26, 30, .45);
+  --shadow-popover: 0 14px 30px rgba(138, 28, 43, .14), 0 0 0 1px #efdadd;
+  --shadow-modal: 0 24px 64px rgba(138, 28, 43, .2), 0 0 0 1px #dab5bb;
 }
 html[data-font="serif"] { --font-chat: 'Georgia', 'Noto Serif CJK SC', 'SimSun', serif; }
 html[data-font="mono"] { --font-chat: var(--font-mono); }

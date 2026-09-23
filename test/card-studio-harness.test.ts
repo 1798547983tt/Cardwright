@@ -139,6 +139,107 @@ test('planning replies register dispatches once, sending a dispatch starts it an
   assert.deepEqual(saved.dispatches.map((item: { status: string }) => item.status), ['active', 'done']);
 });
 
+test('撤回 stops the turn in progress, takes the message out, hands its text back and returns its dispatch to 未派', async t => {
+  const { root, harness, studio } = await setup(t);
+  const folder = join(root, 'withdraw');
+  const { card: { projectId } } = await studio.create({ name: '西游·撤回', kind: 'fan', source: '西游记', folder });
+  await writeFile(join(folder, '设计书.md'), '# 设计书 · 西游·撤回\n');
+  const plan = await studio.startConversation({ projectId, sectionId: 'plan', prompt: 'reply-dispatches' });
+  await until(() => card(harness).dispatches.length === 2 && settled(harness, plan.id), 'dispatches registered');
+  const [rules] = card(harness).dispatches;
+  const sent = `${formatDispatch(rules)}\nRUN:hold`;
+  const conversation = await studio.startConversation({ projectId, sectionId: 'lore-rules', dispatchId: rules.id, title: rules.title, prompt: sent });
+  await until(() => task(harness, conversation.id).tools.length > 0, 'the turn in progress');
+  assert.equal(card(harness).dispatches[0].status, 'active');
+  const message = task(harness, conversation.id).messages.find(item => item.role === 'user')!;
+
+  const result = await studio.withdraw(conversation.id, message.id);
+  assert.equal(result.text, sent, 'the text goes back to the composer');
+  assert.equal(result.turnId, message.turnId, 'the turn, so its writes can still be undone');
+  const after = task(harness, conversation.id);
+  assert.equal(after.workerActive, false, 'the turn has stopped');
+  assert.deepEqual(after.messages, [], 'the message and the partial reply are gone');
+  assert.deepEqual(after.tools, []);
+  assert.equal(after.status, 'idle');
+  assert.equal(after.card?.dispatchId, rules.id, 'the conversation still belongs to its dispatch');
+  assert.equal(card(harness).dispatches[0].status, 'todo', 'the dispatch is 未派 again');
+  const saved = JSON.parse(await readFile(join(folder, '卡项目.json'), 'utf8'));
+  assert.equal(saved.dispatches[0].status, 'todo');
+
+  await harness.prompt(conversation.id, formatDispatch(rules));
+  await until(() => settled(harness, conversation.id), 'the resent dispatch');
+  assert.equal(card(harness).dispatches[0].status, 'active', 'sending again starts the dispatch again');
+  await assert.rejects(studio.withdraw(conversation.id, task(harness, conversation.id).messages[0].id), /编辑/, 'a written message is edited, not withdrawn');
+});
+
+test('撤回 keeps the earlier turns, only takes the latest message, and takes a queued message out before it runs', async t => {
+  const { root, harness, studio } = await setup(t);
+  const folder = join(root, 'withdraw-later');
+  const { card: { projectId } } = await studio.create({ name: '西游·撤回二', kind: 'fan', source: '西游记', folder });
+  const conversation = await studio.startConversation({ projectId, sectionId: 'plan', prompt: 'complete' });
+  await until(() => settled(harness, conversation.id), 'the first turn');
+  await harness.prompt(conversation.id, 'hold');
+  await until(() => task(harness, conversation.id).tools.length > 0, 'the second turn in progress');
+  const [first, , second] = task(harness, conversation.id).messages;
+  await assert.rejects(studio.withdraw(conversation.id, first.id), /最后/, 'only the latest message can be withdrawn');
+  assert.equal((await studio.withdraw(conversation.id, second.id)).text, 'hold');
+  assert.deepEqual(task(harness, conversation.id).messages.map(item => [item.role, item.text]), [['user', 'complete'], ['assistant', 'Fixture completed.']]);
+  assert.equal(task(harness, conversation.id).status, 'completed');
+
+  // A plain task holds the only slot, so the card conversation's next message waits in the queue.
+  harness.savePreferences({ maxConcurrent: 1 });
+  await mkdir(join(root, 'plain'), { recursive: true });
+  const plain = await harness.createTask({ projectId: (await harness.addProject(join(root, 'plain'))).id, prompt: 'hold' });
+  await until(() => task(harness, plain.id).status === 'running', 'the plain task holding the slot');
+  await harness.prompt(conversation.id, '排队的这句');
+  assert.equal(task(harness, conversation.id).status, 'queued');
+  const queued = task(harness, conversation.id).messages.at(-1)!;
+  assert.equal((await studio.withdraw(conversation.id, queued.id)).text, '排队的这句');
+  assert.equal(task(harness, conversation.id).messages.length, 2);
+  assert.equal(task(harness, conversation.id).status, 'completed');
+  await harness.cancelTask(plain.id);
+  await until(() => settled(harness, plain.id), 'the plain task stopped');
+  await new Promise(done => setTimeout(done, 200));
+  assert.equal(task(harness, conversation.id).messages.length, 2, 'the withdrawn message never runs');
+});
+
+test('撤回 of a first message the model is still answering leaves a conversation that can be sent again', async t => {
+  // Pi writes a new session file only once the first reply is finished. When the run has to be stopped the hard way, the
+  // file never exists, so the conversation must not keep pointing into it: in the packaged 1.0 smoke every later message
+  // failed with "missing a saved entry".
+  const { root, harness, studio } = await setup(t);
+  const folder = join(root, 'withdraw-unsaved');
+  const { card: { projectId } } = await studio.create({ name: '西游·撤回三', kind: 'fan', source: '西游记', folder });
+  await writeFile(join(folder, '设计书.md'), '# 设计书 · 西游·撤回三\n');
+  const plan = await studio.startConversation({ projectId, sectionId: 'plan', prompt: 'reply-dispatches' });
+  await until(() => card(harness).dispatches.length === 2 && settled(harness, plan.id), 'dispatches registered');
+  const [rules] = card(harness).dispatches;
+  const conversation = await studio.startConversation({ projectId, sectionId: 'lore-rules', dispatchId: rules.id, title: rules.title, prompt: `${formatDispatch(rules)}\nRUN:unsaved` });
+  await until(() => lastReply(harness, conversation.id).includes('正在写'), 'the reply being written');
+  const message = task(harness, conversation.id).messages.find(item => item.role === 'user')!;
+  assert.equal(message.sessionEntryId, 'fixture-unsaved-entry', 'the worker said where the message sits in its session');
+
+  await studio.withdraw(conversation.id, message.id);
+  const after = task(harness, conversation.id);
+  assert.equal(after.sessionFile, undefined, 'nothing of that session reached the disk, so the next message starts a new one');
+  assert.equal(after.sessionLeafId, undefined);
+  assert.equal(after.branchBeforeEntryId, undefined);
+
+  await harness.prompt(conversation.id, formatDispatch(rules));
+  await until(() => settled(harness, conversation.id), 'the resent dispatch');
+  assert.equal(task(harness, conversation.id).status, 'completed', task(harness, conversation.id).error);
+  assert.equal(card(harness).dispatches[0].status, 'active');
+});
+
+test('the style preset the design book names shows on the card', async t => {
+  const { root, harness, studio } = await setup(t);
+  const folder = join(root, 'preset');
+  const { card: { projectId } } = await studio.create({ name: '樱花庄', kind: 'original', folder });
+  assert.equal(card(harness).stylePreset, null, 'to be planned');
+  await writeFile(join(folder, '设计书.md'), '# 设计书 · 樱花庄\n\n## 风格预设\n预设：粉樱（sakura）。樱粉只给当前项。\n');
+  assert.deepEqual((await studio.reload(projectId)).stylePreset, { id: 'sakura', name: '粉樱' });
+});
+
 test('the app asks the section AI for a handoff summary and hands it to one new conversation', async t => {
   const { root, harness, studio } = await setup(t);
   const folder = join(root, 'handoff');
@@ -524,4 +625,22 @@ test('the local preview runs the card regex over the format sample and hands eac
   await writeFile(join(folder, '世界书/正文格式', light), `${fence}示例输出\n<content>轻量版的示例。</content>\n${fence}`);
   const second = await studio.preview(id, 'body');
   assert.deepEqual(second.source, { from: 'sample', path: `世界书/正文格式/${light}` });
+});
+
+test('the preview shows a front-end written as a bare document the way the exported card renders it: in its own frame', async t => {
+  const published: Array<{ owner: string; segments: PreviewSegment[] }> = [];
+  const publishPreview = (owner: string, segments: PreviewSegment[]) => { published.push({ owner, segments }); return segments.map((_, index) => `test://${owner}/${index}`); };
+  const { root, studio } = await setup(t, { publishPreview });
+  const fence = '`'.repeat(3);
+  const format = ['<customize_format>根标签 content</customize_format>', `${fence}示例输出`, '<content>雾从码头升起。</content>', fence].join('\n');
+  const file = join(root, 'bare-card.json');
+  await writeFile(file, JSON.stringify({ spec: 'chara_card_v3', spec_version: '3.0', name: '雾港档案', data: {
+    name: '雾港档案', first_mes: '雾。',
+    character_book: { name: '雾港档案世界书', entries: [{ id: 0, keys: [], secondary_keys: [], comment: '正文格式', content: format, constant: true, selective: true, insertion_order: 0, enabled: true, position: 'before_char', use_regex: true, extensions: { position: 4, depth: 0 } }] },
+    extensions: { regex_scripts: [{ id: 'r1', scriptName: '正文美化', findRegex: String.raw`/<content>([\s\S]*?)<\/content>/is`, replaceString: '<!DOCTYPE html>\n<html><body><div class="mist">$1</div><script>document.body.dataset.ran = "1";</script></body></html>', trimStrings: [], placement: [2], disabled: false, markdownOnly: true, promptOnly: false, runOnEdit: true, substituteRegex: 0, minDepth: null, maxDepth: null }] },
+  } }));
+  const id = (await studio.createFromFile({ name: '雾港档案', kind: 'original', folder: join(root, 'cards', '裸文档'), file })).card.projectId;
+  const body = await studio.preview(id, 'body');
+  assert.deepEqual(body.states[0].frames.map(frame => frame.kind), ['frontend'], 'the app adds the fence, so 酒馆助手 makes it an iframe and its script runs');
+  assert.ok(published.at(-1)!.segments[0].html.includes('<div class="mist">雾从码头升起。</div>'));
 });

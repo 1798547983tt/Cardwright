@@ -1,6 +1,6 @@
 {
   "name": "cardwright",
-  "version": "0.9.1",
+  "version": "1.0.0",
   "private": true,
   "description": "Cardwright local agent studio for projects, teams and reviewed changes",
   "type": "module",

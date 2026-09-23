@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { AppSnapshot, Bridge, Project, Task } from '../shared/types';
+import type { AppearanceSnapshot, AppSnapshot, Bridge, Project, Task } from '../shared/types';
 import type { PanelTab } from './SidePanel';
 
 export type SettingsTab = 'general' | 'privacy' | 'usage' | 'code' | 'search' | 'schedules' | 'export' | 'desktop' | 'developer' | 'skills' | 'extensions' | 'workbench' | 'card-studio';
@@ -17,6 +17,8 @@ export interface AppContextValue {
   view?: (action: { kind: 'search' } | { kind: 'panel'; tab: PanelTab } | { kind: 'file'; path: string; line?: number; endLine?: number }) => void;
   /** Token usage counts every conversation, including the card conversations the workbench hides. */
   usage?: { tasks: Task[]; projects: Project[] };
+  /** 主题包 and 桌宠 packs, with a way to read them again after an install (workbench only). */
+  appearance?: { snapshot: AppearanceSnapshot | null; refresh: () => void };
 }
 export const AppContext = createContext<AppContextValue | null>(null);
 export function useApp() { const value = useContext(AppContext); if (!value) throw new Error('App context is unavailable'); return value; }

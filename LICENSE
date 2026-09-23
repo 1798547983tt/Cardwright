@@ -19,3 +19,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+The files under assets/ are not covered by the MIT License above. Each folder
+there carries a NOTICE.md with its source, author and terms. The desk pet in
+assets/pets/erii is unofficial fan art and may only be used non-commercially;
+see assets/pets/erii/NOTICE.md.

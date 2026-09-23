@@ -6,6 +6,7 @@ import { buildNative } from './build-native.mjs';
 await buildNative();
 await build({ entryPoints: ['src/main/main.ts'], outfile: 'dist/main.cjs', platform: 'node', format: 'cjs', bundle: true, external: ['electron', '@earendil-works/pi-ai/compat'] });
 await build({ entryPoints: ['src/main/preload.ts'], outfile: 'dist/preload.cjs', platform: 'node', format: 'cjs', bundle: true, external: ['electron'] });
+await build({ entryPoints: ['src/main/pet-preload.ts'], outfile: 'dist/pet-preload.cjs', platform: 'node', format: 'cjs', bundle: true, external: ['electron'] });
 await build({ entryPoints: ['src/runtime/worker.ts'], outfile: 'dist/worker.mjs', platform: 'node', format: 'esm', bundle: true, packages: 'external' });
 const server = await createServer({ server: { host: '127.0.0.1', port: 5173, strictPort: true } });
 await server.listen();

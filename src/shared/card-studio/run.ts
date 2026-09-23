@@ -28,6 +28,12 @@ export function runIsOpen(run: Pick<CardRun, 'status'> | undefined): boolean {
   return !!run && (run.status === 'running' || run.status === 'pausing' || run.status === 'paused');
 }
 
+/** Whether an open run holds this conversation: the one it works in, the one handing off, or its conversation in a section. */
+export function runOwns(run: Pick<CardRun, 'status' | 'current' | 'handoff' | 'conversations'> | undefined, taskId: string): boolean {
+  if (!run || !runIsOpen(run)) return false;
+  return run.current?.taskId === taskId || run.handoff?.fromTaskId === taskId || Object.values(run.conversations ?? {}).includes(taskId);
+}
+
 /** The dispatches a run will send: still unsent, aimed at a section of the chosen boards, in planning order. A section no board has is skipped. */
 export function runQueue(dispatches: readonly CardDispatch[], scope: CardRunScope): string[] {
   const boards: readonly string[] = scope === 'all' ? RUN_BOARDS : [scope];

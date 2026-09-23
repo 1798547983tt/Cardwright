@@ -1,0 +1,73 @@
+/* 1.0.0 主题与桌宠 (ADR 0018): the theme background and entrance, and their settings. The desk pet has its own window (src/renderer/pet). */
+
+/* A theme pack's picture sits under a veil of the canvas colour, so text keeps its contrast. */
+html[data-theme-background] .desk-main {
+  background: linear-gradient(color-mix(in srgb, var(--canvas) 90%, transparent), color-mix(in srgb, var(--canvas) 90%, transparent)), var(--theme-background) center / cover no-repeat, var(--canvas);
+}
+
+/* ---------- 登场动画 ---------- */
+.theme-entrance { position: fixed; inset: 0; z-index: 60; overflow: hidden; pointer-events: none; }
+.theme-entrance.is-wash { background: radial-gradient(60% 55% at 50% 38%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 72%); animation: theme-wash 1.8s ease-out forwards; }
+.theme-entrance.is-petals i {
+  position: absolute; top: -28px; left: calc(var(--petal) * 6.1% + 2%); width: 15px; height: 11px; border-radius: 13px 2px 13px 2px;
+  background: linear-gradient(135deg, #ffe1e8, #f28aa9); box-shadow: 0 1px 2px rgba(138, 28, 43, .15); opacity: 0;
+  animation: theme-petal calc(1.35s + var(--petal) * 40ms) cubic-bezier(.3, .6, .4, 1) calc(var(--petal) * 48ms) forwards;
+}
+.theme-entrance.is-petals i:nth-child(3n) { width: 11px; height: 9px; background: linear-gradient(135deg, #fff4f6, #f6a8bd); }
+.theme-entrance.is-petals i:nth-child(4n) { background: linear-gradient(135deg, #ffd0dc, #d0386a); }
+@keyframes theme-petal {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+  12% { opacity: .95; }
+  100% { opacity: 0; transform: translate3d(calc(var(--petal) * 4px - 36px), 104vh, 0) rotate(calc(160deg + var(--petal) * 27deg)); }
+}
+@keyframes theme-wash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-entrance { display: none; }
+}
+html[data-motion="reduced"] .theme-entrance { display: none; }
+
+/* ---------- 头像与外观：主题与桌宠 ---------- */
+.theme-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 4px 0 8px; }
+.theme-card { display: grid; gap: 8px; padding: 10px; text-align: left; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2);
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast); }
+.theme-card:hover { border-color: var(--line-strong); }
+.theme-card[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.theme-swatch { display: flex; height: 34px; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; }
+.theme-swatch i { flex: 1; }
+.theme-swatch i:first-child { flex: 2.4; }
+.theme-swatch.is-system i:first-child { background: linear-gradient(135deg, #111316 50%, #f3f2ee 50%) !important; }
+.theme-card b { font-size: 13px; font-weight: 600; }
+.theme-card small { color: var(--muted); font-size: 12px; }
+.appearance-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 4px; }
+.appearance-rejected { display: grid; gap: 4px; margin-top: 8px; padding: 8px 10px; font-size: 12.5px; color: var(--text); border-left: 2px solid var(--warning); background: var(--warning-soft); }
+.appearance-rejected b { font-weight: 600; }
+.pet-list { display: grid; gap: 8px; margin: 4px 0; }
+.pet-option { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: start; padding: 10px 12px; text-align: left;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); transition: border-color var(--motion-fast); }
+.pet-option:hover { border-color: var(--line-strong); }
+.pet-option[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pet-option > span:first-child { grid-row: span 2; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; border: 2px solid var(--line-strong); }
+.pet-option[aria-pressed="true"] > span:first-child { border-color: var(--accent); background: var(--accent); }
+.pet-option b { font-size: 13.5px; }
+.pet-option small { color: var(--muted); font-size: 12px; }
+.pet-notice { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+.pet-notice summary { cursor: pointer; }
+.pet-notice pre { margin: 8px 0 0; padding: 10px 12px; max-height: 260px; overflow: auto; white-space: pre-wrap; font: 12px/1.6 var(--font-ui); color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+
+/* ---------- 借鉴优化 (1.0.0): code blocks you can copy, and a way back to the latest message ---------- */
+.code-block { position: relative; }
+.code-block > pre { margin: 0; }
+/* The block's spacing moves from the pre to its wrapper, so the copy button sits on the code. */
+.message-body .code-block { margin: 14px 0; }
+.code-copy { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px;
+  color: var(--muted); background: var(--floating); border: 1px solid var(--line); opacity: 0; transition: opacity var(--motion-fast), color var(--motion-fast); }
+.code-block:hover .code-copy, .code-copy:focus-visible { opacity: 1; }
+.code-copy:hover { color: var(--text); }
+.code-block.is-studio .code-copy { border-radius: 0; background: var(--cs-panel-2, var(--floating)); border-color: var(--cs-hair-2, var(--line)); color: var(--cs-muted, var(--muted)); }
+.jump-latest { position: sticky; bottom: 14px; z-index: 5; display: flex; justify-content: center; height: 0; overflow: visible; pointer-events: none; }
+.jump-latest button { pointer-events: auto; transform: translateY(-100%); display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 12.5px;
+  color: var(--text); background: var(--floating); border: 1px solid var(--line-strong); border-radius: 999px; box-shadow: var(--shadow-popover); transition: border-color var(--motion-fast); }
+.jump-latest button:hover { border-color: var(--accent); }
+.jump-latest.is-studio button { border-radius: 0; color: var(--cs-text, var(--text)); background: var(--cs-panel-2, var(--floating)); border-color: var(--cs-hair-2, var(--line-strong)); }
+.jump-latest.is-studio button:hover { border-color: var(--board, var(--accent)); }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Check, FileDown, FileText, Import, LoaderCircle, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Check, FileDown, FileText, Import, LoaderCircle, Plus, Undo2 } from 'lucide-react';
 import { useApp } from '../context';
 import { boardOf, sectionLabel, sectionOf } from '../../shared/card-studio/boards';
 import { formatDispatch } from '../../shared/card-studio/dispatch';
@@ -16,6 +16,7 @@ import { SourcesPage } from './SourcesPage';
 import { StudioComposer } from './StudioComposer';
 import { KickoffOptions, useKickoffChoice } from './Kickoff';
 import { PromptEditor } from './PromptEditor';
+import { JumpToLatest } from '../ReadingAids';
 import { RunBar } from './RunPanel';
 import { runIsOpen } from '../../shared/card-studio/run';
 import { sectionPromptIds } from '../../shared/card-studio/prompt-files';
@@ -101,7 +102,7 @@ function PieceList({ card, kind }: { card: CardProjectView; kind: 'regex' | 'scr
 }
 
 export function SectionPage({ card, sectionId, conversation }: { card: CardProjectView; sectionId: string; conversation?: string }) {
-  const { data, api, t, run } = useApp();
+  const { data, api, t, run, notify } = useApp();
   const studio = useStudio();
   const now = useNow();
   const scroller = useRef<HTMLDivElement>(null);
@@ -161,7 +162,7 @@ export function SectionPage({ card, sectionId, conversation }: { card: CardProje
     <button type="button" className="cs-btn is-primary" onClick={() => studio.openSection(card.projectId, 'plan')}><ArrowLeft size={14} />{t('Back to planning', '回到规划')}</button>
   </div></div>;
   else if (selected) body = <>
-    <div className="cs-stage-scroll" ref={scroller}>{sectionId === 'build' && <AssemblyPanel card={card} />}{preview}<SectionThread task={selected} card={card} scroller={scroller} /></div>
+    <div className="cs-stage-scroll" ref={scroller}>{sectionId === 'build' && <AssemblyPanel card={card} />}{preview}<SectionThread task={selected} card={card} scroller={scroller} /><JumpToLatest scroller={scroller} className="is-studio" /></div>
     <StudioComposer card={card} sectionId={sectionId} task={selected} />
   </>;
   else body = <>
@@ -177,7 +178,9 @@ export function SectionPage({ card, sectionId, conversation }: { card: CardProje
         <h2>{t(`${waiting.length} dispatches wait here`, `这个分区有 ${waiting.length} 条未派的派单`)}</h2>
         {waiting.map(dispatch => <DispatchCard key={dispatch.id} dispatch={dispatch} card={card} />)}
       </div>}
-      {draft && <p className="cs-draft-note">{draft.dispatchId ? t('A new conversation for this dispatch. Review the text below and press Send; sending starts the dispatch.', '这是这条派单的新对话。确认下方内容后按发送，发送后派单变为进行中。') : draft.title ? t(`New conversation · ${draft.title}. Nothing has been sent yet.`, `新对话 · ${draft.title}。还没有发送。`) : t('New conversation. Nothing has been sent yet.', '新对话，还没有发送。')}</p>}
+      {draft && <div className="cs-draft-note"><p>{draft.dispatchId ? t('A new conversation for this dispatch. Review the text below and press Send; sending starts the dispatch.', '这是这条派单的新对话。确认下方内容后按发送，发送后派单变为进行中。') : draft.title ? t(`New conversation · ${draft.title}. Nothing has been sent yet.`, `新对话 · ${draft.title}。还没有发送。`) : t('New conversation. Nothing has been sent yet.', '新对话，还没有发送。')}</p>
+        <button type="button" className="cs-link" title={t('Clears the composer; nothing is sent.', '清空输入框，这条草稿不发送。')} onClick={() => { studio.clearDraft(card.projectId, sectionId); notify(t('Draft withdrawn; nothing was sent.', '草稿已撤回，没有发送。')); }}><Undo2 size={13} />{t('Withdraw draft', '撤回草稿')}</button>
+      </div>}
       {sectionId !== 'plan' && !draft && !waiting.length && <p className="cs-note">{t('Type below to start a new conversation in this section.', '在下方输入，开始这个分区的新对话。')}</p>}
     </div></div>
     <StudioComposer card={card} sectionId={sectionId} />

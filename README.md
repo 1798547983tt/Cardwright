@@ -18,7 +18,7 @@ Cardwright 是面向 Windows 本地项目的 Agent 工作台：连接你自己�
 
 ### 安装
 
-从 [Releases](../../releases) 下载 `Cardwright-Setup-0.9.1.exe` 并安装。安装包没有代码签名，Windows 首次运行会提示「未知发布者」，可以选择「更多信息 → 仍要运行」。卸载时保留你的资料目录。
+从 [Releases](../../releases) 下载 `Cardwright-Setup-1.0.0.exe` 并安装。安装包没有代码签名，Windows 首次运行会提示「未知发布者」，可以选择「更多信息 → 仍要运行」。卸载时保留你的资料目录。
 
 也可以自己构建：
 
@@ -67,6 +67,26 @@ node scripts/package.mjs      # 便携版输出到 release/<版本>/Cardwright-w
 
 从工作台左下角进入。卡项目是本地文件夹，只出现在卡库里。规划 AI 按轮提问、给推荐答案，写出设计书后派单；世界书条目、正则、脚本、开场白各是一个组件文件，由应用确定性地拼装成卡。导出整卡 JSON、PNG 卡、世界书和单件，每次导出附一份替换说明。本地预览在隔离的 iframe 里按酒馆的处理顺序渲染，不联网。
 
+- 状态栏、正文美化、开局创角页这类前端，组件文件里只写 HTML 文档；拼装时应用自动包上 ```` ```html ```` 围栏，酒馆助手才会把它渲染成能交互的页面。拼装检查会核对围栏，并对每个前端做质量检查：手机宽度下横向滚动、没有任何交互反馈、正文对比度不足、用了 Google Fonts、塞了大图 base64 会禁止导出；设计令牌太少、没有 `@media`、循环动画不照顾「减少动画」、强调色用得太多会提醒。
+- 前端有七套风格预设（战术档案、鎏金典狱、工业终端、复古电影、粉樱、和纸、霓虹夜）和一套按题材自定的写法，规划在设计书里选定。
+- 说错了话可以撤回：AI 还在写时，撤回会停下这一轮、把这条消息收回，文字放回输入框，它发出的派单回到「未派」；已经写完的消息可以编辑后重新生成，产生新的对话版本。写进卡项目的文件不跟着回滚，要退文件用「本轮写入」里的【撤销本轮】。
+
+### 主题与桌宠
+
+- 「工作室设置 → 头像与外观」里可以选主题：跟随系统、深色、浅色、红粉白。主题只换颜色，布局和控件不变；制卡工坊保持自己的样子，只有金色和板块灯光会向主题色偏一点。
+- 自己的主题包放在资料目录的 `themes/<id>/theme.json` 里，可以改颜色、背景图、登场动画和桌宠；读不了的主题包会列出原因。
+- 桌宠默认关。打开后它在自己的小窗口里，浮在所有窗口最前面，Cardwright 最小化或收到托盘时也还在。它只报本机的状态：当前任务、审批、结果、一键制作的进度和今天的 Token 用量，不调用模型。单击它回到 Cardwright 并打开它正在报的任务；拖到屏幕上任何位置，下次还在那里；右键有菜单，点 × 收起；系统开了「减少动画」时它不动。宠物包用 Codex 桌宠包格式（`pet.json` 加 `spritesheet.webp`），可以从 ZIP 或文件夹安装。
+- 内置的绘梨衣桌宠由顾清寒创作，是非官方同人作品，按 CC BY-NC 4.0（署名、非商业）授权；角色权利归原权利人，权利人要求即移除。详见 [assets/pets/erii/NOTICE.md](assets/pets/erii/NOTICE.md)。
+
+### 本地模型与本地代理
+
+添加网关时可以选两个预设，都是你自己在本机运行的服务，Cardwright 不附带、不安装、也不管理它们：
+
+- **本地模型**：Ollama（`http://127.0.0.1:11434/v1`）、llama.cpp（`http://127.0.0.1:8080/v1`）、LM Studio（`http://127.0.0.1:1234/v1`）。本机地址可以不填密钥，应用会发送占位值 `local`。
+- **本地代理网关**：你自己运行的 OpenAI 兼容代理，例如 CLIProxyAPI（`http://127.0.0.1:8317/v1`），密钥填你在它的配置里给客户端设的那一个。账号能不能这样用，请自行确认服务条款。
+
+【一键自检】先读模型列表，再给默认模型发一次只生成一个 Token 的补全，两步分别报告结果。
+
 ### 数据
 
 资料默认存在 `%APPDATA%\Cardwright`：设置、会话、检查点、附件和凭据。凭据用 Windows 的 `safeStorage` 加密。升级时如果数据结构变化，会先在 `backups/` 留一份原始备份。
@@ -75,7 +95,12 @@ node scripts/package.mjs      # 便携版输出到 release/<版本>/Cardwright-w
 
 ### 许可
 
-MIT，见 [LICENSE](LICENSE)。第三方组件的许可声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+MIT，见 [LICENSE](LICENSE)。`assets/` 下的素材不在 MIT 之内，各自的来源与条件见对应文件夹里的 `NOTICE.md`；内置桌宠只能非商业使用。第三方组件的许可声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+### 贡献者
+
+- 顾清寒
+- Claude（Anthropic，AI 结对）
 
 ---
 
@@ -93,7 +118,7 @@ The interface stays quiet, deterministic rules are executed by the program, and 
 
 ### Install
 
-Download `Cardwright-Setup-0.9.1.exe` from [Releases](../../releases). The installer is not code-signed, so Windows shows an "unknown publisher" warning the first time; choose "More info → Run anyway". Uninstalling keeps your data directory.
+Download `Cardwright-Setup-1.0.0.exe` from [Releases](../../releases). The installer is not code-signed, so Windows shows an "unknown publisher" warning the first time; choose "More info → Run anyway". Uninstalling keeps your data directory.
 
 Or build it yourself:
 
@@ -142,6 +167,26 @@ Restricted commands and the terminal run in a native Windows AppContainer with *
 
 Enter from the bottom of the sidebar. A card project is a local folder and appears only in the card library. The planning AI asks one question at a time with a recommended answer, writes a design document and then dispatches the work. World-book entries, regexes, scripts and greetings are each a component file, and the application assembles the card deterministically. Export the whole card as JSON or PNG, the world book, or single pieces; every export comes with a note on how to replace it in SillyTavern. The local preview renders in an isolated iframe in SillyTavern's own order, offline.
 
+- Front-ends such as the status bar, the body renderer and the start page are written as a plain HTML document; on assembly the application wraps it in the ```` ```html ```` fence the SillyTavern helper needs to render it as an interactive page. The assembly checks verify the fence and run quality checks on every front-end: horizontal scrolling at phone width, no interaction feedback at all, body text below 4.5:1, Google Fonts and big base64 images block the export; too few design tokens, no `@media`, looping motion that ignores reduced motion and an overused accent are warnings.
+- Front-ends follow one of seven style presets (Tactical dossier, Gilded ward, Industrial terminal, Vintage cinema, Sakura, Washi and Neon night) or one derived from the card's subject, chosen in the design document.
+- A message can be withdrawn: while the AI is still writing, withdrawing stops the turn, takes the message back, returns its text to the composer and puts a dispatch it sent back to not sent. A finished message can be edited and regenerated into a new conversation version. Files already written stay as they are; use Undo this turn in the turn's writes to take them back.
+
+### Themes and the desk pet
+
+- Studio settings → Profile & appearance offers Follow system, Dark, Light and Red, pink & white. A theme changes colours only; the card studio keeps its own look, with only its gold and board light leaning towards the theme.
+- Your own theme packs go in `themes/<id>/theme.json` in the data directory and can change colours, a background picture, the entrance and the pet; a pack that cannot be read is listed with the reason.
+- The desk pet is off by default. When on, it floats in its own small window above every other window, and stays there while Cardwright is minimized or in the tray. It only reports local state: the task at hand, approvals, results, one-click making's progress and today's tokens; it never calls a model. Click it to bring Cardwright back on the task it reports; drag it anywhere on the screen and it stays there next time; right-click for its menu, or close it with its ×. Under reduced motion it stands still. Pet packs use the Codex pet format (`pet.json` and `spritesheet.webp`) and install from a ZIP or a folder.
+- The built-in Erii pet is unofficial fan art by 顾清寒, licensed CC BY-NC 4.0 (credit, non-commercial). The character belongs to its rights holders, and the pet is removed at a rights holder's request. See [assets/pets/erii/NOTICE.md](assets/pets/erii/NOTICE.md).
+
+### Local models and a local proxy
+
+When adding a gateway you can start from two presets. Both are services you run yourself on this computer; Cardwright does not ship, install or manage them:
+
+- **Local model**: Ollama (`http://127.0.0.1:11434/v1`), llama.cpp (`http://127.0.0.1:8080/v1`) or LM Studio (`http://127.0.0.1:1234/v1`). On a local address the key may be left empty; the placeholder `local` is sent.
+- **Local proxy gateway**: an OpenAI-compatible proxy you run yourself, such as CLIProxyAPI (`http://127.0.0.1:8317/v1`); enter the client key you set in its config. Whether your accounts may be used this way is for you to check.
+
+Self-test lists the models, then sends one completion of a single token to the default model, and reports each step.
+
 ### Data
 
 Everything lives in `%APPDATA%\Cardwright`: settings, sessions, checkpoints, attachments and credentials. Credentials are encrypted with Windows `safeStorage`. If the data shape changes across versions, the original file is copied into `backups/` first.
@@ -150,4 +195,9 @@ When a page of the interface fails, an error card takes its place and copies the
 
 ### Licence
 
-MIT, see [LICENSE](LICENSE). Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT, see [LICENSE](LICENSE). The files under `assets/` are not covered by the MIT License; each folder's `NOTICE.md` gives its source and terms, and the built-in desk pet is for non-commercial use only. Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+### Contributors
+
+- 顾清寒
+- Claude (Anthropic, AI pair)

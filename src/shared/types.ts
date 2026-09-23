@@ -2,6 +2,8 @@ import type { AttachmentInfo, DeliverySummary, ModelPricing, StudioBridge, Studi
 import type { AppUpdate } from './app-updates.ts';
 import type { RendererErrorReport } from './diagnostics.ts';
 import type { HooksConfig } from '../core/hooks-config.ts';
+import type { ThemeDefinition } from './themes.ts';
+import type { PetTarget, SpriteLayout } from './pets.ts';
 import type { CardRun, CardRunScope, CardRunSettings, CardSettings, PromptOverrideDetail, PromptOverrideItem, CardMeta, CardPieceImport, CardPreview, CardPieceSummary, CardCheckReport, CardComponentResult, CardComponentSummary, CardExportResult, CardImportPreview, CardImportReport, CardProjectView, CardStudioSnapshot, CardTaskInfo, CoverSource, NewCardComponent, NewCardProject, PlanMode, SourceImportReport, SourceRecord, StartCardConversation } from './card-studio/types.ts';
 export type PermissionMode = 'ask' | 'edit' | 'full';
 export type TaskStatus = 'idle' | 'queued' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled';
@@ -23,7 +25,8 @@ export interface Gateway {
   pricing?: ModelPricing;
 }
 export interface Preferences {
-  name: string; theme: 'system' | 'light' | 'dark'; language: 'en' | 'zh';
+  /** 主题: 'system', a built-in id (dark, light, sakura) or a theme pack's id; a pack that has gone shows as dark. */
+  name: string; theme: string; language: 'en' | 'zh';
   font: 'sans' | 'serif' | 'mono'; reducedMotion: boolean; notifications: boolean;
   instructions: string; defaultPermission: PermissionMode; maxConcurrent: number;
   defaultGatewayId: string; defaultThinking: ThinkingLevel; skillPaths: string[];
@@ -48,6 +51,16 @@ export interface Preferences {
   cardHandoff?: { tokens: number; windowPercent: number };
   /** Card studio: shows and edits the built-in prompts (提示词覆盖). */
   developerMode?: boolean;
+  /** 桌宠: off by default; the pet, when none is chosen, is the theme's; where its floating window was dragged to. */
+  petEnabled?: boolean; petId?: string; petPosition?: { x: number; y: number };
+}
+/** 一键自检 of a gateway: the model list, then one completion of a single token; each step on its own. */
+export interface GatewaySelfTest { ok: boolean; steps: Array<{ step: 'models' | 'completion'; ok: boolean; detail: string; ms: number }> }
+export interface PetSummary { id: string; displayName: string; description: string; builtIn: boolean; version: 1 | 2; /** The pack carries a NOTICE.md (source, author, licence). */ notice: boolean }
+export interface AppearanceSnapshot {
+  themes: ThemeDefinition[]; rejectedThemes: Array<{ folder: string; reason: string }>;
+  pets: PetSummary[]; rejectedPets: Array<{ folder: string; reason: string }>;
+  themesFolder: string; petsFolder: string;
 }
 export interface SearchConfig { enabled: boolean; provider: 'auto' | 'native' | 'exa' | 'brave' | 'searxng'; baseUrl: string; hasKey: boolean }
 export interface SearchResult { title: string; url: string; snippet: string; age?: string }
@@ -72,7 +85,7 @@ export interface MemoryItem { id: string; content: string; category?: string; so
 export interface BackupPreview { files: string[]; bytes: number; createdAt: string; excludes: string[] }
 export interface Project { id: string; name: string; path: string; isGit: boolean; createdAt: string; collapsed?: boolean; pinned?: boolean; /** Card studio projects appear only in the card library. */ kind?: 'card'; cardSettings?: CardSettings; /** The card's 一键制作 / 全部开做 run, if any. */ cardRun?: CardRun }
 export interface Usage { input: number; output: number; cacheRead: number; cacheWrite: number; cost: number }
-export interface ChatMessage { id: string; role: 'user' | 'assistant' | 'system'; text: string; thinking?: string; at: string; usage?: Usage; model?: string; turnId?: string; sessionEntryId?: string; pending?: boolean; attachments?: AttachmentInfo[] }
+export interface ChatMessage { id: string; role: 'user' | 'assistant' | 'system'; text: string; thinking?: string; at: string; usage?: Usage; model?: string; turnId?: string; sessionEntryId?: string; pending?: boolean; attachments?: AttachmentInfo[]; /** The card dispatch this message started; 撤回 sends it back to 未派. */ dispatchId?: string }
 export interface ToolCall { id: string; toolCallId?: string; name: string; args: Record<string, unknown>; output: string; status: 'running' | 'waiting' | 'completed' | 'failed'; patch?: string; at: string; search?: SearchOutput; turnId?: string }
 /** A phase of a long conversation, marked by the agent (§6.3). */
 export interface TaskChapter { id: string; title: string; turnId: string; at: string }
@@ -148,6 +161,8 @@ export interface Bridge extends StudioBridge {
   subscribe(listener: (snapshot: AppSnapshot) => void): () => void;
   /** Internal renderer stream; avoids copying complete histories across contextBridge. */
   subscribeUpdates?(listener: (update: AppUpdate) => void): () => void;
+  /** The desk pet's click (ADR 0018): the main process asks this window to open what the pet reported. */
+  onOpen(listener: (target: PetTarget) => void): () => void;
   pickProject(): Promise<Project | null>;
   addProject(path: string): Promise<Project>;
   updateProject(id: string, changes: { name?: string; collapsed?: boolean; pinned?: boolean }): Promise<void>;
@@ -189,6 +204,8 @@ export interface Bridge extends StudioBridge {
   openExternal(url: string): Promise<void>;
   saveGateway(gateway: Omit<Gateway, 'hasKey'>, apiKey?: string): Promise<void>;
   removeGateway(id: string): Promise<void>;
+  /** Lists the models, then sends one completion of a single token, to the gateway being set up. */
+  selfTestGateway(input: { id?: string; baseUrl: string; protocol: Gateway['protocol']; modelId: string }, apiKey?: string): Promise<GatewaySelfTest>;
   testGateway(id: string): Promise<{ ok: boolean; message: string }>;
   fetchModels(input: { id?: string; baseUrl: string; protocol: Gateway['protocol'] }, apiKey?: string): Promise<Array<{ id: string; name?: string }>>;
   diff(taskId: string): Promise<DiffResult>;
@@ -235,6 +252,16 @@ export interface Bridge extends StudioBridge {
   /** Asks the section AI for a handoff summary; the summary then opens one new conversation in the same section. */
   requestCardHandoff(taskId: string): Promise<void>;
   consumeCardHandoff(taskId: string): Promise<void>;
+  /** 主题包 and 桌宠 packs: what is installed, and what was refused with the reason. */
+  appearance(): Promise<AppearanceSnapshot>;
+  themeBackground(themeId: string): Promise<string>;
+  petSprite(petId: string): Promise<{ dataUrl: string; layout: SpriteLayout }>;
+  petNotice(petId: string): Promise<string>;
+  /** Picks a pet pack ZIP or folder and installs it; null when the picker is cancelled. */
+  installPet(from: 'zip' | 'folder'): Promise<{ id: string; displayName: string; version: 1 | 2; replaced: boolean } | null>;
+  openAppearanceFolder(kind: 'themes' | 'pets'): Promise<void>;
+  /** 撤回: stops the turn, takes the message out and returns its text for the composer. */
+  withdrawCardMessage(taskId: string, messageId: string): Promise<{ text: string; turnId: string }>;
   /** 一键制作 (one board) or 全部开做 (all boards): sends the card's unsent dispatches in order. */
   startCardRun(projectId: string, scope: CardRunScope, settings: CardRunSettings): Promise<CardRun>;
   pauseCardRun(projectId: string): Promise<void>;

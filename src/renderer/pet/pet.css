@@ -1,0 +1,35 @@
+/* 桌宠's own window (ADR 0018, revised 2026-09-23): transparent everywhere but the pet and its bubble. */
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+body { font: 12.5px/1.5 var(--font-ui); color: var(--text); user-select: none; -webkit-user-select: none; }
+#pet { height: 100%; }
+
+.pet-root { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; padding-bottom: 4px; }
+.pet-body { position: relative; }
+.pet-sprite { display: block; padding: 0; border: 0; background-color: transparent; background-repeat: no-repeat; cursor: grab; touch-action: none;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .28)); }
+.pet-sprite:focus { outline: none; }
+.pet-root[data-dragging] .pet-sprite { cursor: grabbing; }
+.pet-close { position: absolute; top: 0; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
+  color: var(--muted); background: var(--floating); box-shadow: var(--shadow-popover); cursor: pointer; opacity: 0; transition: opacity var(--motion-fast) var(--motion-ease); }
+.pet-body:hover .pet-close { opacity: 1; }
+.pet-close:hover { color: var(--text); }
+
+.pet-bubble { display: grid; gap: 2px; max-width: 250px; padding: 8px 12px; border-radius: 12px; color: var(--text); background: var(--floating);
+  box-shadow: var(--shadow-popover); animation: pet-bubble var(--motion-medium) var(--motion-ease); }
+.pet-bubble[hidden] { display: none; }
+.pet-bubble p { margin: 0; }
+.pet-bubble b { font-size: 12px; color: var(--accent-text); }
+.pet-task { display: flex; gap: 8px; min-width: 0; }
+.pet-task span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pet-task em { flex: none; font-style: normal; color: var(--muted); }
+.pet-root[data-pet-event="waiting"] .pet-task em { color: var(--warning); }
+.pet-root[data-pet-event="failed"] .pet-task em { color: var(--danger); }
+.pet-root[data-pet-event="complete"] .pet-task em { color: var(--success); }
+.pet-progress { color: var(--accent-text); }
+.pet-bubble small { color: var(--muted); font-size: 11.5px; }
+@keyframes pet-bubble { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-bubble { animation: none; }
+  .pet-close { transition: none; }
+}

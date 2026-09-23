@@ -15,8 +15,8 @@
 .squad-overview-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .squad-overview-line strong { font-size: 13px; font-weight: 550; }
 .squad-ultra { flex-shrink: 0; color: var(--warning); background: var(--warning-soft); padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
-.squad-overview p { margin-top: 9px; color: var(--sidebar-text); font-size: 12px; line-height: 1.75; }
-.squad-counts { display: flex; align-items: center; flex-wrap: wrap; gap: 13px; margin-top: 13px; font-size: 11px; color: var(--sidebar-text); font-variant-numeric: tabular-nums; }
+.squad-overview p { margin-top: 9px; color: var(--text-soft); font-size: 12px; line-height: 1.75; }
+.squad-counts { display: flex; align-items: center; flex-wrap: wrap; gap: 13px; margin-top: 13px; font-size: 11px; color: var(--text-soft); font-variant-numeric: tabular-nums; }
 .squad-counts > span { display: flex; align-items: center; gap: 5px; }
 .squad-counts .squad-needs-input { color: var(--warning); }
 .squad-roster { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; }

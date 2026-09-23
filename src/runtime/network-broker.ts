@@ -16,6 +16,10 @@ function permitted(url: URL, policy: NetworkPolicy): boolean {
 
 /** Redirects are new egress decisions, even when the first origin was configured. */
 export async function brokeredFetch(native: typeof fetch, policy: NetworkPolicy, input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> {
+  // The request in flight follows the caller's own signal. undici links a Request's signal to another only through a weak
+  // reference, and the Request objects made here are dropped once the response arrives: after a garbage collection an
+  // abort would no longer reach the stream.
+  const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
   let request = new Request(input, init);
   const redirectMode = request.redirect;
   for (let hop = 0; hop <= 5; hop++) {
@@ -24,7 +28,7 @@ export async function brokeredFetch(native: typeof fetch, policy: NetworkPolicy,
     request.signal.throwIfAborted();
     if (!permitted(url, policy) && !await policy.approve({ url: url.origin + url.pathname, method: request.method }, request.signal)) throw new Error(`Network access denied: ${url.origin}`);
     request.signal.throwIfAborted();
-    const response = await native(request.clone(), { redirect: 'manual' });
+    const response = await native(request.clone(), { redirect: 'manual', ...(signal ? { signal } : {}) });
     if (![301, 302, 303, 307, 308].includes(response.status) || !response.headers.has('location') || redirectMode === 'manual') return response;
     await response.body?.cancel();
     if (redirectMode === 'error') throw new Error('The endpoint redirected a request that forbids redirects.');

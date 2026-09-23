@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, Notification, safeStorage, shell, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, safeStorage, shell, Tray } from 'electron';
 import { join, resolve, sep } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir, release as osRelease, version as osVersion } from 'node:os';
@@ -17,6 +17,8 @@ import { handlePreviewScheme, PREVIEW_SCHEME, publishPreview, registerPreviewSch
 import { UpdateService } from './updates.ts';
 import { BrowserHost } from './browser.ts';
 import { appendRendererLog, LOG_FOLDER } from './renderer-log.ts';
+import { AppearanceService } from './appearance.ts';
+import { PetWindow } from './pet-window.ts';
 import { diagnosticText, windowsLabel } from '../shared/diagnostics.ts';
 
 const directory = __dirname;
@@ -27,6 +29,7 @@ registerPreviewScheme();
 if (process.env.CARDWRIGHT_DATA_DIR) app.setPath('userData', process.env.CARDWRIGHT_DATA_DIR);
 let window: BrowserWindow | undefined;
 let tray: Tray | undefined;
+let pet: PetWindow | undefined;
 let harness: Harness | undefined;
 let exiting = false;
 let closeReady = false;
@@ -226,6 +229,7 @@ async function initialize(): Promise<void> {
   handle('saveGateway', async (gateway, key) => service.saveGateway(gateway, key));
   handle('removeGateway', async id => service.removeGateway(id));
   handle('testGateway', async id => service.testGateway(id));
+  handle('selfTestGateway', async (input, key) => service.selfTestGateway(input, key));
   handle('diff', async id => service.diff(id));
   handle('mergeTask', async id => service.mergeTask(id));
   handle('createSchedule', async input => service.createSchedule(input));
@@ -263,6 +267,39 @@ async function initialize(): Promise<void> {
     const error = await shell.openPath(logDirectory); if (error) throw new Error(error);
   });
   handle('copyText', async text => { clipboard.writeText(String(text)); });
+  // 主题包 and 桌宠 (ADR 0018): packs are read from the data folder; the built-in pet ships in assets/pets.
+  const appearance = new AppearanceService(dataDirectory, app.getAppPath());
+  // 桌宠 (ADR 0018, 2026-09-23): a window of its own above every other one; a click brings this one back on what it reported.
+  const desk = new PetWindow({
+    directory, devUrl: frontendUrl,
+    snapshot: () => service.snapshot(), savePreferences: changes => service.savePreferences(changes),
+    appearance: () => appearance.snapshot(), sprite: id => appearance.petSprite(id),
+    systemDark: () => nativeTheme.shouldUseDarkColors,
+    open: target => { showWindow(); if (window && !window.isDestroyed()) window.webContents.send('cardwright:open', target); },
+  });
+  pet = desk;
+  service.on('change', () => desk.schedule());
+  nativeTheme.on('updated', () => desk.schedule());
+  desk.schedule();
+  handle('appearance', async () => appearance.snapshot());
+  handle('themeBackground', async id => appearance.themeBackground(String(id)));
+  handle('petSprite', async id => appearance.petSprite(String(id)));
+  handle('petNotice', async id => appearance.petNotice(String(id)));
+  handle('installPet', async from => {
+    const selected = await dialog.showOpenDialog(window!, from === 'folder'
+      ? { title: '选择宠物包文件夹 / Choose a pet pack folder', properties: ['openDirectory'] }
+      : { title: '选择宠物包 / Choose a pet pack', properties: ['openFile'], filters: [{ name: 'Codex 宠物包 / Codex pet pack', extensions: ['zip'] }] });
+    if (selected.canceled || !selected.filePaths.length) return null;
+    const installed = await appearance.installPet(selected.filePaths[0]);
+    desk.forgetAppearance();
+    return installed;
+  });
+  handle('openAppearanceFolder', async kind => {
+    const folder = kind === 'pets' ? appearance.petsFolder : appearance.themesFolder;
+    await mkdir(folder, { recursive: true });
+    desk.forgetAppearance();
+    const error = await shell.openPath(folder); if (error) throw new Error(error);
+  });
   handle('createCardProject', async input => cardStudio.create(input));
   handle('defaultCardFolder', async name => cardStudio.defaultFolder(String(name ?? '')));
   handle('pickCardFolder', async () => {
@@ -286,6 +323,7 @@ async function initialize(): Promise<void> {
   handle('setCardConversationWeb', async (taskId, enabled) => cardStudio.setWeb(taskId, enabled));
   handle('requestCardHandoff', async taskId => cardStudio.requestHandoff(taskId));
   handle('consumeCardHandoff', async taskId => cardStudio.consumeHandoff(taskId));
+  handle('withdrawCardMessage', async (taskId, messageId) => cardStudio.withdraw(taskId, messageId));
   handle('startCardRun', async (id, scope, settings) => cardStudio.runner.start(id, scope, settings));
   handle('pauseCardRun', async id => cardStudio.runner.pause(id));
   handle('resumeCardRun', async id => cardStudio.runner.resume(id));
@@ -348,6 +386,7 @@ else {
   app.on('window-all-closed', () => { if (!tray) app.quit(); });
   app.on('before-quit', event => {
     exiting = true;
+    pet?.dispose();
     if (!closeReady && harness) {
       event.preventDefault();
       void harness.close().then(() => { closeReady = true; tray?.destroy(); tray = undefined; app.quit(); }, error => { exiting = false; dialog.showErrorBox('Cardwright could not save', `${error instanceof Error ? error.message : String(error)}\nThe application remains open so you can export data or free disk space before trying again.`); });
