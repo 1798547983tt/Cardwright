@@ -116,6 +116,13 @@ process.on('message', message => {
       finish(JSON.stringify({ canDelegate: init.canDelegate, memoryEnabled: init.ecosystem?.memoryEnabled, searchEnabled: init.search?.enabled, role: init.roleDefinition?.id, readOnly: !!init.roleDefinition?.readOnly, permission: init.permission, thinking: init.thinking, modelId: init.gateway?.modelId, prompt: init.card?.prompt ?? '', readRoots: init.card?.readRoots ?? [] }));
     } else if (command === 'reply-dispatches') {
       finish(['设计书已写入。', '```派单\n目标: 世界书/叙事规则\n标题: 写叙事规则\n前置: 设计书已确认\n---\n写四条叙事规则。\n```', '```派单\n目标: 世界书/人设\n标题: 写人物模板\n前置: 设计书已确认\n---\n量身定做人物模板。\n```'].join('\n\n'));
+    } else if (command.includes('CHANGE:impact')) {
+      // The change AI's 影响清单, in no particular order and with the title prefix written three ways; each body is a run script.
+      const block = (target, title, body) => '```派单\n目标: ' + target + '\n标题: ' + title + '\n前置: \n---\n' + body + '\n```';
+      finish(['创角页要多一个自定义开局选项，牵涉四个组件。', block('开场白', '改动 · 开场白提到自定义开局', 'RUN:deliver 开场白'), block('正则/开局创角页', '加自定义选项', 'RUN:deliver 创角页'), block('脚本/变量结构', '改动 · 变量表加开局字段', 'RUN:deliver 变量表'), block('世界书/变量', '改动·变量规则', 'RUN:deliver 变量规则')].join('\n\n'));
+    } else if (command.includes('CHANGE:direct')) {
+      toolRecord('edit', '正则/创角页.json');
+      finish('只动了创角页这一个组件，已直接改好。');
     } else if (command.startsWith('card-request:')) {
       event({ type: 'tool_execution_start', toolCallId: 'card-tool', toolName: 'card_tool', args: {} });
       send({ type: 'request', id: 'card-request', method: 'card', args: JSON.parse(command.slice('card-request:'.length)) });

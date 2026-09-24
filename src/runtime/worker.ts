@@ -151,7 +151,7 @@ export class WorkerRuntime {
         const args = parameters as Record<string, unknown>;
         const decision = await decidePermission(cwd, this.permission, definition.name, args, { readRoots: this.init?.card?.readRoots });
         const effectiveArgs = decision.resolvedPath ? { ...args, path: decision.resolvedPath } : { ...args };
-        const workflowTool = ['search_skills', 'use_skill', 'todo', 'ask_user_question', 'plan_mode_question', 'plan_mode_complete', 'ctx_search', 'ctx_memory', 'agent', 'agent_team', 'get_subagent_result', 'steer_subagent', 'card_new_component', 'card_check', 'card_search_sources', 'mark_chapter', ...BROWSER_TOOLS].includes(definition.name);
+        const workflowTool = ['search_skills', 'use_skill', 'todo', 'ask_user_question', 'plan_mode_question', 'plan_mode_complete', 'ctx_search', 'ctx_memory', 'agent', 'agent_team', 'get_subagent_result', 'steer_subagent', 'card_new_component', 'card_check', 'card_sync_variables', 'card_search_sources', 'mark_chapter', ...BROWSER_TOOLS].includes(definition.name);
         const authorizedSkillRead = definition.name === 'read' && decision.resolvedPath && (this.readableSkills.has(decision.resolvedPath) || this.readableAttachments.has(decision.resolvedPath));
         if (!workflowTool && !authorizedSkillRead && !decision.approvedAutomatically) {
           const result = await this.request('approve', {
@@ -262,6 +262,7 @@ export class WorkerRuntime {
       ...(init.card ? { card: {
         newComponent: (args, signal) => this.request('card', { action: 'new_component', ...args }, signal),
         check: signal => this.request('card', { action: 'check' }, signal),
+        syncVariables: signal => this.request('card', { action: 'sync_variables' }, signal),
         searchSources: (args, signal) => this.request('card', { action: 'search_sources', ...args }, signal),
       } } : {}),
       ...(init.browser ? { browser: (action, args, signal) => this.request('browser', { action, ...args }, signal) } : {}),

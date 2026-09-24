@@ -23,6 +23,21 @@ export const SECTION_IDS: readonly string[] = BOARDS.flatMap(board => board.sect
 /** Where an imported world book entry no section takes is kept (世界书/未分类). It has no board section, no page and no prompt. */
 export const UNCLASSIFIED_SECTION = 'lore-other';
 
+/**
+ * The order sections depend on each other (§5.4): a section reads what the ones before it wrote. 改动派单 run in this
+ * order whatever order the change AI wrote them in.
+ */
+export const SECTION_ORDER: readonly string[] = [
+  'plan', 'lore-rules', 'lore-overview', 'lore-setting', 'lore-people', 'lore-plot', 'script-schema', 'lore-vars',
+  'lore-format', 'regex-update', 'regex-body', 'regex-status', 'regex-start', 'greet', 'script-controller', 'script-mechanism', 'build',
+];
+
+/** Items in dependency order of their sections; the order they came in breaks ties, and an unknown or missing section goes last. */
+export function sortByDependency<T extends { sectionId: string | null }>(items: readonly T[]): T[] {
+  const rank = (item: T) => { const at = item.sectionId ? SECTION_ORDER.indexOf(item.sectionId) : -1; return at < 0 ? SECTION_ORDER.length : at; };
+  return items.map((item, index) => ({ item, index })).sort((a, b) => rank(a.item) - rank(b.item) || a.index - b.index).map(entry => entry.item);
+}
+
 /** The board of a section, or undefined: section ids also come from card data (checks, dispatches, conversations). */
 export function findBoard(sectionId: string): StudioBoard | undefined {
   return BOARDS.find(item => item.sections.some(section => section.id === sectionId));

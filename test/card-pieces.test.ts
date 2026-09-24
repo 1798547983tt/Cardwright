@@ -4,7 +4,10 @@ import { mkdtemp, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createCardFolder } from '../src/core/card-studio/card-project.ts';
-import { buildPiece, importCard, importPiece, pieceFileName, readProject } from '../src/core/card-studio/components.ts';
+import { createComponent, importCard, importPiece, pieceFileName, readProject } from '../src/core/card-studio/components.ts';
+import { buildPiece } from '../src/core/card-studio/assembly.ts';
+
+const CTX = { frontend: null, table: null, cardName: '样卡' };
 
 async function project(): Promise<string> {
   const root = join(await mkdtemp(join(tmpdir(), 'cardwright-pieces-')), '卡项目');
@@ -27,10 +30,10 @@ test('a piece exports exactly what the card carried', async () => {
   const root = await project();
   await importCard(root, sampleCard());
   const components = await readProject(root);
-  assert.deepEqual(buildPiece(components, 'regex', '01-正文美化'), regexPiece, 'the body goes back into replaceString, in the same field order');
-  assert.deepEqual(buildPiece(components, 'script', '01-变量结构'), scriptPiece, 'the body goes back into content');
-  assert.ok(Object.keys(buildPiece(components, 'regex', '01-正文美化')).join(',').includes('scriptName,replaceString'), 'the body is written back right after the name, as buildCard does');
-  assert.throws(() => buildPiece(components, 'regex', '没有这个'), /没有这个/);
+  assert.deepEqual(buildPiece(components, 'regex', '01-正文美化', CTX), regexPiece, 'the body goes back into replaceString, in the same field order');
+  assert.deepEqual(buildPiece(components, 'script', '01-变量结构', CTX), scriptPiece, 'the body goes back into content');
+  assert.ok(Object.keys(buildPiece(components, 'regex', '01-正文美化', CTX)).join(',').includes('scriptName,replaceString'), 'the body is written back right after the name, as buildCard does');
+  assert.throws(() => buildPiece(components, 'regex', '没有这个', CTX), /没有这个/);
 });
 
 test('the export file name carries the piece, the version and the date', () => {
@@ -46,11 +49,11 @@ test('an exported piece imports into another project', async () => {
   assert.equal(report.bodyPath, '正则/01-正文美化.html');
   assert.equal(await readFile(join(root, '正则/01-正文美化.html'), 'utf8'), regexPiece.replaceString, 'the body is a file of its own');
   assert.equal(JSON.parse(await readFile(join(root, '正则/01-正文美化.json'), 'utf8')).replaceString, undefined, 'and never stays in the parameters');
-  assert.deepEqual(buildPiece(await readProject(root), 'regex', '01-正文美化'), regexPiece, 'the round trip is lossless');
+  assert.deepEqual(buildPiece(await readProject(root), 'regex', '01-正文美化', CTX), regexPiece, 'the round trip is lossless');
 
   const script = await importPiece(root, scriptPiece);
   assert.equal(script.bodyPath, '脚本/01-变量结构.js');
-  assert.deepEqual(buildPiece(await readProject(root), 'script', '01-变量结构'), scriptPiece);
+  assert.deepEqual(buildPiece(await readProject(root), 'script', '01-变量结构', CTX), scriptPiece);
 });
 
 test('importing a piece again replaces the one with the same id', async () => {
@@ -61,7 +64,7 @@ test('importing a piece again replaces the one with the same id', async () => {
   assert.equal(report.replaced, true, 'the same id replaces the component in place');
   assert.equal(report.name, '01-正文美化', 'and keeps the file it already had');
   assert.deepEqual((await readdir(join(root, '正则'))).sort(), ['01-正文美化.html', '01-正文美化.json'], 'no second copy appears');
-  assert.deepEqual(buildPiece(await readProject(root), 'regex', '01-正文美化'), changed);
+  assert.deepEqual(buildPiece(await readProject(root), 'regex', '01-正文美化', CTX), changed);
 });
 
 test('a piece with a new id is added next to the ones already there', async () => {
@@ -78,4 +81,17 @@ test('only regex and script pieces are accepted', async () => {
   await assert.rejects(() => importPiece(root, { name: '世界书', entries: {} }), /正则|脚本/);
   await assert.rejects(() => importPiece(root, 'not an object'), /正则|脚本/);
   await assert.rejects(() => importPiece(root, { id: 'x' }), /正则|脚本/);
+});
+
+test('re-importing a piece over a sheet component replaces the .yaml body with the .html one', async () => {
+  const root = await project();
+  const made = await createComponent(root, { board: 'regex', name: '正文美化', format: 'sheet' });
+  const id = JSON.parse(await readFile(join(root, made.paramsPath), 'utf8')).id as string;
+  const report = await importPiece(root, { ...regexPiece, id });
+  assert.equal(report.replaced, true);
+  assert.equal(report.bodyPath, '正则/01-正文美化.html');
+  assert.deepEqual((await readdir(join(root, '正则'))).sort(), ['01-正文美化.html', '01-正文美化.json'], 'the stale .yaml body is gone');
+  const components = await readProject(root);
+  assert.deepEqual(components.issues, []);
+  assert.equal(components.regex[0].format, 'html');
 });

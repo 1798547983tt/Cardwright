@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { ArrowRight, Zap } from 'lucide-react';
+import { ArrowRight, FilePenLine, FolderTree, Zap } from 'lucide-react';
 import { useApp } from '../context';
 import { BOARDS, findBoard, sectionLabel, type StudioBoard } from '../../shared/card-studio/boards';
 import { formatDispatch } from '../../shared/card-studio/dispatch';
@@ -8,8 +8,10 @@ import { RUN_BOARDS, runIsOpen, runQueue } from '../../shared/card-studio/run';
 import { progressInputOf, relativeTime } from '../../shared/card-studio/view';
 import type { CardDispatch, CardProjectView, CardRunScope } from '../../shared/card-studio/types';
 import { useStudio } from './CardStudio';
+import { changeStateLabel } from './ChangePanel';
 import { CoverDialog } from './CoverDialog';
 import { RunBar, RunDialog } from './RunPanel';
+import { UnclassifiedDialog } from './UnclassifiedDialog';
 import { CardCover, CoverStroke, kindLabel, stateLabel, Swatch, tilt, useNow } from './parts';
 
 export function ProjectHome({ card }: { card: CardProjectView }) {
@@ -22,8 +24,10 @@ export function ProjectHome({ card }: { card: CardProjectView }) {
   const people = card.design.people;
   const [coverOpen, setCoverOpen] = useState(false);
   const [runScope, setRunScope] = useState<CardRunScope | null>(null);
+  const [sorting, setSorting] = useState(false);
   const running = runIsOpen(card.run);
   const everything = runQueue(card.dispatches, 'all').length;
+  const openChanges = card.changes.filter(change => change.status === 'draft' || change.status === 'running' || change.status === 'paused');
 
   /** 下一步 and dispatch rows: an unsent dispatch opens a draft with the dispatch filled in; a started one opens its conversation. */
   function openDispatch(dispatch: CardDispatch) {
@@ -59,12 +63,27 @@ export function ProjectHome({ card }: { card: CardProjectView }) {
       <header className="cs-desk-head">
         <span className="cs-kicker">DOSSIER · {t('Card project', '卡项目')}</span>
         <h1>{card.name}</h1>
-        <button type="button" className="cs-next" onClick={() => step.kind === 'dispatch' ? openDispatch(step.dispatch) : studio.openSection(card.projectId, step.sectionId)} onPointerEnter={() => studio.preview(findBoard(step.sectionId)?.color ?? null)} onPointerLeave={() => studio.preview(null)}>
-          <span className="cs-next-label">{t('Next', '下一步')}</span>
-          <b>{stepTitle}</b>
-          {step.sectionId === 'lore-people' && people && <small>{t(`Written ${people.written} of ${people.total}`, `已写 ${people.written} / 名单 ${people.total}`)}</small>}
-          <span className="cs-next-go">{t('Go', '前往')}<ArrowRight size={15} /></span>
-        </button>
+        <div className="cs-next-row">
+          <button type="button" className="cs-next" onClick={() => step.kind === 'dispatch' ? openDispatch(step.dispatch) : studio.openSection(card.projectId, step.sectionId)} onPointerEnter={() => studio.preview(findBoard(step.sectionId)?.color ?? null)} onPointerLeave={() => studio.preview(null)}>
+            <span className="cs-next-label">{t('Next', '下一步')}</span>
+            <b>{stepTitle}</b>
+            {step.sectionId === 'lore-people' && people && <small>{t(`Written ${people.written} of ${people.total}`, `已写 ${people.written} / 名单 ${people.total}`)}</small>}
+            <span className="cs-next-go">{t('Go', '前往')}<ArrowRight size={15} /></span>
+          </button>
+          <button type="button" className="cs-change-open" onClick={() => studio.openChange(card.projectId)} title={t('One sentence or an error log; the change AI lists what it affects and runs it section by section.', '一句话或一段报错：改动 AI 列出影响清单，确认后按分区一口气做完。')}>
+            <FilePenLine size={16} /><span><b>{t('Ask for a change', '提改动')}</b><small>{t('or paste an error', '或贴报错')}</small></span>
+          </button>
+        </div>
+        {openChanges.length > 0 && <ol className="cs-changes" aria-label={t('Open changes', '进行中的改动')}>{openChanges.map(change => <li key={change.id}>
+          <button type="button" onClick={() => studio.openSection(card.projectId, 'plan', change.taskId && data.tasks.some(task => task.id === change.taskId) ? change.taskId : undefined)}>
+            <FilePenLine size={13} /><b>{change.text.split('\n')[0]}</b>
+            <em className={`is-${change.status}`}>{changeStateLabel(change, t)}{change.status === 'draft' && change.items.length > 0 ? t(` · ${change.items.length}`, ` · ${change.items.length} 条`) : ''}</em>
+            <ArrowRight size={13} />
+          </button>
+        </li>)}</ol>}
+        {card.unclassified > 0 && <button type="button" className="cs-unclassified-open" onClick={() => setSorting(true)}>
+          <FolderTree size={13} /><span>{t(`${card.unclassified} unclassified entries`, `未分类条目 ${card.unclassified} 条`)}</span><em>· {t('Sort', '整理')}</em><ArrowRight size={13} />
+        </button>}
         {card.design.exists && <div className="cs-desk-run">
           <button type="button" className="cs-btn is-primary" disabled={running || !everything} title={running ? t('A run is in progress.', '一键制作进行中。') : undefined} onClick={() => setRunScope('all')}><Zap size={14} />{t('Run everything', '全部开做')}<small>{t(`${everything} unsent`, `${everything} 条未派`)}</small></button>
           <span className="cs-note">{t('Sends every unsent world book, script, regex and greeting dispatch in order, then runs the assembly check.', '按顺序代发世界书、脚本、正则、开场白的全部未派派单，最后跑一次拼装检查。')}</span>
@@ -109,5 +128,6 @@ export function ProjectHome({ card }: { card: CardProjectView }) {
     </section>
     {coverOpen && <CoverDialog card={card} onClose={() => setCoverOpen(false)} />}
     {runScope && <RunDialog card={card} scope={runScope} onClose={() => setRunScope(null)} />}
+    {sorting && <UnclassifiedDialog card={card} onClose={() => setSorting(false)} />}
   </main>;
 }

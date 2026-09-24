@@ -22,7 +22,7 @@ export function defaultPreferences(): Preferences {
     notifications: false, instructions: '', defaultPermission: 'ask', maxConcurrent: 2,
     defaultGatewayId: '', defaultModelId: '', defaultContextWindow: 300000,
     defaultThinking: 'medium', skillPaths: [], disabledSkillIds: [], disabledAgentIds: [], browserAllowed: [], avatars: {},
-    soundEnabled: false, soundVolume: 40, bootSequence: false,
+    soundEnabled: false, soundVolume: 40, bootSequence: false, releaseCheck: true,
   };
 }
 
@@ -91,7 +91,7 @@ function parseState(value: unknown): StoredState {
     safePreferences.cardHandoff = { tokens: handoff.tokens as number, windowPercent: handoff.windowPercent as number };
   }
   if (typeof settings.developerMode === 'boolean') safePreferences.developerMode = settings.developerMode;
-  for (const key of ['notifyFinished', 'notifyApproval', 'bootSequence', 'quietUpgrade'] as const) if (typeof settings[key] === 'boolean') safePreferences[key] = settings[key] as boolean;
+  for (const key of ['notifyFinished', 'notifyApproval', 'bootSequence', 'quietUpgrade', 'releaseCheck'] as const) if (typeof settings[key] === 'boolean') safePreferences[key] = settings[key] as boolean;
   const result: StoredState = {
     preferences: safePreferences, gateways: [], projects: [], tasks: [], schedules: [],
     search: { enabled: true, provider: 'auto', baseUrl: '', hasKey: false }, ecosystem: defaultEcosystem(),

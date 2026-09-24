@@ -6,6 +6,7 @@
  * `<body` into an iframe. Only the card's own regex take part: the player's global and preset regex are not known here.
  */
 import { findFences, normalizeNewlines } from './fences.ts';
+import { PREVIEW_MESSAGE_KEY } from './tavern-sim.ts';
 
 export interface PreviewRegex {
   scriptName?: string; findRegex?: string; replaceString?: string; trimStrings?: string[]; placement?: number[];
@@ -15,7 +16,7 @@ export interface PreviewMacros { char: string; user: string }
 /** What one regex did to the reply. `stage` is null when the regex never touches a displayed AI reply. */
 export interface RegexStep { name: string; outcome: 'applied' | 'no-match' | 'skipped'; stage: 'stored' | 'display' | null; reason?: string }
 /** `frontend`: a document 酒馆助手 renders in an iframe of its own; `html`: the message text itself. */
-export interface PreviewSegment { kind: 'html' | 'frontend'; html: string }
+export interface PreviewSegment { kind: 'html' | 'frontend'; html: string; /** 模拟酒馆, defined before the document's own scripts. */ sim?: string }
 export interface PreviewRender { text: string; steps: RegexStep[]; segments: PreviewSegment[]; external: string[] }
 
 const AI_OUTPUT = 2;
@@ -39,7 +40,8 @@ function substituteMacros(text: string, macros: PreviewMacros): string {
   return text.replace(/\{\{char\}\}/gi, () => macros.char).replace(/\{\{user\}\}/gi, () => macros.user);
 }
 
-function findSource(script: PreviewRegex, macros: PreviewMacros): string {
+/** SillyTavern's find expression after its substituteRegex step: macros left alone (0), put in raw (1) or regex-escaped (2). */
+export function findSource(script: PreviewRegex, macros: PreviewMacros): string {
   const find = String(script.findRegex ?? '');
   const mode = Number(script.substituteRegex);
   if (mode === 1) return substituteMacros(find, macros);
@@ -216,7 +218,9 @@ export function updateBlocks(text: string): { done: string; streaming: string } 
 /** Posts the document's height, its script errors and what the policy blocked to the studio. */
 const REPORTER = [
   '(() => {',
-  "  const post = data => parent.postMessage(Object.assign({ cardwrightPreview: 1 }, data), '*');",
+  // The parent as it is before the card runs: a card that declares its own parent cannot cut the studio off.
+  '  const host = window.parent;',
+  `  const post = data => host.postMessage(Object.assign({ ${PREVIEW_MESSAGE_KEY}: 1 }, data), '*');`,
   "  addEventListener('error', event => post({ error: String(event.message || '脚本出错').slice(0, 300) }));",
   "  addEventListener('unhandledrejection', event => post({ error: String((event.reason && event.reason.message) || event.reason || '脚本出错').slice(0, 300) }));",
   "  addEventListener('securitypolicyviolation', event => post({ blocked: /^https?:/.test(event.blockedURI) ? 'network' : event.effectiveDirective.startsWith('script') ? 'script' : 'other' }));",
@@ -311,8 +315,8 @@ const BASE_POLICY = "default-src 'none'; style-src 'unsafe-inline'; img-src data
 
 /**
  * One preview document and the policy it is served with. Nothing reaches the network. A frontend document runs its
- * scripts, as in the iframe 酒馆助手 gives it (with the same base style); the message text runs none of its own, since
- * SillyTavern strips them, and only the reporter carries the nonce.
+ * scripts, as in the iframe 酒馆助手 gives it (with the same base style), after the 模拟酒馆 when the segment carries
+ * one; the message text runs none of its own, since SillyTavern strips them, and only the reporter carries the nonce.
  */
 export function previewDocument(segment: PreviewSegment, nonce: string): { html: string; csp: string } {
   if (segment.kind === 'frontend') {
@@ -321,7 +325,8 @@ export function previewDocument(segment: PreviewSegment, nonce: string): { html:
       html: [
         '<!DOCTYPE html>', '<html>', '<head>', '<meta charset="utf-8">', '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
         '<style>*,*::before,*::after{box-sizing:border-box;}html,body{margin:0!important;padding:0;overflow:hidden!important;max-width:100%!important;}</style>',
-        `<script>${STORAGE}</script>`, `<script>${REPORTER}</script>`, '</head>', '<body>', segment.html, '</body>', '</html>', '',
+        `<script>${STORAGE}</script>`, `<script>${REPORTER}</script>`, ...(segment.sim ? [`<script>${segment.sim}</script>`] : []),
+        '</head>', '<body>', segment.html, '</body>', '</html>', '',
       ].join('\n'),
     };
   }

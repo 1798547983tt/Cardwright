@@ -138,10 +138,6 @@ kbd { display: inline-block; color: var(--muted); font-size: 11px; font-weight: 
 .message-body th { background: var(--hover); }.message-body img { max-width: 100%; }
 .message-footer { display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 10px; margin-top: 10px; }
 .message-footer .icon-button { width: 25px; height: 25px; }
-.thinking-record { font-size: 12px; color: var(--muted); margin: 8px 0 14px; }
-.thinking-record summary { display: flex; align-items: center; gap: 5px; cursor: pointer; list-style: none; padding: 4px 0; }
-.thinking-record[open] summary svg { transform: rotate(90deg); }
-.thinking-record > div { white-space: pre-wrap; padding: 9px 12px; line-height: 1.7; background: var(--code-bg); border-radius: 7px; margin-top: 5px; max-height: 320px; overflow: auto; }
 .tool-record { border: 1px solid var(--line); border-radius: 9px; margin: 10px 0; overflow: hidden; }
 .tool-record summary { display: flex; align-items: center; gap: 7px; padding: 9px 10px; list-style: none; cursor: pointer; font-size: 11px; color: var(--muted); }
 .tool-record summary:hover { background: var(--hover); }.tool-record summary strong { color: var(--text); font-size: 12px; font-weight: 500; }
@@ -267,7 +263,7 @@ html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-
 .permission-option input { accent-color: var(--permission-color); }
 
 /* Readable conversation hierarchy and live work feedback. */
-.message-assistant > .message-body, .message-assistant > .message-footer, .message-assistant > .thinking-record { margin-left: 44px; }
+.message-assistant > .message-body, .message-assistant > .message-footer { margin-left: 44px; }
 .message-assistant .message-author > span:not(.avatar) { color: var(--text); }
 .message-author > .avatar { margin-right: 0; }
 .message-usage summary { list-style: none; display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 5px 0; }

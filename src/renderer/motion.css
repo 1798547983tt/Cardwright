@@ -23,8 +23,7 @@ button.portrait:hover { transform: translateY(-2px) scale(1.03); }
 button.portrait:hover .portrait-corners { animation: hud-corners .6s ease-in-out infinite alternate; }
 .hazard-head { animation: hud-stripes 1.6s linear infinite; }
 .status-tag.truncated { animation: hud-blink 2.4s ease-in-out infinite; }
-.working-cells i { animation: hud-working 1s ease-in-out infinite; }
-.working-cells i:nth-child(2) { animation-delay: .15s; } .working-cells i:nth-child(3) { animation-delay: .3s; }
+/* The conversation's own loops (working dots, cursor, thinking rail, running tools) are in conversation/conversation.css. */
 
 /* ---------- boot sequence (off by default since 0.9; the setting turns it back on) ---------- */
 .boot-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #07080a; color: #e8ebee; cursor: pointer; transition: opacity .45s ease, visibility .45s; }
@@ -40,8 +39,8 @@ button.portrait:hover .portrait-corners { animation: hud-corners .6s ease-in-out
 .boot-skip { position: absolute; bottom: 64px; font: 12px var(--font-code); color: #5c6570; letter-spacing: .15em; }
 
 /* ---------- pause & reduced motion ---------- */
-html[data-window="inactive"] :is(.send-button, .status-diamond, .portrait, .hazard-head, .status-tag.truncated, .working-cells i, .spinning),
-html[data-window="inactive"] .portrait::after { animation-play-state: paused !important; }
+html[data-window="inactive"] :is(.send-button, .status-diamond, .portrait, .hazard-head, .status-tag.truncated, .spinning, .conv-dots i, .conv-cursor, .cs-live-label, .conv-thinking.is-live > .conv-thinking-head > span),
+html[data-window="inactive"] :is(.portrait, .conv-thinking-rail, .tool-record.running > summary, .tool-group.running > summary)::after { animation-play-state: paused !important; }
 html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-motion="reduced"] *::after { animation: none !important; transition: none !important; }
 html[data-motion="reduced"] .boot-overlay { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
@@ -61,7 +60,6 @@ html[data-motion="reduced"] .boot-overlay { display: none !important; }
 @keyframes hud-corners { from { inset: 5px; } to { inset: 2px; } }
 @keyframes hud-stripes { to { background-position: 40px 0; } }
 @keyframes hud-blink { 0%, 100% { opacity: 1; } 50% { opacity: .62; } }
-@keyframes hud-working { 0%, 100% { opacity: .3; transform: scaleY(.7); } 50% { opacity: 1; transform: none; } }
 @keyframes hud-mark-in { from { transform: scale(.4) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes hud-flicker { 0%, 12%, 24%, 100% { opacity: 1; } 6%, 18% { opacity: .35; } }
 @keyframes hud-clip-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }

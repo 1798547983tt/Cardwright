@@ -80,6 +80,15 @@ const ACCENT_LIMIT = 8;
 const BASE64_LIMIT = 16 * 1024;
 const CONTRAST_MINIMUM = 4.5;
 
+/** Hosts that often fail or crawl from China, or that a card should not lean on for its look (Q23): warned, not blocked. */
+const MIRROR_HOSTS = /\b(?:fonts\.loli\.net|gstatic\.loli\.net|fonts\.googleapis\.cn|fonts\.gstatic\.cn|fonts\.font\.im)\b/i;
+/** A style sheet or a font file on jsDelivr, with a scheme or protocol-relative (//cdn.jsdelivr.net/…); a script there is not part of the look. */
+const CDN_FONT = /(?:https?:)?\/\/(?:[a-z0-9-]+\.)?jsdelivr\.net\/[^\s"'`)<>]*?\.(?:css|woff2?|ttf|otf)(?![\w@.-])(?:[?#][^\s"'`)<>]*)?/i;
+/** Anything on GitHub raw: pictures and sounds, and the addresses a script puts together (`…/${commit}/avatars/${file}`). */
+const RAW_GITHUB = /(?:(?:https?:)?\/\/)?raw\.githubusercontent\.com\b[^\s"'`)<>]*/i;
+/** HTML comments and CSS / JS block comments: a link that is commented out loads nothing. */
+const COMMENTS = /<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//g;
+
 /** Every declaration of a style sheet with its selector and the @media conditions around it. */
 export function cssDeclarations(css: string): Declaration[] {
   const text = css.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -141,10 +150,23 @@ function gridWidth(value: string): number | null {
   return tracks.length && tracks.every(track => track !== null) ? tracks.reduce((sum, track) => sum! + track!, 0) : null;
 }
 
+/** The last compound of each selector in a list: `.blk-ascend .rays` → `.rays`. */
+const lastCompounds = (selector: string): string[] => selector.split(',').map(part => part.trim().split(/\s*[\s>+~]\s*/).at(-1) ?? '').filter(Boolean);
+/**
+ * Selectors whose boxes never widen the page: pseudo-elements (decoration) and anything a rule of the same last compound
+ * positions absolutely or fixed. 酒馆助手's iframe hides its own overflow, so such a box is clipped, not scrolled to.
+ */
+function outOfFlow(declarations: Declaration[]): (selector: string) => boolean {
+  const positioned = new Set<string>();
+  for (const item of declarations) if (item.property === 'position' && /\b(absolute|fixed)\b/i.test(item.value)) for (const compound of lastCompounds(item.selector)) positioned.add(compound);
+  return selector => lastCompounds(selector).every(compound => /::?(before|after|backdrop|marker)\b/i.test(compound) || positioned.has(compound));
+}
+
 function mobileProblems(declarations: Declaration[], markup: string): string[] {
   const problems: string[] = [];
+  const decorative = outOfFlow(declarations);
   for (const item of declarations) {
-    if (!phoneSees(item.media)) continue;
+    if (!phoneSees(item.media) || decorative(item.selector)) continue;
     const width = ['width', 'min-width', 'flex-basis'].includes(item.property) ? pixels(item.value)
       : item.property === 'flex' ? pixels(item.value.split(/\s+/).at(-1) ?? '')
       : item.property === 'grid-template-columns' ? gridWidth(item.value) : null;
@@ -257,9 +279,13 @@ export function frontendQuality(html: string): FrontendFinding[] {
   if (!pseudo && !listens) add('error', 'frontend-interaction', '整个前端没有任何交互反馈：没有 :hover、:active、:focus，也没有事件监听。可以点的东西要让人看出来能点、点了有反应。');
   const contrast = contrastProblems(tokens);
   if (contrast.length) add('error', 'frontend-contrast', `正文对比度低于 4.5:1：${summary(contrast)}。加深文字或调整底色。`);
-  if (/fonts\.(googleapis|gstatic)\.com/i.test(html)) add('error', 'frontend-fonts', '用了 Google Fonts：国内经常加载不出来，还会拖慢整个页面。改用系统字体栈。');
+  const live = html.replace(COMMENTS, '');
+  // A warning since 1.1.0 (the user's call, 2026-09-24): hand-written cards that work in SillyTavern still export.
+  if (/fonts\.(googleapis|gstatic)\.com/i.test(live)) add('warning', 'frontend-fonts', '用了 Google Fonts：国内经常加载不出来，还会拖慢整个页面。能换就换成系统字体栈。');
+  const external = [MIRROR_HOSTS, CDN_FONT, RAW_GITHUB].flatMap(pattern => { const match = pattern.exec(live); return match ? [match[0].replace(/^(?:https?:)?\/\//, '').slice(0, 80)] : []; });
+  if (external.length) add('warning', 'frontend-external', `用了外部资源：${summary(external)}。字体镜像、CDN 上的样式表或字体、GitHub raw 上的文件都可能加载慢或失效，卡在别人的机器上会掉样子；骨架前端一律系统字体栈，素材只用设计书里给的链接。`);
   const images = [...html.matchAll(/data:(?:image|audio|video|font)\/[\w.+-]+(?:;[\w=.-]+)*;base64,([A-Za-z0-9+/=\s]+)/gi)].filter(match => match[1].length >= BASE64_LIMIT);
-  if (images.length) add('error', 'frontend-base64', `把 ${images.length} 个大文件（最大约 ${Math.round(Math.max(...images.map(match => match[1].length)) * 0.75 / 1024)} KB）以 base64 塞进了替换内容：每一楼都要重新解析它，卡会变慢、变大。图片用设计书里给的链接。`);
+  if (images.length) add('warning', 'frontend-base64',`把 ${images.length} 个大文件（最大约 ${Math.round(Math.max(...images.map(match => match[1].length)) * 0.75 / 1024)} KB）以 base64 塞进了替换内容：每一楼都要重新解析它，卡会变慢、变大。图片用设计书里给的链接。`);
 
   // Tokens count wherever the sheet declares them: Re0 keeps its set on the app's mount element rather than :root.
   const declared = new Set(cssDeclarations(css).filter(item => item.property.startsWith('--')).map(item => item.property));

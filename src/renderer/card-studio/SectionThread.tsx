@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
+import type { Components } from 'react-markdown';
 import { ArrowRight, Check, ChevronRight, Copy, LoaderCircle, MessageSquarePlus, Pencil, RotateCcw, Terminal, Undo2 } from 'lucide-react';
 import { useApp } from '../context';
 import { Modal } from '../primitives';
@@ -14,7 +13,11 @@ import { ACCEPT_ALL_TEXT, isHandoffRequest, isKickoff, segmentReply, stripMarker
 import { dispatchDone, messageAction, nextDispatch, turnWrites } from '../../shared/card-studio/view';
 import { runOwns } from '../../shared/card-studio/run';
 import { RevisionBar } from '../RevisionBar';
-import { CodeBlock } from '../ReadingAids';
+import { Markdown as KernelMarkdown } from '../conversation/Markdown';
+import { ThinkingBlock } from '../conversation/Thinking';
+import { RunError, ToolGroup, WorkingDots } from '../conversation/parts';
+import { groupToolRuns } from '../conversation/tool-groups';
+import { useArrivals, useFollowScroll } from '../conversation/motion';
 import { tokenCount, undoTurnWrites, useCardActions } from './actions';
 import type { CardProjectView } from '../../shared/card-studio/types';
 import type { ChatMessage, Task } from '../../shared/types';
@@ -23,16 +26,30 @@ import { useStudio } from './CardStudio';
 type Turn = ReturnType<typeof groupConversation>[number];
 const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-function Markdown({ text }: { text: string }) {
+/** A web address opens in the browser; any other link stays text. */
+function StudioLink({ children, href }: ComponentProps<'a'>) {
   const { api, run } = useApp();
-  return useMemo(() => <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ children, href }) => href && /^https?:\/\//i.test(href)
+  return href && /^https?:\/\//i.test(href)
     ? <a href={href} onClick={event => { event.preventDefault(); void run(() => api.openExternal(href)); }}>{children}</a>
-    : <span>{children}</span>,
-    pre: ({ children }) => <CodeBlock className="is-studio">{children}</CodeBlock> }}>{text}</ReactMarkdown>, [text, api, run]);
+    : <span>{children}</span>;
 }
 
-/** A dispatch in a reply: 复制 copies it; 去这个分区 opens a draft in the target section. Neither sends anything. */
-export function DispatchCard({ dispatch, card }: { dispatch: DispatchParse; card: CardProjectView }) {
+/** The studio skin of the conversation kernel: plain GFM, its own links; code blocks and tables are the kernel's. */
+const STUDIO_MARKDOWN = { skin: 'studio' as const, components: { a: StudioLink } satisfies Components };
+
+function Markdown({ text, streaming }: { text: string; streaming?: boolean }) {
+  return <KernelMarkdown text={text} streaming={streaming} {...STUDIO_MARKDOWN} />;
+}
+
+/** The records the conversation had when it was opened: only what arrives after fades in (handoff §5.5 ⑦). */
+const Arrivals = createContext<ReadonlySet<string>>(new Set());
+
+/**
+ * A dispatch in a reply: 复制 copies it; 去这个分区 opens a draft in the target section. Neither sends anything. In a
+ * change AI's conversation (`listed`) the dispatches are its 影响清单, pruned and started from the 改动单 above the
+ * thread, so the card says so instead of offering 去这个分区.
+ */
+export function DispatchCard({ dispatch, card, listed }: { dispatch: DispatchParse; card: CardProjectView; listed?: boolean }) {
   const { api, t, notify } = useApp();
   const studio = useStudio();
   if ('error' in dispatch) return <div className="cs-dispatch is-broken"><header><span className="cs-dispatch-no">{t('Dispatch', '派单')}</span><em>{dispatch.error}</em></header><pre>{dispatch.raw}</pre></div>;
@@ -58,7 +75,9 @@ export function DispatchCard({ dispatch, card }: { dispatch: DispatchParse; card
     <div className="cs-dispatch-body">{dispatch.body}</div>
     <footer>
       <button type="button" className="cs-btn is-small" onClick={() => void api.copyText(formatDispatch(dispatch)).then(() => notify(t('Dispatch copied', '已复制派单')), () => notify(t('Could not copy', '复制失败')))}><Copy size={13} />{t('Copy', '复制')}</button>
-      <button type="button" className="cs-btn is-small is-primary" disabled={!dispatch.sectionId} onClick={go}>{t('Go to this section', '去这个分区')}<ArrowRight size={13} /></button>
+      {listed
+        ? <span className="cs-note cs-dispatch-listed">{t('On the impact list: prune it in the change order above, then Go ahead.', '已列入影响清单：在上面的改动单里删减后照单开做')}</span>
+        : <button type="button" className="cs-btn is-small is-primary" disabled={!dispatch.sectionId} onClick={go}>{t('Go to this section', '去这个分区')}<ArrowRight size={13} /></button>}
     </footer>
   </article>;
 }
@@ -113,11 +132,12 @@ function UserMessage({ message, started, task, card, editSignal }: { message: Ch
   const studio = useStudio();
   const [editing, setEditing] = useState(false); const [draft, setDraft] = useState(message.text);
   const [asking, setAsking] = useState(false); const [busy, setBusy] = useState(false);
+  const entering = useContext(Arrivals).has(message.id) ? '' : ' conv-enter';
   // A double Esc in the thread opens the latest written message for editing, as in the workbench.
   useEffect(() => { if (editSignal && messageAction(task, message.id, { runOwned: runOwns(card.run, task.id) }) === 'edit') { setDraft(message.text); setEditing(true); } }, [editSignal]);
   const kickoff = started ?? isKickoff(message.text);
-  if (isHandoffRequest(message.text)) return <div className="cs-kickoff is-handoff">{t('Asked the AI for a handoff summary', '已请 AI 写交接摘要')}<time>{clock(message.at)}</time></div>;
-  if (kickoff) return <div className="cs-kickoff">{kickoff === 'refine' ? t('Planning started · refine this card', '已开始规划 · 完善优化卡') : t('Planning started · start from scratch', '已开始规划 · 从零开始制卡')}<time>{clock(message.at)}</time></div>;
+  if (isHandoffRequest(message.text)) return <div className={`cs-kickoff is-handoff${entering}`}>{t('Asked the AI for a handoff summary', '已请 AI 写交接摘要')}<time>{clock(message.at)}</time></div>;
+  if (kickoff) return <div className={`cs-kickoff${entering}`}>{kickoff === 'refine' ? t('Planning started · refine this card', '已开始规划 · 完善优化卡') : t('Planning started · start from scratch', '已开始规划 · 从零开始制卡')}<time>{clock(message.at)}</time></div>;
   const action = messageAction(task, message.id, { runOwned: runOwns(card.run, task.id) });
   const writes = turnWrites(task.tools, message.turnId || message.id, card.path);
 
@@ -141,7 +161,7 @@ function UserMessage({ message, started, task, card, editSignal }: { message: Ch
     if (done) setEditing(false);
   }
 
-  return <article className={`cs-msg is-user ${editing ? 'is-editing' : ''}`} data-message-id={message.id}>
+  return <article className={`cs-msg is-user ${editing ? 'is-editing' : ''}${entering}`} data-message-id={message.id}>
     <header><b>{t('You', '你')}</b>{message.pending && <em>{t('Queued', '等待发送')}</em>}<time>{clock(message.at)}</time>
       {!editing && <span className="cs-msg-actions">
         <button type="button" className="cs-icon" aria-label={t('Copy message', '复制消息')} title={t('Copy message', '复制消息')} onClick={() => void run(() => api.copyText(message.text), t('Message copied', '消息已复制'))}><Copy size={13} /></button>
@@ -198,22 +218,39 @@ function TurnView({ task, turn, card, last, editSignal }: { task: Task; turn: Tu
   const finalMessage = final?.type === 'message' ? final.item : undefined;
   const tools = turn.entries.filter(entry => entry.type === 'tool');
   const notices = turn.entries.flatMap(entry => entry.type === 'message' && entry.item.role === 'system' && !entry.item.usage && entry.item.text ? [entry.item] : []);
-  const thinking = assistant.filter(entry => entry.type === 'message' && entry.item.thinking).length;
+  // The reply being written: the turn's newest record while the task runs. Its thinking (else the reply's) shows in the
+  // thread, live while the model thinks; the other thoughts stay in the work log with the tools (handoff §5.5 ②④).
+  const newest = turn.entries[turn.entries.length - 1];
+  const streaming = task.status === 'running' && last && newest?.type === 'message' && newest.item.role === 'assistant' ? newest.item : undefined;
+  const featured = streaming ?? finalMessage;
+  const thinkingLive = !!streaming && streaming.thinkingMs === undefined && !streaming.text.trim();
+  const logged = turn.entries.filter(entry => entry.type === 'tool' || (!!entry.item.thinking && entry.item.id !== featured?.id));
+  const thinking = logged.filter(entry => entry.type === 'message').length;
+  const logEntry = (entry: Turn['entries'][number]) => entry.type === 'tool' ? <ToolRecord key={entry.item.id} tool={entry.item} /> : <ThinkingBlock key={entry.item.id} message={entry.item} live={false} {...STUDIO_MARKDOWN} />;
+  const thinkingView = featured?.thinking ? <ThinkingBlock key={featured.id} message={featured} live={thinkingLive} {...STUDIO_MARKDOWN} /> : null;
+  const thinkingFirst = !finalMessage || featured === finalMessage;
+  const replyStreaming = !!streaming && streaming === finalMessage;
+  const arrived = useContext(Arrivals);
+  const entering = (turn.entries[0] ? arrived.has(turn.entries[0].item.id) : !turn.user || arrived.has(turn.user.id)) ? '' : ' conv-enter';
   const reply = finalMessage ? stripMarkers(finalMessage.text) : undefined;
   const truncatedHere = task.truncation && !active && (task.truncation.turnId ? task.truncation.turnId === turn.id : last);
   return <section className="cs-turn">
-    {turn.user && <UserMessage message={turn.user} task={task} card={card} editSignal={editSignal} started={task.card?.kickoff && turn.user.id === task.messages.find(message => message.role === 'user')?.id ? task.card.mode ?? 'scratch' : undefined} />}
-    {(turn.entries.length > 0 || (last && active)) && <article className="cs-msg is-ai">
-      <header><b>{t(`${sectionLabel(task.card!.sectionId)} AI`, `${sectionLabel(task.card!.sectionId)} AI`)}</b>{last && active && <em className="cs-working-label">{t('Working', '处理中')}</em>}{turn.entries[0] && <time>{clock(turn.entries[0].at)}</time>}
+    {turn.user && <UserMessage message={turn.user} task={task} card={card} editSignal={editSignal} started={task.card?.kickoff && turn.user.id === task.messages.find(message => message.role === 'user')?.id ? task.card.mode === 'refine' ? 'refine' : 'scratch' : undefined} />}
+    {(turn.entries.length > 0 || (last && active)) && <article className={`cs-msg is-ai${entering}`}>
+      <header><b>{t(`${sectionLabel(task.card!.sectionId)} AI`, `${sectionLabel(task.card!.sectionId)} AI`)}</b>{last && active && <em className="cs-live-label">{t('Working', '处理中')}</em>}{turn.entries[0] && <time>{clock(turn.entries[0].at)}</time>}
         {reply && <span className="cs-msg-actions"><button type="button" className="cs-icon" aria-label={t('Copy response', '复制回复')} title={t('Copy response', '复制回复')} onClick={() => void run(() => api.copyText(reply.text), t('Response copied', '已复制回复'))}><Copy size={13} /></button></span>}
       </header>
-      {(tools.length > 0 || thinking > 0) && <details className="cs-process"><summary><ChevronRight size={13} />{t('Work log', '处理过程')}<small>{tools.length ? t(`${tools.length} tool calls`, `${tools.length} 次工具调用`) : t(`${thinking} reasoning steps`, `${thinking} 段思考`)}</small>{last && active && <LoaderCircle size={12} className="spinning" />}</summary>
-        <div className="cs-process-body">{turn.entries.map(entry => entry.type === 'tool' ? <ToolRecord key={entry.item.id} tool={entry.item} /> : entry.item.thinking ? <details key={entry.item.id} className="cs-thinking"><summary>{t('Reasoning', '思考')}</summary><div>{entry.item.thinking}</div></details> : null)}</div>
+      {logged.length > 0 && <details className="cs-process"><summary><ChevronRight size={13} />{t('Work log', '处理过程')}<small>{tools.length ? t(`${tools.length} tool calls`, `${tools.length} 次工具调用`) : t(`${thinking} reasoning steps`, `${thinking} 段思考`)}</small>{last && active && <LoaderCircle size={12} className="spinning" />}</summary>
+        <div className="cs-process-body">{groupToolRuns(logged, entry => entry.type === 'tool' ? { tool: entry.item.name } : 'quiet').map(item => item.kind === 'group'
+          ? <ToolGroup key={`group-${item.items[0].item.id}`} name={item.name} calls={item.calls.flatMap(entry => entry.type === 'tool' ? [entry.item] : [])}>{item.items.map(logEntry)}</ToolGroup>
+          : logEntry(item.item))}</div>
       </details>}
+      {thinkingFirst && thinkingView}
       {notices.map(notice => <p key={notice.id} className="cs-notice">{notice.text}</p>)}
-      {reply && segmentReply(reply.text).map((segment, index) => segment.type === 'markdown' ? <div key={index} className="cs-md"><Markdown text={segment.text} /></div>
-        : segment.type === 'dispatch' ? <DispatchCard key={index} dispatch={segment.dispatch} card={card} />
+      {reply && segmentReply(reply.text).map((segment, index, segments) => segment.type === 'markdown' ? <div key={index} className={`cs-md${replyStreaming && index === segments.length - 1 ? ' conv-live' : ''}`}><Markdown text={segment.text} streaming={replyStreaming && index === segments.length - 1} /></div>
+        : segment.type === 'dispatch' ? <DispatchCard key={index} dispatch={segment.dispatch} card={card} listed={!!task.card?.changeId} />
         : <HandoffCard key={index} handoff={segment.handoff} raw={segment.raw} requested={!!turn.user && isHandoffRequest(turn.user.text)} />)}
+      {!thinkingFirst && thinkingView}
       <WrittenThisTurn task={task} turn={turn} card={card} canUndo={last && !active} />
       {truncatedHere && <TruncationNotice task={task} userMessageId={turn.user?.id} />}
       {last && !active && reply?.hasAcceptAll && <div className="cs-accept">
@@ -230,11 +267,9 @@ export function SectionThread({ task, card, scroller }: { task: Task; card: Card
   const active = ['running', 'queued', 'waiting'].includes(task.status) || !!task.workerActive;
   const lastTurn = turns.findLastIndex(turn => !turn.user?.pending);
   const approvals = data.approvals.filter(approval => approval.taskId === task.id);
-  useEffect(() => {
-    const element = scroller.current;
-    if (element && element.scrollHeight - element.scrollTop - element.clientHeight < 160) element.scrollTop = element.scrollHeight;
-  }, [task.messages, task.tools, approvals.length, scroller]);
-  useEffect(() => { const element = scroller.current; if (element) element.scrollTop = element.scrollHeight; }, [task.id, scroller]);
+  // The stage eases after the reply while the reader is at the bottom and lets go when they scroll up (handoff §5.5 ⑤).
+  useFollowScroll(scroller, [task.messages, task.tools, approvals.length, task.status], task.id);
+  const arrived = useArrivals(`${task.id}:${task.activeRevisionId ?? ''}`, task);
   // Esc stops this turn and a second Esc within a moment edits the latest message, as in the workbench; one-click
   // making's conversations are stopped from its own bar.
   const [editSignal, setEditSignal] = useState(0);
@@ -251,7 +286,7 @@ export function SectionThread({ task, card, scroller }: { task: Task; card: Card
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [task.id, active, card.run]);
-  return <div className="cs-thread">
+  return <Arrivals.Provider value={arrived}><div className="cs-thread">
     <RevisionBar task={task} className="cs-revisions" />
     {turns.length === 0 && <p className="cs-note cs-thread-empty">{t('This conversation has no messages yet.', '这个对话还没有消息。')}</p>}
     {turns.map((turn, index) => <TurnView key={`${task.activeRevisionId || 'original'}-${turn.id}`} task={task} turn={turn} card={card} last={index === lastTurn} editSignal={index === lastTurn ? editSignal : undefined} />)}
@@ -262,8 +297,8 @@ export function SectionThread({ task, card, scroller }: { task: Task; card: Card
       <pre>{approval.toolName}{'\n'}{JSON.stringify(approval.args, null, 2)}</pre>
       <div className="modal-actions"><button type="button" className="cs-btn" onClick={() => void run(() => api.approve(approval.id, false))}>{t('Deny', '拒绝')}</button><button type="button" className="cs-btn is-primary" onClick={() => void run(() => api.approve(approval.id, true))}>{t('Allow once', '允许本次')}</button></div>
     </section>)}
-    {task.error && !task.truncation && !active && <div className="cs-error" role="alert"><strong>{t('This run needs attention', '本次执行需要处理')}</strong><p>{task.error}</p></div>}
+    {task.error && !task.truncation && !active && <RunError message={task.error} skin="studio" />}
     {!active && !task.error && <ConversationEnd task={task} card={card} />}
-    {active && !approvals.length && <div className="cs-working"><LoaderCircle size={14} className="spinning" />{task.status === 'queued' ? t('Queued · waiting for an agent slot', '已排队 · 等待空闲名额') : task.status === 'waiting' ? t('Waiting for your answer or approval', '等待你的回答或审批') : t('Working…', '正在处理…')}</div>}
-  </div>;
+    {active && !approvals.length && <div className="cs-working"><WorkingDots />{task.status === 'queued' ? t('Queued · waiting for an agent slot', '已排队 · 等待空闲名额') : task.status === 'waiting' ? t('Waiting for your answer or approval', '等待你的回答或审批') : t('Working…', '正在处理…')}</div>}
+  </div></Arrivals.Provider>;
 }

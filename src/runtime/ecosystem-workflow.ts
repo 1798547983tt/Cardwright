@@ -20,7 +20,7 @@ export interface WorkflowOptions {
   steer: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>;
   canDelegate: boolean; roles: AgentRole[]; isPlanMode: () => boolean;
   /** Present only in card studio section conversations. */
-  card?: { newComponent: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>; check: (signal?: AbortSignal) => Promise<unknown>; searchSources: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> };
+  card?: { newComponent: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>; check: (signal?: AbortSignal) => Promise<unknown>; syncVariables: (signal?: AbortSignal) => Promise<unknown>; searchSources: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> };
   /** Present only in workbench tasks; card studio conversations have no browser. */
   browser?: (action: string, args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>;
 }
@@ -56,11 +56,13 @@ export async function createWorkflow(options: WorkflowOptions) {
     options.emit({ type: 'workflow_todos', todos }); return todos;
   }
   const cardTools: ToolDefinition[] = options.card ? [
-    defineTool({ name: 'card_new_component', label: 'New card component', description: 'Create one card component and get its uid from the application. Never invent a uid. board: lore (default, a world book entry), regex, script or greeting; section is a card studio section id such as lore-people; keys are the world book keywords.',
-      parameters: Type.Object({ name: Type.String({ minLength: 1, maxLength: 60 }), board: Type.Optional(Type.String()), section: Type.Optional(Type.String()), keys: Type.Optional(Type.Array(Type.String())), order: Type.Optional(Type.Number()), constant: Type.Optional(Type.Boolean()), position: Type.Optional(Type.Number()), depth: Type.Optional(Type.Number()), kind: Type.Optional(Type.String()) }),
+    defineTool({ name: 'card_new_component', label: 'New card component', description: "Create one card component and get its uid from the application. Never invent a uid. board: lore (default, a world book entry), regex, script or greeting; section is a card studio section id such as lore-people; keys are the world book keywords. format: 'sheet' creates a 装配单 (.yaml) instead of an HTML body for a regex.",
+      parameters: Type.Object({ name: Type.String({ minLength: 1, maxLength: 60 }), board: Type.Optional(Type.String()), section: Type.Optional(Type.String()), keys: Type.Optional(Type.Array(Type.String())), order: Type.Optional(Type.Number()), constant: Type.Optional(Type.Boolean()), position: Type.Optional(Type.Number()), depth: Type.Optional(Type.Number()), kind: Type.Optional(Type.String()), format: Type.Optional(Type.Literal('sheet')) }),
       execute: async (_id, args, signal) => textResult(await options.card!.newComponent(args as Record<string, unknown>, signal)) }),
     defineTool({ name: 'card_check', label: 'Card checks', description: 'Run the deterministic assembly checks over this card project and read the findings. Errors block the export.',
       parameters: Type.Object({}), execute: async (_id, _args, signal) => textResult(await options.card!.check(signal)) }),
+    defineTool({ name: 'card_sync_variables', label: 'Generate variable files', description: 'After writing or changing 变量表.yaml in the card project root: the application generates the Zod script, the disabled [initvar] entry, the fixed 变量列表 and 变量输出格式 entries, the path list at the end of 变量规则 and the prompt-cleanup regex, then runs the checks. Returns what it created or rewrote and the check errors and warnings. Never write those files by hand.',
+      parameters: Type.Object({}), execute: async (_id, _args, signal) => textResult(await options.card!.syncVariables(signal)) }),
     defineTool({ name: 'card_search_sources', label: 'Search material', description: 'Search the imported material chapters (资料/分章) for a person, event or phrase. Keywords: every word must appear in a line; regex: true for a regular expression. Returns file, material, chapter title, line number and snippet. Use it before reading chapters instead of running commands.',
       parameters: Type.Object({ query: Type.String({ minLength: 1, maxLength: 200 }), regex: Type.Optional(Type.Boolean()), limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })), source: Type.Optional(Type.String()) }),
       execute: async (_id, args, signal) => textResult(await options.card!.searchSources(args as Record<string, unknown>, signal)) }),

@@ -107,7 +107,7 @@ export class Harness extends EventEmitter {
   }
   publicView(): AppSnapshot {
     const ecosystem = { ...this.store.state.ecosystem, roles: this.roles(), mcpServers: this.store.state.ecosystem.mcpServers.map(s => ({ ...s, hasSecrets: this.vault.has(`mcp:${s.id}`) })), webdav: { ...this.store.state.ecosystem.webdav, hasPassword: this.vault.has('webdav:password') } };
-    return { ...this.store.state, storageError: this.store.lastSaveError?.message, tasks: this.store.state.tasks.map(task => ({ ...task, workerActive: this.workers.has(task.id) || this.retiring.has(task.id) || this.starting.has(task.id) })), studio: this.studio?.snapshot(), cardStudio: this.cardStudio?.snapshot(), ecosystem, extensions: extensionManifest(ecosystem, this.store.state.search), interactions: [...this.interactions.values()], search: { ...this.store.state.search, hasKey: this.vault.has('search:brave') }, gateways: this.store.state.gateways.map(g => ({ ...g, hasKey: this.vault.has(g.id) })), approvals: [...this.approvals.values()], skills: this.skills, browser: this.browserState, version: '1.0.0' };
+    return { ...this.store.state, storageError: this.store.lastSaveError?.message, tasks: this.store.state.tasks.map(task => ({ ...task, workerActive: this.workers.has(task.id) || this.retiring.has(task.id) || this.starting.has(task.id) })), studio: this.studio?.snapshot(), cardStudio: this.cardStudio?.snapshot(), ecosystem, extensions: extensionManifest(ecosystem, this.store.state.search), interactions: [...this.interactions.values()], search: { ...this.store.state.search, hasKey: this.vault.has('search:brave') }, gateways: this.store.state.gateways.map(g => ({ ...g, hasKey: this.vault.has(g.id) })), approvals: [...this.approvals.values()], skills: this.skills, browser: this.browserState, version: '1.1.0' };
   }
   snapshot(): AppSnapshot { return structuredClone(this.publicView()); }
   attachStudio(studio: StudioServices): void { this.studio = studio; }
@@ -583,16 +583,28 @@ export class Harness extends EventEmitter {
       }
       return task.messages.find(m => m.id === id)!;
     };
+    // 思考中 N 秒 / 思考了 N 秒: the thinking time stays on the message. When the model thinks again in the same message,
+    // the start moves on by the time already spent, so the renderer's live count carries on from the total.
+    const thinkingStarts = (msg: Task['messages'][number]) => {
+      if (msg.thinkingMs !== undefined) { msg.thinkingStartedAt = new Date(Date.now() - msg.thinkingMs).toISOString(); delete msg.thinkingMs; }
+      else msg.thinkingStartedAt ??= stamp();
+    };
+    const thinkingEnds = (msg: Task['messages'][number]) => {
+      if (msg.thinkingStartedAt && msg.thinkingMs === undefined) msg.thinkingMs = Math.max(0, Date.now() - Date.parse(msg.thinkingStartedAt));
+    };
     if (type === 'message_start' && object(event.message).role === 'assistant') {
       this.streaming.delete(task.id); ensureAssistant();
     } else if (type === 'message_update') {
       const update = object(event.assistantMessageEvent);
-      if (update.type === 'text_delta') ensureAssistant().text += string(update.delta);
-      if (update.type === 'thinking_delta') { const msg = ensureAssistant(); msg.thinking = (msg.thinking || '') + string(update.delta); }
+      if (update.type === 'text_delta') { const msg = ensureAssistant(); msg.text += string(update.delta); thinkingEnds(msg); }
+      if (update.type === 'thinking_start') thinkingStarts(ensureAssistant());
+      if (update.type === 'thinking_delta') { const msg = ensureAssistant(); if (!msg.thinkingStartedAt || msg.thinkingMs !== undefined) thinkingStarts(msg); msg.thinking = (msg.thinking || '') + string(update.delta); }
+      if (update.type === 'thinking_end') thinkingEnds(ensureAssistant());
     } else if (type === 'message_end') {
       const message = object(event.message);
       if (message.role === 'assistant') {
         const msg = ensureAssistant();
+        thinkingEnds(msg);
         msg.text = contentText(message.content);
         msg.model = string(message.model) || task.modelId || this.store.state.gateways.find(g => g.id === task.gatewayId)?.modelId;
         msg.thinking = contentText(message.content, 'thinking') || undefined;
@@ -935,7 +947,7 @@ export class Harness extends EventEmitter {
     if (typeof next.name !== 'string' || next.name.length > 80 || typeof next.instructions !== 'string' || next.instructions.length > 40_000) throw new Error('Name or instructions are too long.');
     if (!Array.isArray(next.skillPaths) || next.skillPaths.some(p => typeof p !== 'string')) throw new Error('Skill folders must be paths.');
     if (next.developerMode !== undefined && typeof next.developerMode !== 'boolean') throw new Error('开发者模式只能打开或关闭。');
-    for (const key of ['notifyFinished', 'notifyApproval', 'bootSequence', 'quietUpgrade'] as const) if (next[key] !== undefined && typeof next[key] !== 'boolean') throw new Error('These switches are on or off.');
+    for (const key of ['notifyFinished', 'notifyApproval', 'bootSequence', 'quietUpgrade', 'releaseCheck'] as const) if (next[key] !== undefined && typeof next[key] !== 'boolean') throw new Error('These switches are on or off.');
     if (next.cardHandoff !== undefined) {
       const { tokens, windowPercent } = (next.cardHandoff ?? {}) as { tokens?: unknown; windowPercent?: unknown };
       if (!Number.isInteger(tokens) || (tokens as number) < 10_000 || (tokens as number) > 10_000_000 || !Number.isInteger(windowPercent) || (windowPercent as number) < 10 || (windowPercent as number) > 90) throw new Error('换对话阈值要在 1 万到 1000 万 Token、窗口的 10% 到 90% 之间。');

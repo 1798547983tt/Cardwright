@@ -2,7 +2,7 @@ import { findBoard } from './boards.ts';
 import { componentName } from './components.ts';
 import { stripMarkers } from './markers.ts';
 import { projectRelativePath } from './view.ts';
-import type { CardCheckFinding, CardCheckReport, CardDispatch, CardRun, CardRunPause, CardRunScope } from './types.ts';
+import type { CardChange, CardCheckFinding, CardCheckReport, CardDispatch, CardRun, CardRunPause, CardRunScope } from './types.ts';
 import type { ChatMessage, Task, TaskStatus, ToolCall } from '../types.ts';
 
 /** The boards one-click making covers; planning, material and assembly are never run for the user. */
@@ -34,13 +34,27 @@ export function runOwns(run: Pick<CardRun, 'status' | 'current' | 'handoff' | 'c
   return run.current?.taskId === taskId || run.handoff?.fromTaskId === taskId || Object.values(run.conversations ?? {}).includes(taskId);
 }
 
-/** The dispatches a run will send: still unsent, aimed at a section of the chosen boards, in planning order. A section no board has is skipped. */
+/**
+ * The dispatches a run will send: still unsent, aimed at a section of the chosen boards, in planning order. A section no
+ * board has is skipped, and so are 改动派单: they belong to their 改动单's own run (`changeQueue`).
+ */
 export function runQueue(dispatches: readonly CardDispatch[], scope: CardRunScope): string[] {
   const boards: readonly string[] = scope === 'all' ? RUN_BOARDS : [scope];
   return dispatches.filter(item => {
-    const board = item.status === 'todo' && item.sectionId ? findBoard(item.sectionId) : undefined;
+    const board = item.status === 'todo' && item.sectionId && !item.changeId ? findBoard(item.sectionId) : undefined;
     return !!board && boards.includes(board.id);
   }).map(item => item.id);
+}
+
+/** Whether one-click making can send a dispatch to this section: one of the world book, script, regex or greeting boards. */
+export function runnableSection(sectionId: string | null): boolean {
+  const board = sectionId ? findBoard(sectionId) : undefined;
+  return !!board && (RUN_BOARDS as readonly string[]).includes(board.id);
+}
+
+/** What a 改动单's run still has to send: its dispatches not yet sent, in the dependency order 照单开做 stored them in. */
+export function changeQueue(change: Pick<CardChange, 'dispatchIds'>, dispatches: readonly CardDispatch[]): string[] {
+  return change.dispatchIds.filter(id => dispatches.some(item => item.id === id && item.status === 'todo' && item.sectionId));
 }
 
 /** The longest run of failures of one tool, in call order, when it reaches the limit. */

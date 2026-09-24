@@ -17,6 +17,8 @@ export function schemaSource(code: string): string {
   return String(code ?? '')
     .replace(/^\uFEFF/, '')
     .replace(/^[ \t]*import\b[^;]*;?[ \t]*$/gm, '')
+    // The community's fallback pattern loads registerMvuSchema with a top-level `await import(...)` inside try/catch; the sandbox hands it a ready-made module.
+    .replace(/await\s+import\s*\(\s*(['"])[^'"]*mvu_zod[^'"]*\1\s*\)/g, 'globalThis.__cardwrightMvuZod')
     .replace(/^[ \t]*export\s+(?=(const|let|var|function|class)\b)/gm, '')
     .replace(/^[ \t]*export\s+default\s+/gm, 'const __default = ');
 }
@@ -25,9 +27,12 @@ export function schemaSource(code: string): string {
 export function evaluateSchema(code: string, options: { timeoutMs?: number } = {}): EvaluatedSchema {
   const source = schemaSource(code);
   let registered: unknown;
+  const register = (schema: unknown): unknown => { registered = schema; return schema; };
   const sandbox: Record<string, unknown> = {
     z, _,
-    registerMvuSchema: (schema: unknown) => { registered = schema; return schema; },
+    registerMvuSchema: register,
+    /** What `await import('…/mvu_zod.js')` resolves to after schemaSource() rewrote it. */
+    __cardwrightMvuZod: { registerMvuSchema: register },
     $: (value: unknown) => { if (typeof value === 'function') (value as () => void)(); return value; },
     console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
   };

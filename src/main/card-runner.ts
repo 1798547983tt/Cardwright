@@ -5,12 +5,12 @@ import type { CardStudioService } from './card-studio.ts';
 import { formatDispatch } from '../shared/card-studio/dispatch.ts';
 import { ACCEPT_ALL_TEXT } from '../shared/card-studio/markers.ts';
 import { DEFAULT_HANDOFF, handoffThreshold } from '../shared/card-studio/handoff.ts';
-import { CONTINUE_TEXT, RUN_PAUSE_LABELS, dispatchErrors, runIsOpen, runQueue, turnOutcome } from '../shared/card-studio/run.ts';
+import { CONTINUE_TEXT, RUN_PAUSE_LABELS, changeQueue, dispatchErrors, runIsOpen, runQueue, turnOutcome } from '../shared/card-studio/run.ts';
 import type { CardCheckFinding, CardRun, CardRunPause, CardRunScope, CardRunSettings } from '../shared/card-studio/types.ts';
 import type { Approval, ChatMessage, Interaction, Project, Task } from '../shared/types.ts';
 
 const ACTIVE = new Set(['queued', 'running', 'waiting']);
-const SCOPES = new Set<CardRunScope>(['all', 'lore', 'script', 'regex', 'greet']);
+const SCOPES = new Set<CardRunScope>(['all', 'lore', 'script', 'regex', 'greet', 'change']);
 const LEVELS = new Set(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
 const stamp = () => new Date().toISOString();
 
@@ -41,24 +41,40 @@ export class CardRunner extends EventEmitter {
   private restore(): void {
     for (const project of this.harness.store.state.projects) {
       const run = project.cardRun;
-      if (run && (run.status === 'running' || run.status === 'pausing')) this.harness.saveCardRun(project.id, { ...run, status: 'paused', pause: { reason: 'restart', message: '应用重启时这次一键制作还没做完，点【继续】接着做。', at: stamp() }, updatedAt: stamp() });
+      if (!run || (run.status !== 'running' && run.status !== 'pausing')) continue;
+      const message = '应用重启时这次一键制作还没做完，点【继续】接着做。';
+      this.harness.saveCardRun(project.id, { ...run, status: 'paused', pause: { reason: 'restart', message, at: stamp() }, updatedAt: stamp() });
+      this.followChange(project.id, run, 'paused', message);
     }
   }
 
-  async start(projectId: string, scope: CardRunScope, settings: CardRunSettings): Promise<CardRun> {
+  /** Throws unless these are complete run settings with a gateway that exists. */
+  checkSettings(settings: CardRunSettings): void {
+    if (!settings || !['ask', 'edit', 'full'].includes(settings.permission) || !LEVELS.has(settings.thinking) || typeof settings.autoAnswer !== 'boolean' || !this.harness.store.state.gateways.some(gateway => gateway.id === settings.gatewayId)) throw new Error('一键制作的设置不完整：请选好思考强度、模型和权限。');
+  }
+
+  /** Scope `change` runs one 改动单's dispatches (`options.changeId`) in their stored order; it needs no design book (Q15). */
+  async start(projectId: string, scope: CardRunScope, settings: CardRunSettings, options: { changeId?: string } = {}): Promise<CardRun> {
     return this.exclusive(projectId, async () => {
       const project = this.project(projectId);
       if (runIsOpen(project.cardRun)) throw new Error('这张卡还有一次一键制作没做完，先继续或停止它。');
-      if (!SCOPES.has(scope)) throw new Error('未知的一键制作范围。');
-      if (!settings || !['ask', 'edit', 'full'].includes(settings.permission) || !LEVELS.has(settings.thinking) || typeof settings.autoAnswer !== 'boolean' || !this.harness.store.state.gateways.some(gateway => gateway.id === settings.gatewayId)) throw new Error('一键制作的设置不完整：请选好思考强度、模型和权限。');
+      if (!SCOPES.has(scope) || (scope === 'change') !== !!options.changeId) throw new Error('未知的一键制作范围。');
+      this.checkSettings(settings);
       if (this.harness.store.state.tasks.some(task => task.projectId === projectId && task.card && !task.card.member && ACTIVE.has(task.status))) throw new Error('这张卡有对话正在运行，等它结束或先停止它。');
       const view = await this.studio.reload(projectId);
-      if (!view.design.exists) throw new Error('还没有设计书。先在规划写出设计书和派单。');
-      const queue = runQueue(view.dispatches, scope);
+      let queue: string[];
+      if (scope === 'change') {
+        const change = view.changes.find(item => item.id === options.changeId);
+        if (!change) throw new Error('找不到这个改动。');
+        queue = changeQueue(change, view.dispatches);
+      } else {
+        if (!view.design.exists) throw new Error('还没有设计书。先在规划写出设计书和派单。');
+        queue = runQueue(view.dispatches, scope);
+      }
       if (!queue.length) throw new Error('没有未派的派单可做。');
       const chosen: CardRunSettings = { thinking: settings.thinking, gatewayId: settings.gatewayId, ...(settings.modelId ? { modelId: settings.modelId } : {}), permission: settings.permission, autoAnswer: settings.autoAnswer };
       this.harness.saveCardSettings(projectId, { run: chosen });
-      const run: CardRun = { id: randomUUID(), scope, status: 'running', settings: chosen, queue, total: queue.length, done: [], conversations: {}, autoAnswered: [], startedAt: stamp(), updatedAt: stamp() };
+      const run: CardRun = { id: randomUUID(), scope, ...(options.changeId ? { changeId: options.changeId } : {}), status: 'running', settings: chosen, queue, total: queue.length, done: [], conversations: {}, autoAnswered: [], startedAt: stamp(), updatedAt: stamp() };
       this.save(projectId, run);
       void this.advance(projectId);
       return structuredClone(run);
@@ -119,9 +135,11 @@ export class CardRunner extends EventEmitter {
       if (nudge && current) {
         try { await this.send(projectId, run, current.id, nudge); }
         catch (error) { this.save(projectId, previous); throw error; }
+        this.followChange(projectId, run, 'running');
         return;
       }
       this.save(projectId, run);
+      this.followChange(projectId, run, 'running');
       void this.advance(projectId);
     });
   }
@@ -133,6 +151,7 @@ export class CardRunner extends EventEmitter {
       if (!run || !runIsOpen(run)) throw new Error('这张卡没有进行中的一键制作。');
       run.status = 'stopped'; run.finishedAt = stamp(); delete run.pause;
       this.save(projectId, run);
+      this.followChange(projectId, run, 'paused', '一键制作已停止。点「继续跑」接着做还没做完的改动派单。');
       for (const id of [run.current?.taskId, run.handoff?.fromTaskId]) if (id && ACTIVE.has(this.task(id)?.status ?? '')) { this.stopping.add(id); await this.harness.cancelTask(id); }
     });
   }
@@ -270,14 +289,16 @@ export class CardRunner extends EventEmitter {
       return;
     }
 
-    if (run.scope === 'all') {
+    if (run.scope === 'all' || run.scope === 'change') {
       const report = await this.studio.runChecks(projectId);
       run.finalCheck = { errors: report.findings.filter(item => item.level === 'error').length, warnings: report.findings.filter(item => item.level === 'warning').length, at: stamp() };
     }
     run.status = 'completed'; run.finishedAt = stamp(); delete run.pause;
     this.save(projectId, run);
+    if (run.changeId) await this.studio.finishChange(projectId, run.changeId, { errors: run.finalCheck?.errors ?? 0 }).catch(() => undefined);
     const check = run.finalCheck ? `，拼装检查 ${run.finalCheck.errors} 个错误、${run.finalCheck.warnings} 个警告` : '';
-    this.emit('notify', { title: run.scope === 'all' ? this.say('Full run finished', '全部开做完成') : this.say('One-click making finished', '一键制作完成'), body: `${project.name}：做完 ${run.done.length} 条派单${check}。` });
+    const title = run.scope === 'all' ? this.say('Full run finished', '全部开做完成') : run.scope === 'change' ? this.say('Change order finished', '改动单做完了') : this.say('One-click making finished', '一键制作完成');
+    this.emit('notify', { title, body: `${project.name}：做完 ${run.done.length} 条${run.scope === 'change' ? '改动' : ''}派单${check}。` });
   }
 
   private async onApproval(projectId: string, approval: Approval): Promise<void> {
@@ -305,6 +326,7 @@ export class CardRunner extends EventEmitter {
   private halt(projectId: string, run: CardRun, reason: CardRunPause, message: string): void {
     run.status = 'paused'; run.pause = { reason, message: message.slice(0, 2000), at: stamp() };
     this.save(projectId, run);
+    this.followChange(projectId, run, 'paused', `${RUN_PAUSE_LABELS[reason].zh}：${message}`);
     this.emit('notify', { title: this.say(`One-click making paused: ${RUN_PAUSE_LABELS[reason].en}`, `一键制作已暂停：${RUN_PAUSE_LABELS[reason].zh}`), body: `${this.project(projectId).name}：${message.split('\n')[0].slice(0, 120)}` });
   }
 
@@ -315,6 +337,10 @@ export class CardRunner extends EventEmitter {
     this.save(projectId, run);
   }
 
+  /** A change's run keeps its 改动单 in step: paused with the reason, or running again. Detached: the card file has its own queue. */
+  private followChange(projectId: string, run: CardRun, status: 'running' | 'paused', note?: string): void {
+    if (run.changeId) void this.studio.markChangeRun(projectId, run.changeId, status, note).catch(() => undefined);
+  }
   private say(en: string, zh: string): string { return this.harness.store.state.preferences.language === 'en' ? en : zh; }
   private conversationSettings(run: CardRun) {
     return { thinking: run.settings.thinking, gatewayId: run.settings.gatewayId, ...(run.settings.modelId ? { modelId: run.settings.modelId } : {}), permission: run.settings.permission };

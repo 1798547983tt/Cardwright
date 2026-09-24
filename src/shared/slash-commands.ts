@@ -22,6 +22,7 @@ const COMMANDS: SlashCommand[] = [
   { name: '标记完成', label: '/标记完成', description: { en: "Mark this conversation's dispatch done", zh: '把这个对话的派单标记完成' }, scopes: ['card'] },
   { name: '换对话', label: '/换对话', description: { en: 'Ask for a handoff summary and start a new conversation', zh: '请 AI 写交接摘要，再开新对话' }, scopes: ['card'] },
   { name: '下一步', label: '/下一步', description: { en: 'Open the next dispatch', zh: '打开下一条派单' }, scopes: ['card'] },
+  { name: '改动', label: '/改动', description: { en: 'Ask for a change or paste an error; the change AI lists what it affects', zh: '提改动或贴报错，改动 AI 列出影响清单' }, scopes: ['card'] },
 ];
 
 export function commandsFor(scope: SlashScope, options: { task?: boolean } = {}): SlashCommand[] {
@@ -48,4 +49,10 @@ export function slashSuggestions(text: string, input: { skills: SlashSkill[]; co
 export function matchCommand(text: string, commands: SlashCommand[]): SlashCommand | undefined {
   const value = text.trim();
   return commands.find(command => command.label === value);
+}
+
+/** `/改动` takes the rest of the message as what to change: the text after it (possibly empty), or null for any other message. */
+export function changeCommandText(text: string): string | null {
+  const match = /^\/改动(?:\s+([\s\S]*))?$/.exec(text.trim());
+  return match ? (match[1] ?? '').trim() : null;
 }

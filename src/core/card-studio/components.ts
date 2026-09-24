@@ -4,11 +4,10 @@
  * body can never invent a uid or break the JSON around a 20,000 character entry (ADR 0010).
  */
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { buildCard, emptyCardEnvelope, joinComponent, splitCard, splitComponent, type CardParts, type ComponentSplit } from '../../shared/card-studio/card-file.ts';
+import { emptyCardEnvelope, splitCard, splitComponent } from '../../shared/card-studio/card-file.ts';
 import { bookEntryToParams, cardEntryToParams, defaultLoreParams, loreFileName, paramsToBookEntry, sectionOfParams, type LoreParams } from '../../shared/card-studio/lore.ts';
-import { withFrontendFence } from '../../shared/card-studio/frontend.ts';
 import { allocateUids, raiseNextUid, readCardFile } from './card-project.ts';
 import type { CardComponentResult, CardImportReport, NewCardComponent } from '../../shared/card-studio/types.ts';
 
@@ -25,7 +24,7 @@ const TEMPLATE_STEMS = new Set(['人物模板', '剧情模板', '出处索引'])
 
 export interface ComponentIssue { level: 'error' | 'warning'; code: string; message: string; path?: string }
 export interface LoreComponent { uid: number; section: string; params: LoreParams; content: string; paramsPath: string; bodyPath: string }
-export interface FileComponent { name: string; params: Record<string, unknown>; body: string; paramsPath: string; bodyPath: string }
+export interface FileComponent { name: string; params: Record<string, unknown>; body: string; paramsPath: string; bodyPath: string; format: 'html' | 'yaml' | 'js' }
 export interface GreetingComponent { kind: 'first' | 'alternate' | 'group'; text: string; path: string }
 export interface ProjectComponents {
   root: string;
@@ -106,27 +105,31 @@ export async function readProject(root: string): Promise<ProjectComponents> {
   const rank = new Map(book.order.map((uid, index) => [uid, index]));
   lore.sort((a, b) => (rank.get(a.uid) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.uid) ?? Number.MAX_SAFE_INTEGER) || Number(a.params.order) - Number(b.params.order) || a.uid - b.uid);
 
-  const regex = await readFileComponents(root, '正则', '.html', issues);
-  const scripts = await readFileComponents(root, '脚本', '.js', issues);
+  const regex = await readFileComponents(root, '正则', ['.yaml', '.html'], issues);
+  const scripts = await readFileComponents(root, '脚本', ['.js'], issues);
   const greetings = await readGreetings(root);
   return { root, envelope, book, lore, regex, scripts, greetings, issues };
 }
 
-async function readFileComponents(root: string, folder: string, extension: string, issues: ComponentIssue[]): Promise<FileComponent[]> {
+/** Bodies may carry any of `extensions`; the first one listed wins when a component has two, and that is an error. */
+async function readFileComponents(root: string, folder: string, extensions: string[], issues: ComponentIssue[]): Promise<FileComponent[]> {
   const names = await readdir(join(root, folder)).catch(() => [] as string[]);
-  const bodies = new Set(names.filter(name => name.endsWith(extension)));
+  const bodies = new Set(names.filter(name => extensions.some(extension => name.endsWith(extension))));
   const components: FileComponent[] = [];
   for (const name of names.filter(item => item.endsWith('.json') && !item.startsWith('.'))) {
     const paramsPath = `${folder}/${name}`;
-    const bodyName = `${stem(name)}${extension}`;
     const raw = await read(root, paramsPath);
     let params: Record<string, unknown>;
     try { params = record(JSON.parse(raw ?? '')); }
     catch { issues.push({ level: 'error', code: 'params-parse', message: `参数文件不是合法 JSON：${paramsPath}`, path: paramsPath }); continue; }
-    const body = await read(root, `${folder}/${bodyName}`);
-    if (body === null) { issues.push({ level: 'error', code: 'orphan-params', message: `参数文件没有对应的正文：${paramsPath}`, path: paramsPath }); continue; }
-    bodies.delete(bodyName);
-    components.push({ name: stem(name), params, body, paramsPath, bodyPath: `${folder}/${bodyName}` });
+    const candidates = extensions.map(extension => `${stem(name)}${extension}`).filter(candidate => bodies.has(candidate));
+    if (!candidates.length) { issues.push({ level: 'error', code: 'orphan-params', message: `参数文件没有对应的正文：${paramsPath}`, path: paramsPath }); continue; }
+    if (candidates.length > 1) issues.push({ level: 'error', code: 'duplicate-body', message: `「${stem(name)}」同时有 ${candidates.join(' 和 ')}，只认前者；删掉另一个。`, path: `${folder}/${candidates[1]}` });
+    for (const candidate of candidates) bodies.delete(candidate);
+    const bodyName = candidates[0];
+    const body = await read(root, `${folder}/${bodyName}`) ?? '';
+    const format = bodyName.endsWith('.yaml') ? 'yaml' : bodyName.endsWith('.js') ? 'js' : 'html';
+    components.push({ name: stem(name), params, body, paramsPath, bodyPath: `${folder}/${bodyName}`, format });
   }
   for (const orphan of bodies) issues.push({ level: 'error', code: 'orphan-body', message: `正文没有对应的参数文件：${folder}/${orphan}`, path: `${folder}/${orphan}` });
   return components.sort((a, b) => numberPrefix(a.name) - numberPrefix(b.name) || a.name.localeCompare(b.name));
@@ -142,31 +145,6 @@ async function readGreetings(root: string): Promise<GreetingComponent[]> {
   const groupNames = (await readdir(join(root, '开场白/群聊')).catch(() => [] as string[])).filter(name => name.endsWith('.md')).sort((a, b) => numberPrefix(a) - numberPrefix(b) || a.localeCompare(b));
   for (const name of groupNames) greetings.push({ kind: 'group', text: await read(root, `开场白/群聊/${name}`) ?? '', path: `开场白/群聊/${name}` });
   return greetings;
-}
-
-/** What a regex component writes into `replaceString`: the iframe front-ends get their 前端围栏 here, and only here. */
-export function regexReplacement(item: FileComponent): string {
-  return withFrontendFence(item.body);
-}
-
-function partsOf(project: ProjectComponents): CardParts {
-  const toComponent = (item: FileComponent): ComponentSplit => ({ params: item.params, body: item.body });
-  return {
-    envelope: project.envelope,
-    book: { name: project.book.name, extras: project.book.extras },
-    lore: project.lore.map(item => ({ params: item.params, content: item.content })),
-    regex: project.regex.map(item => ({ params: item.params, body: regexReplacement(item) })),
-    scripts: project.scripts.map(toComponent),
-    greetings: {
-      first: project.greetings.find(item => item.kind === 'first')?.text ?? '',
-      alternates: project.greetings.filter(item => item.kind === 'alternate').map(item => item.text),
-      groupOnly: project.greetings.filter(item => item.kind === 'group').map(item => item.text),
-    },
-  };
-}
-
-export function buildCardFromProject(project: ProjectComponents): Record<string, unknown> {
-  return buildCard(partsOf(project));
 }
 
 /** A standalone world book export: the same entries without the card-only fields. */
@@ -246,6 +224,43 @@ export async function importLorebook(root: string, book: Record<string, unknown>
   return { lore: order.length, regex: 0, scripts: 0, greetings: 0, issues };
 }
 
+/**
+ * 整理未分类 (1.1 Q22): moves world book components to another section. A component's section is the folder its pair
+ * sits in, so each pair is renamed into the target folder under a name nothing there has (compared without case, as
+ * Windows does); the uid, the order and the body stay as they are, and so does the export order, which the book keeps.
+ * Every path is checked before anything moves. Returns the new parameter paths, in the order given.
+ */
+export async function moveLoreComponents(root: string, paramsPaths: readonly string[], section: string): Promise<string[]> {
+  const folder = LORE_FOLDERS[section];
+  if (!folder) throw new Error(`未知的世界书分区：${section}`);
+  const project = await readProject(root);
+  const byPath = new Map(project.lore.map(item => [item.paramsPath, item]));
+  const items = [...new Set(paramsPaths)].map(path => {
+    const item = byPath.get(path);
+    if (!item) throw new Error(`找不到这条世界书组件：${path}`);
+    return item;
+  });
+  const target = join(root, ...folder.split('/'));
+  await mkdir(target, { recursive: true });
+  const taken = new Set((await readdir(target)).map(name => stem(name).toLowerCase()));
+  const has = { has: (name: string) => taken.has(name.toLowerCase()) };
+  const at = (relative: string) => join(root, ...relative.split('/'));
+  const moved: string[] = [];
+  for (const item of items) {
+    if (item.section === section) { moved.push(item.paramsPath); continue; }
+    const named = loreFileName(item.params, has);
+    let base = named;
+    for (let copy = 2; has.has(base); copy++) base = `${named}-${copy}`;
+    taken.add(base.toLowerCase());
+    const next = { params: `${folder}/${base}.json`, body: `${folder}/${base}.md` };
+    await rename(at(item.paramsPath), at(next.params));
+    try { await rename(at(item.bodyPath), at(next.body)); }
+    catch (error) { await rename(at(next.params), at(item.paramsPath)).catch(() => undefined); throw error; }
+    moved.push(next.params);
+  }
+  return moved;
+}
+
 async function clearLore(root: string): Promise<void> {
   for (const folder of Object.values(LORE_FOLDERS)) {
     const names = await readdir(join(root, ...folder.split('/'))).catch(() => [] as string[]);
@@ -262,13 +277,6 @@ const PIECE = {
   script: { folder: '脚本', extension: '.js', body: 'content', name: 'name', label: '脚本' },
 } as const;
 export interface PieceImport { kind: PieceKind; name: string; paramsPath: string; bodyPath: string; replaced: boolean }
-
-/** One regex or script joined back into the shape SillyTavern and 酒馆助手 import. */
-export function buildPiece(project: ProjectComponents, kind: PieceKind, name: string): Record<string, unknown> {
-  const piece = (kind === 'regex' ? project.regex : project.scripts).find(item => item.name === name);
-  if (!piece) throw new Error(`没有找到${PIECE[kind].label}组件「${name}」。`);
-  return joinComponent({ params: piece.params, body: kind === 'regex' ? regexReplacement(piece) : piece.body }, PIECE[kind].body);
-}
 
 export function pieceFileName(kind: PieceKind, name: string, version: string, date: string): string {
   return `${[PIECE[kind].folder, name, version, date].filter(Boolean).join('-')}.json`;
@@ -294,6 +302,8 @@ export async function importPiece(root: string, value: unknown): Promise<PieceIm
   const existing = typeof item.id === 'string' && item.id ? siblings.find(component => component.params.id === item.id) : undefined;
   const next = Math.max(0, ...siblings.map(component => numberPrefix(component.name)).filter(value => value < Number.MAX_SAFE_INTEGER)) + 1;
   const base = existing ? existing.name : `${String(next).padStart(2, '0')}-${safeName(String(item[shape.name] ?? shape.label), shape.label)}`;
+  // A replaced component keeps its file name but always gets this shape's extension: a stale sheet body would win over the imported document.
+  if (existing && !existing.bodyPath.endsWith(shape.extension)) await rm(join(root, ...existing.bodyPath.split('/')), { force: true });
   await write(root, `${shape.folder}/${base}.json`, json(split.params));
   await write(root, `${shape.folder}/${base}${shape.extension}`, split.body);
   return { kind, name: base, paramsPath: `${shape.folder}/${base}.json`, bodyPath: `${shape.folder}/${base}${shape.extension}`, replaced: Boolean(existing) };
@@ -301,6 +311,17 @@ export async function importPiece(root: string, value: unknown): Promise<PieceIm
 
 export type NewComponentInput = NewCardComponent;
 export type NewComponentResult = CardComponentResult;
+
+/** What a sheet starts as: its kind from the name, and the find expression that kind uses (the AI still owns the params). */
+const SHEET_STARTS: Array<{ test: RegExp; kind: string; params: Record<string, unknown> }> = [
+  { test: /状态栏|状态|status/i, kind: '状态栏', params: { findRegex: String.raw`/<StatusPlaceHolderImpl\/>/g`, placement: [2], maxDepth: null } },
+  { test: /正文|美化|body/i, kind: '正文美化', params: { findRegex: String.raw`/<content>([\s\S]*?)<\/content>/is`, placement: [2], maxDepth: 9 } },
+  { test: /创角|开局|start/i, kind: '创角页', params: { findRegex: String.raw`/<start>([\s\S]*?)<\/start>/gsi`, placement: [1, 2], maxDepth: null } },
+];
+function sheetStart(name: string): { body: string; params: Record<string, unknown> } {
+  const start = SHEET_STARTS.find(item => item.test.test(name)) ?? SHEET_STARTS[0];
+  return { params: start.params, body: ['# 装配单：字段与区块词汇见内置资料 frontend/blocks/词汇.md，样例见 frontend/blocks/样例-*.yaml', `前端: ${start.kind}`, ''].join('\n') };
+}
 
 /** Creates one component with the parameters its section needs. The uid comes from the registration, never from the AI. */
 export async function createComponent(root: string, input: NewComponentInput): Promise<NewComponentResult> {
@@ -322,8 +343,9 @@ export async function createComponent(root: string, input: NewComponentInput): P
     await writeBook(root, project.book, [...project.book.order.filter(item => item !== uid), uid]);
     return { uid, section, paramsPath: `${folder}/${base}.json`, bodyPath: `${folder}/${base}.md` };
   }
+  const sheet = input.board === 'regex' && input.format === 'sheet' ? sheetStart(name) : null;
   const folder = input.board === 'regex' ? '正则' : input.board === 'script' ? '脚本' : '开场白';
-  const extension = input.board === 'regex' ? '.html' : input.board === 'script' ? '.js' : '.md';
+  const extension = input.board === 'regex' ? (sheet ? '.yaml' : '.html') : input.board === 'script' ? '.js' : '.md';
   const target = input.board === 'greeting' && input.kind === 'group' ? `${folder}/群聊` : folder;
   const names = await readdir(join(root, ...target.split('/'))).catch(() => [] as string[]);
   const next = Math.max(0, ...names.map(numberPrefix).filter(value => value < Number.MAX_SAFE_INTEGER)) + 1;
@@ -333,9 +355,9 @@ export async function createComponent(root: string, input: NewComponentInput): P
     return { uid: -1, paramsPath: '', bodyPath: `${target}/${base}.md` };
   }
   const params = input.board === 'regex'
-    ? { id: randomUUID(), scriptName: name, findRegex: '', trimStrings: [], placement: [2], disabled: false, markdownOnly: true, promptOnly: false, runOnEdit: true, substituteRegex: 0, minDepth: null, maxDepth: null }
+    ? { id: randomUUID(), scriptName: name, findRegex: '', trimStrings: [], placement: [2], disabled: false, markdownOnly: true, promptOnly: false, runOnEdit: true, substituteRegex: 0, minDepth: null, maxDepth: null, ...(sheet?.params ?? {}) }
     : { type: 'script', enabled: true, name, id: randomUUID(), info: '', button: { enabled: false, buttons: [] }, data: {}, export_with: { data: false, button: false } };
   await write(root, `${target}/${base}.json`, json(params));
-  await write(root, `${target}/${base}${extension}`, '');
+  await write(root, `${target}/${base}${extension}`, sheet?.body ?? '');
   return { uid: -1, paramsPath: `${target}/${base}.json`, bodyPath: `${target}/${base}${extension}` };
 }

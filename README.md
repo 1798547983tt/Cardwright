@@ -18,7 +18,7 @@ Cardwright 是面向 Windows 本地项目的 Agent 工作台：连接你自己�
 
 ### 安装
 
-从 [Releases](../../releases) 下载 `Cardwright-Setup-1.0.0.exe` 并安装。安装包没有代码签名，Windows 首次运行会提示「未知发布者」，可以选择「更多信息 → 仍要运行」。卸载时保留你的资料目录。
+从 [Releases](../../releases) 下载 `Cardwright-Setup-1.1.0.exe` 并安装。安装包没有代码签名，Windows 首次运行会提示「未知发布者」，可以选择「更多信息 → 仍要运行」。卸载时保留你的资料目录。
 
 也可以自己构建：
 
@@ -45,6 +45,8 @@ node scripts/package.mjs      # 便携版输出到 release/<版本>/Cardwright-w
 - **Shift+Tab** 在默认审批 → 项目内自动编辑 → 计划 → 完全访问之间循环。
 - **子代理**：除了自建的，还会读项目和用户的 `.claude/agents/*.md`，可以逐个停用。
 - **钩子**：按 Claude Code 的 `settings.json` 格式配置 SessionStart、UserPromptSubmit、PreToolUse、PostToolUse、Stop、SubagentStop、Notification，可以从 Claude Code 导入并逐条试跑。
+- **对话**（工作台和制卡工坊都是）：代码块有语法高亮、语言标签和复制，长代码自动折叠；模型的思考过程边想边显示，想完折成「思考了 N 秒」；连续的同类工具调用合成一行；回复末尾有光标，新字淡入，滚动平滑跟随；表格有斑马纹，太宽时横向滚动。系统开了「减少动画」时这些都不动。
+- **新版本提醒**：每天查一次 GitHub 上的最新版本号，有新版本时在顶栏提示，点一下打开发布页；不下载、不上传任何东西，可以在「工作室设置」里关掉。
 
 ### 内置浏览器
 
@@ -67,9 +69,15 @@ node scripts/package.mjs      # 便携版输出到 release/<版本>/Cardwright-w
 
 从工作台左下角进入。卡项目是本地文件夹，只出现在卡库里。规划 AI 按轮提问、给推荐答案，写出设计书后派单；世界书条目、正则、脚本、开场白各是一个组件文件，由应用确定性地拼装成卡。导出整卡 JSON、PNG 卡、世界书和单件，每次导出附一份替换说明。本地预览在隔离的 iframe 里按酒馆的处理顺序渲染，不联网。
 
-- 状态栏、正文美化、开局创角页这类前端，组件文件里只写 HTML 文档；拼装时应用自动包上 ```` ```html ```` 围栏，酒馆助手才会把它渲染成能交互的页面。拼装检查会核对围栏，并对每个前端做质量检查：手机宽度下横向滚动、没有任何交互反馈、正文对比度不足、用了 Google Fonts、塞了大图 base64 会禁止导出；设计令牌太少、没有 `@media`、循环动画不照顾「减少动画」、强调色用得太多会提醒。
-- 前端有七套风格预设（战术档案、鎏金典狱、工业终端、复古电影、粉樱、和纸、霓虹夜）和一套按题材自定的写法，规划在设计书里选定。
+- **变量一次做对**：「变量结构」分区写一张变量表（路径、类型、默认值、范围、由谁维护），Zod 结构、初始变量 `[initvar]`、变量列表、变量输出格式和规则里的路径清单都由应用照表生成。拼装检查会核对状态栏和创角页读写的路径、示例补丁能不能打在初始变量上、渲染正则能不能匹配输出格式，还有条数上限和 `[initvar]` 的设置。导入的卡会推导出一份变量表，只用来核对，不改你的 Zod。
+- **前端由应用编译**：状态栏、正文美化、开局创角页可以写成「装配单」——选风格、分页、区块和要显示的变量，应用用自带的前端骨架编译成完整的页面。属性表、进度条、环形量表、标签、折叠面板、列表、关系卡、时间线、危机档位、变动徽章都是现成的区块，放不下的内容写成自定义区块。状态栏有三种形态：每楼一个占位符（只画最新一楼）、正文顶部的状态头（新卡默认）、悬浮球加可拖动的状态面板。创角页可以带一个「自定义开局」步骤。
+- **八套皮肤**：战术档案、鎏金典狱、工业终端、复古电影、粉樱、和纸、霓虹夜，外加按题材自定的一套，规划在设计书里选定。手写 HTML 的前端照旧支持，拼装时应用自动包上 ```` ```html ```` 围栏，酒馆助手才会把它渲染成能交互的页面。
+- **导出前先看**：预览里有一个「模拟酒馆」，替酒馆助手和 MVU 提供变量、事件和聊天世界书，所以状态栏和创角页也能预览。样例变量可以改了再推一次更新；创角页要写的东西只列成「将写入」，不会真的写；宽度可以切 375、768 和桌面三档。
+- **质量检查**：手机宽度下横向滚动、没有任何交互反馈、正文对比度不足、直接引用 Google 字体、塞了大图 base64、会卡死的正则会禁止导出；设计令牌太少、没有 `@media`、循环动画不照顾「减少动画」、强调色用得太多、字体镜像与外链素材、在安卓上表现不同的正则写法会提醒。
+- **一处提改动**：点卡项目主页的「提改动」，或在任意分区输入 `/改动`：一句话说要改什么，或者贴一段酒馆里的报错，AI 读整张卡列出影响清单；删掉不要的条目，点「照单开做」，应用按分区的先后顺序一口气改完，再跑拼装检查。只动一个文件时直接改好，可以撤销。没有设计书的卡也能用。
+- **导入更顺**：导入时先看条目名里的标记（`[initvar]`、人物总览、地点总览等）再看编号来分区；未分类的条目可以多选后一起移到分区，也可以点「AI 归类建议」，确认之后才搬。
 - 说错了话可以撤回：AI 还在写时，撤回会停下这一轮、把这条消息收回，文字放回输入框，它发出的派单回到「未派」；已经写完的消息可以编辑后重新生成，产生新的对话版本。写进卡项目的文件不跟着回滚，要退文件用「本轮写入」里的【撤销本轮】。
+- 工坊的标题和正文用内置的开源宋体（Noto Serif SC 的子集），每台电脑上看起来都一样。
 
 ### 主题与桌宠
 
@@ -118,7 +126,7 @@ The interface stays quiet, deterministic rules are executed by the program, and 
 
 ### Install
 
-Download `Cardwright-Setup-1.0.0.exe` from [Releases](../../releases). The installer is not code-signed, so Windows shows an "unknown publisher" warning the first time; choose "More info → Run anyway". Uninstalling keeps your data directory.
+Download `Cardwright-Setup-1.1.0.exe` from [Releases](../../releases). The installer is not code-signed, so Windows shows an "unknown publisher" warning the first time; choose "More info → Run anyway". Uninstalling keeps your data directory.
 
 Or build it yourself:
 
@@ -145,6 +153,8 @@ node scripts/package.mjs      # portable output in release/<version>/Cardwright-
 - **Shift+Tab** cycles ask → auto-edit in project → plan → full access.
 - **Subagents**: your own, plus whatever `.claude/agents/*.md` holds in the project and in your home directory; each can be switched off.
 - **Hooks**: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop, SubagentStop and Notification, configured in Claude Code's `settings.json` shape, importable from Claude Code and testable one by one.
+- **Conversation** (in the workbench and the card studio alike): code blocks are syntax-highlighted with a language label and a copy button, and long ones fold; the model's thinking shows as it happens and folds to "Thought for N s" when done; consecutive calls of the same tool fold into one row; a reply ends in a cursor while it writes, new text fades in and scrolling follows smoothly; tables are striped and scroll sideways when wide. Under reduced motion none of it moves.
+- **New version reminder**: once a day Cardwright reads the latest version number on GitHub; when there is a newer one, the top bar says so and opens the release page on a click. Nothing is downloaded or uploaded, and Studio settings can turn it off.
 
 ### The built-in browser
 
@@ -167,9 +177,15 @@ Restricted commands and the terminal run in a native Windows AppContainer with *
 
 Enter from the bottom of the sidebar. A card project is a local folder and appears only in the card library. The planning AI asks one question at a time with a recommended answer, writes a design document and then dispatches the work. World-book entries, regexes, scripts and greetings are each a component file, and the application assembles the card deterministically. Export the whole card as JSON or PNG, the world book, or single pieces; every export comes with a note on how to replace it in SillyTavern. The local preview renders in an isolated iframe in SillyTavern's own order, offline.
 
-- Front-ends such as the status bar, the body renderer and the start page are written as a plain HTML document; on assembly the application wraps it in the ```` ```html ```` fence the SillyTavern helper needs to render it as an interactive page. The assembly checks verify the fence and run quality checks on every front-end: horizontal scrolling at phone width, no interaction feedback at all, body text below 4.5:1, Google Fonts and big base64 images block the export; too few design tokens, no `@media`, looping motion that ignores reduced motion and an overused accent are warnings.
-- Front-ends follow one of seven style presets (Tactical dossier, Gilded ward, Industrial terminal, Vintage cinema, Sakura, Washi and Neon night) or one derived from the card's subject, chosen in the design document.
+- **Variables right the first time**: the variable structure section writes a variable table (path, type, default, range, who maintains it), and the application generates the Zod schema, the `[initvar]` initial variables, the variable list, the output format and the paths in the rules from it. The assembly checks verify the paths the status bar and the start page read and write, apply the sample patch to the initial variables, match the renderer regex against the output format, and check list caps and the `[initvar]` settings. An imported card gets a derived table that is only checked against; your Zod stays as it is.
+- **Front-ends compiled by the application**: a status bar, body renderer or start page can be an assembly sheet — a style, pages, blocks and the variables they show — that the application compiles with its built-in front-end skeleton into a complete page. Stat tables, bars, ring gauges, tags, folds, lists, relationship cards, timelines, crisis tiers and change badges are ready-made blocks; anything else goes in a custom block. The status bar comes in three forms: a placeholder on each message (only the latest one is drawn), a status head at the top of the body (the default for new cards), or a floating orb with a draggable status panel. A start page can include a free-text custom opening step.
+- **Eight skins**: Tactical dossier, Gilded ward, Industrial terminal, Vintage cinema, Sakura, Washi and Neon night, plus one derived from the card's subject, chosen in the design document. Hand-written HTML front-ends still work; on assembly the application wraps them in the ```` ```html ```` fence the SillyTavern helper needs to render them as interactive pages.
+- **See it before you export**: the preview carries a simulated tavern that stands in for the SillyTavern helper and MVU (variables, events, the chat world book), so status bars and start pages can be previewed as well. Edit the sample variables and push an update; what a start page would write is listed, never written; switch between 375, 768 and desktop widths.
+- **Quality checks**: horizontal scrolling at phone width, no interaction feedback at all, body text below 4.5:1, Google's own font links, big base64 images and regexes that can hang block the export; too few design tokens, no `@media`, looping motion that ignores reduced motion, an overused accent, font mirrors and external media, and regex writings that behave differently on Android are warnings.
+- **Change it in one place**: Ask for a change on the card project home, or type `/改动` in any section: say in a sentence what to change, or paste an error from SillyTavern, and the AI reads the whole card and lists what the change affects. Take out what you do not want, press Go ahead, and the application works through the sections in dependency order and runs the assembly checks. A change to a single file is made directly and can be undone. Cards without a design document work too.
+- **Smoother imports**: entries are sorted by the markers in their names first (`[initvar]`, character and place overviews and the like) and by their order number second; unclassified entries can be moved to a section several at a time, or you can ask for AI suggestions and confirm them before anything moves.
 - A message can be withdrawn: while the AI is still writing, withdrawing stops the turn, takes the message back, returns its text to the composer and puts a dispatch it sent back to not sent. A finished message can be edited and regenerated into a new conversation version. Files already written stay as they are; use Undo this turn in the turn's writes to take them back.
+- The studio's headings and text use a bundled open-source serif (a subset of Noto Serif SC), so it looks the same on every computer.
 
 ### Themes and the desk pet
 

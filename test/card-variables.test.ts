@@ -116,3 +116,22 @@ test('the packaged sandbox denies a file read even when the vm context is escape
   assert.equal(good.ok, true, JSON.stringify(good));
   assert.equal(good.restricted, true);
 });
+
+test('a schema that loads registerMvuSchema with a dynamic import in try/catch still registers in the sandbox', () => {
+  const dynamic = [
+    'let registerMvuSchema;',
+    'try {',
+    "  ({ registerMvuSchema } = await import('https://cdn.jsdelivr.net/gh/StageDog/tavern_resource/dist/util/mvu_zod.js'));",
+    '} catch (e) {',
+    "  ({ registerMvuSchema } = await import('https://testingcf.jsdelivr.net/gh/StageDog/tavern_resource/dist/util/mvu_zod.js'));",
+    '}',
+    'const Cap = n => d => _(d).entries().takeRight(n).fromPairs().value();',
+    'export const Schema = z.object({ 主角: z.object({ 生命: z.coerce.number().catch(0).prefault(0) }).prefault({}), 因果: z.record(z.string(), z.string()).transform(Cap(2)).prefault({}) });',
+    '$(() => { registerMvuSchema(Schema); });',
+  ].join(NL);
+  const evaluated = evaluateSchema(dynamic);
+  assert.equal(evaluated.registered, true, 'registered through the module the sandbox provides');
+  const result = validateInitialVariables(evaluated.schema, { 主角: { 生命: '7' }, 因果: { a: '1', b: '2', c: '3' } });
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  assert.deepEqual(result.value, { 主角: { 生命: 7 }, 因果: { b: '2', c: '3' } });
+});

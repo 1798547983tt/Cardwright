@@ -1,0 +1,72 @@
+/* Cardwright skin: sakura (粉樱) */
+:root {
+  --bg: #fff7f9;
+  --panel: #ffffff;
+  --panel-2: #ffeef3;
+  --line: #f3d3dd;
+  --line-strong: #e9b3c4;
+  --text: #3f2a33;
+  --text-2: #7b5b68;
+  --text-3: #a3838f;
+  --accent: #e2517f;
+  --accent-2: #5f9e7c;
+  --ok: #3f9a6b; --warn: #d98a2b; --danger: #d64550;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --shadow: 0 6px 18px rgba(226, 81, 127, .10);
+  --sans: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+  --round: "YouYuan", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --mono: "Cascadia Mono", Consolas, monospace;
+}
+
+/* --- 面板 --- */
+.cw-block { border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.cw-block-title { font-family: var(--round); letter-spacing: 0.02em; }
+.cw-chapter { font-family: var(--round); }
+.cw-head { font-size: 13px; }
+
+/* --- 分页签 --- */
+.cw-tab { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.cw-tab.is-on { color: var(--accent); border-bottom-color: currentColor; background: var(--panel-2); }
+.cw-tab:hover { background: var(--panel-2); }
+
+/* --- 标签 --- */
+.cw-tag { border-radius: 999px; border-color: var(--line); background: var(--panel-2); color: var(--text-2); font-size: 12px; }
+
+/* --- 进度条 --- */
+.cw-bar-track { border-radius: 999px; height: 6px; }
+.cw-bar-fill { border-radius: 999px; }
+
+/* --- 对白 --- */
+.cw-say { border-left: 3px solid var(--line); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--panel); padding: 6px 10px; }
+.cw-say.is-player { border-left-color: var(--line-strong); }
+
+/* --- 按钮 --- */
+.cw-btn { border-radius: var(--radius-sm); transition: transform 120ms, box-shadow 150ms, background 150ms; }
+.cw-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.cw-btn:active { transform: scale(0.97); }
+.cw-btn.is-primary { background: var(--accent); color: var(--panel); border-color: transparent; }
+
+/* --- 悬浮球与面板 --- */
+.cw-ball { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--panel); color: var(--accent); cursor: pointer; box-shadow: var(--shadow); font-size: 20px; }
+.cw-ball::after { content: ''; display: block; width: 12px; height: 12px; background: currentColor; border-radius: 50%; }
+.cw-ball:hover { transform: translateY(-2px); box-shadow: 0 8px 20px var(--line); }
+.cw-panel { position: absolute; bottom: 64px; left: 0; width: min(360px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); font: 15px/1.7 var(--sans); box-shadow: var(--shadow); overflow: hidden; }
+.cw-panel-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.cw-panel-close { border: 1px solid var(--line); border-radius: var(--radius-sm); background: none; color: var(--text-2); font: inherit; cursor: pointer; padding: 2px 10px; }
+.cw-panel-close:hover { background: var(--panel-2); color: var(--text); }
+
+/* --- 装饰：樱瓣（标题旁伪元素） --- */
+.cw-block-title::after { content: ''; display: inline-block; width: 10px; height: 10px; margin-left: 6px; background: var(--line-strong); border-radius: 50% 0 50% 50%; transform: rotate(-45deg); vertical-align: middle; opacity: 0.6; }
+
+/* --- 装饰：选中面板左侧竖条 --- */
+.cw-relation:hover { border-left: 3px solid var(--accent-2); }
+
+/* --- 动效 --- */
+.cw-block { animation: cw-skr-in 240ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes cw-skr-in { from { opacity: 0; transform: translateY(4px); } }
+.cw-tab, .cw-btn, .cw-choice, .cw-relation, .cw-ball { transition: transform 150ms, box-shadow 150ms, background 150ms, border-color 150ms; }
+@media (prefers-reduced-motion: reduce) {
+  .cw-block { animation: none; }
+  .cw-btn:hover, .cw-ball:hover { transform: none; }
+}

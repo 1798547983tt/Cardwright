@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { AlertTriangle, CircleCheck, FileDown, FolderOpen, Image, Info, LoaderCircle, Package, Save, ShieldAlert } from 'lucide-react';
 import { useApp } from '../context';
-import { sectionLabel } from '../../shared/card-studio/boards';
+import { UNCLASSIFIED_SECTION, sectionLabel } from '../../shared/card-studio/boards';
 import { renderCoverPng } from './cover-canvas';
 import { PreviewPanel } from './PreviewPanel';
+import { UnclassifiedDialog } from './UnclassifiedDialog';
 import type { CardCheckReport, CardExportResult, CardMeta, CardProjectView } from '../../shared/card-studio/types';
 
 const LEVEL_ICON = { error: ShieldAlert, warning: AlertTriangle, info: Info } as const;
@@ -50,6 +51,7 @@ export function AssemblyPanel({ card }: { card: CardProjectView }) {
   const [report, setReport] = useState<CardCheckReport | null>(null);
   const [exported, setExported] = useState<CardExportResult[]>([]);
   const [busy, setBusy] = useState<Busy>(null);
+  const [sorting, setSorting] = useState(false);
 
   const check = useCallback(async (quiet = false) => {
     setBusy('check');
@@ -112,7 +114,12 @@ export function AssemblyPanel({ card }: { card: CardProjectView }) {
       <div><dt>{t('Warnings', '警告')}</dt><dd>{warnings.length}</dd></div>
     </dl>}
 
-    {report && Object.entries(report.stats.sections).length > 0 && <p className="cs-assembly-sections">{Object.entries(report.stats.sections).map(([section, count]) => `${sectionLabel(section)} ${count}`).join(' ｜ ')}</p>}
+    {report && Object.entries(report.stats.sections).length > 0 && <p className="cs-assembly-sections">{Object.entries(report.stats.sections).map(([section, count], index) => <Fragment key={section}>
+      {index > 0 && ' ｜ '}
+      {section === UNCLASSIFIED_SECTION && count > 0
+        ? <button type="button" className="cs-link" title={t('Move these entries into sections', '把这些条目移到分区')} onClick={() => setSorting(true)}>{`${sectionLabel(section)} ${count} · ${t('Sort', '整理')}`}</button>
+        : `${sectionLabel(section)} ${count}`}
+    </Fragment>)}</p>}
 
     {report && <ol className="cs-findings">
       {[...errors, ...warnings, ...info].map((finding, index) => {
@@ -128,6 +135,8 @@ export function AssemblyPanel({ card }: { card: CardProjectView }) {
 
     <PreviewPanel card={card} kind="body" open={false} />
     <PreviewPanel card={card} kind="update" open={false} />
+    <PreviewPanel card={card} kind="status" open={false} />
+    <PreviewPanel card={card} kind="start" open={false} />
 
     {exported.length > 0 && <section className="cs-exported">
       <h3>{t('Exported this session', '本次导出')}</h3>
@@ -140,5 +149,6 @@ export function AssemblyPanel({ card }: { card: CardProjectView }) {
         <p className="cs-note">{t(`Also saved as ${latestReport.file}.`, `报告也存成了 ${latestReport.file}。`)}</p>
       </article>}
     </section>}
+    {sorting && <UnclassifiedDialog card={card} onClose={moved => { setSorting(false); if (moved) void check(true); }} />}
   </section>;
 }

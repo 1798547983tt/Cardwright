@@ -12,9 +12,9 @@
 | 东西 | 谁写 | 管什么 |
 | --- | --- | --- |
 | MVU 脚本（固定件） | 原样引入 | 解析模型输出里的变量更新块，把变量存进聊天记录 |
-| Zod 结构脚本 | 脚本 · 变量结构分区 | 声明变量长什么样、默认值、容错；注册给 MVU |
-| `[initvar]` 条目 | 脚本 · 变量结构分区 | 这张卡的初始值，YAML 写法，默认关闭，顺序 1002 |
-| 变量更新规则 / 输出格式 | 世界书 · 变量分区 | 告诉模型什么时候、按什么格式写更新块 |
+| Zod 结构脚本 | 应用（从变量表生成） | 声明变量长什么样、默认值、容错；注册给 MVU |
+| `[initvar]` 条目 | 应用（从变量表生成） | 这张卡的初始值，YAML 写法，默认关闭，顺序 1002 |
+| 变量更新规则 / 输出格式 | 规则叙事由世界书 · 变量分区写；输出格式与路径清单由应用生成 | 告诉模型什么时候、按什么格式写更新块 |
 
 变量的真正来源是模型的输出，MVU 只是解析与存储；Zod 负责在存进去之前把不合规的值夹回合法范围。
 
@@ -28,7 +28,7 @@ import 'https://testingcf.jsdelivr.net/gh/NLKASHEI/MVU-offline@v1.0.1/mvu_bundle
 
 按钮配置里六个按钮，只让「重新处理变量」和「重试额外模型解析」可见，其余 `visible: false`。
 
-**Zod 注册的头尾**：
+**Zod 注册的头尾**（应用生成的结构脚本就是这个形状）：
 
 ```js
 import { registerMvuSchema } from 'https://testingcf.jsdelivr.net/gh/StageDog/tavern_resource/dist/util/mvu_zod.js';
@@ -71,15 +71,15 @@ $(() => { registerMvuSchema(Schema); });
 | `.default(v)` | 输入是 `undefined` | 默认值已经是最终形态时 |
 | `.catch(v)` | **任何校验失败** | 不可信输入的兜底，枚举字段必备 |
 
-参考卡里成型的几个工具函数（写法可以借鉴，字段要按自己的卡定）：
+参考卡里成型的几个工具函数（应用生成的结构脚本用的是同类写法；字段由变量表定）：
 
 - `percent(fallback)`：`z.coerce.number().catch(fallback).transform(v => _.clamp(v, 0, 100))`，把数值夹进范围。
 - `text(fallback)`：空值兜底成空串或指定文案。
 - `bool()`：容忍「是 / 否 / true / 1」这类写法。
 - `enumOf(values, fallback)`：`z.enum(values).catch(fallback)`。
 - `limitedRecord(schema, n)`：记录类容器只保留最近 n 条，防止越滚越大。
-- 有不变量的容器用 `.superRefine()` 自己校验，并给出可读的报错。
-- 顶层用 `.passthrough()`（Zod 4 里也可用 `z.looseObject`）保留未知字段，避免旧存档被清空。
+- 有不变量的容器：生成的结构脚本不做跨字段校验，把不变量写进变量规则的「不变量」一节，交给模型遵守。
+- 保留未知字段（避免旧存档被清空）用 `z.looseObject(shape)`，不写 `.passthrough()`：`registerMvuSchema` 自己会把顶层包成 `z.looseObject`，社区也有 `.passthrough()` 在 MVU 的 Zod 里不可用的报告。
 
 ## 5. 在脚本和前端里读变量
 
@@ -105,10 +105,10 @@ eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, (after, before) => render(after.stat_d
 ## 6. 制卡时的固定要求
 
 - `[initvar]` 必须能通过这张卡自己的 Schema——制卡工坊的拼装检查会在独立进程里真的跑一遍 Zod，通不过就是错误。
-- 变量规则、变量输出格式里出现的每条路径，都要在 Schema 里存在；拼装检查也会核对。
-- 由脚本维护的字段，要在变量规则里标成「模型不得修改」。
-- 状态栏只显示 Schema 里有的字段，缺失显示「未知」，不要报错也不要补造。
-- 历史楼层的更新块会占满上下文：固定正则「只发送最新 3 楼的变量更新」用 `promptOnly: true` + `minDepth: 6` 把旧块从提示词里删掉，这条由拼装自动加入。
+- 变量规则、变量输出格式里出现的每条路径，都要在变量表里存在；拼装检查也会核对。
+- 由脚本维护的字段，在变量表里标 `维护者: 脚本`，应用会在变量规则的路径清单里列成「模型不得修改」。
+- 状态栏只显示变量表里有的字段，缺失显示「未知」，不要报错也不要补造。
+- 历史楼层的更新块会占满上下文：固定正则「只发送最新 3 楼的变量更新」用 `promptOnly: true` + `minDepth: 6` 把旧块从提示词里删掉，这条由应用在生成变量文件时加入（1.1.0 起；0.8 的真实酒馆验证用的是冒烟脚本自己拼的卡）。
 
 ## 7. 真实酒馆里看到的
 
@@ -120,3 +120,18 @@ eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, (after, before) => render(after.stat_d
 - MVU 固定件的按钮配置生效：输入框上方只出现「重新处理变量」「重试额外模型解析」两个按钮。
 - 固定件「只发送最新 3 楼的变量更新」生效：第五轮请求里，最早一条回复的更新块已被去掉，最近三条保留。
 - MVU 第一次运行时会弹出几条更新公告（绿色提示条，例如「已更新更多自定义 API 配置」）；有对话框开着时，酒馆会把提示条放进对话框里显示。
+
+## 8. 变量表：应用生成，模型只写表（1.1.0 起）
+
+变量的唯一真相源是卡项目根目录的 `变量表.yaml`（格式见「脚本 · 变量结构」提示词）。应用据它生成：
+
+| 生成物 | 位置 | 说明 |
+| --- | --- | --- |
+| Zod 结构脚本 | `脚本/NN-ZOD.js` | 每个字段 `coerce/preprocess → catch → transform → prefault`；对象用 `z.looseObject`；记录与列表按上限只留最近 N 条 |
+| `[initvar]` | `世界书/变量/1002-[initvar].md` | 表里的默认值，YAML，条目关闭 |
+| 变量列表 | `世界书/变量/9994-变量列表.md` | 固定件 |
+| 变量输出格式 | `世界书/变量/9996-变量输出格式.md` | `<UpdateVariable>` + `<Analysis>` + `<JSONPatch>`，Analysis 按顶层容器逐项核对 |
+| 变量规则的路径清单 | `世界书/变量/9995-变量规则.md` 末尾 | 「【路径清单·应用生成，勿手改】…【路径清单·结束】」，含「模型不得修改」 |
+| 清理正则 | `正则/NN-只发送最新3楼的变量更新.html` | `promptOnly: true`、`minDepth: 6` |
+
+`变量表.生成.json` 记录每个生成物的散列；拼装检查据此报 `generated-edited`（生成物被手改）和 `variable-table-stale`（表改了没重新生成）。导入的卡没有变量表时，应用从 `[initvar]` 与 Zod 推导一份 `变量表.推导.yaml`，只用于核对。

@@ -1,13 +1,29 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { sectionLabel } from '../../shared/card-studio/boards.ts';
+import { REQUIRED_TOKENS } from '../../shared/card-studio/assembly-sheet.ts';
+import { boardOf, sectionLabel } from '../../shared/card-studio/boards.ts';
 import { boardPromptFile, sectionPromptFile } from '../../shared/card-studio/prompt-files.ts';
 import type { CardKind, PlanMode } from '../../shared/card-studio/types.ts';
 
 /** Built-in section prompts ship with the application; developer mode can override them (prompt-overrides.ts). */
-export interface SectionPromptInput { sectionId: string; mode?: PlanMode; cardName: string; cardKind: CardKind; source?: string; projectRoot: string }
+export interface SectionPromptInput {
+  sectionId: string; mode?: PlanMode; cardName: string; cardKind: CardKind; source?: string; projectRoot: string;
+  /** The preset the design book names; the regex board gets it in the prompt (ADR 0019: skins are compiled in, prose is not read). */
+  stylePreset?: { id: string; name: string } | null;
+}
 
 const MISSING_SECTION_PROMPT = '本分区的专用提示词尚未内置。只按设计书和派单工作；遇到需要本分区专门知识才能决定的地方，停下来说明，请用户回规划补充设计书。';
+
+const TOKEN_NAMES = [...REQUIRED_TOKENS, '--panel-2', '--line-strong', '--radius', '--radius-sm', '--shadow', '--sans', '--serif', '--mono'];
+/** What the regex sections are told about the card's look: the preset by id, the token names, and where the sheet vocabulary is. */
+function presetSection(preset: SectionPromptInput['stylePreset']): string[] {
+  const lines = ['## 本卡的风格预设与前端骨架', ''];
+  if (!preset) lines.push('- 设计书还没有定风格预设。装配单里的 `预设:` 先留空（应用按粉樱 sakura 编译），并在交付里提醒用户回规划补「风格预设」一节。');
+  else if (preset.id === 'custom') lines.push('- 预设：题材自定（custom）。把设计书「风格预设」一节的令牌逐个抄进装配单的 `令牌:`（键名见下），缺的令牌回规划补，不要临场发挥。');
+  else lines.push(`- 预设：${preset.name}（${preset.id}）。装配单里写 \`预设: ${preset.id}\` 即可，皮肤由应用在编译时注入；不用去读 styles/ 里的预设散文（那是手写 .html 前端才读的）。`);
+  lines.push(`- 令牌名（自定义区块的 CSS 只能用这些 \`var()\`，不写具体色值）：${TOKEN_NAMES.map(name => `\`${name}\``).join('、')}。`, '- 装配单的字段、区块词汇、图标名与三份样例在内置资料 `frontend/blocks/词汇.md` 与 `frontend/blocks/样例-*.yaml`。');
+  return lines;
+}
 
 export { boardPromptFile, sectionPromptFile } from '../../shared/card-studio/prompt-files.ts';
 
@@ -41,6 +57,7 @@ export async function buildSectionPrompt(resourceRoot: string, input: SectionPro
     ...(board ? ['', board] : []),
     '',
     own,
+    ...(boardOf(input.sectionId).id === 'regex' ? ['', ...presetSection(input.stylePreset ?? null)] : []),
   ].join('\n');
 }
 

@@ -21,8 +21,6 @@
 .turn-process > summary small { color: var(--muted); margin-left: 4px; font-size: 10px; }
 .turn-process-body { margin-top: 8px; padding: 2px 0 2px 11px; border-left: 1px solid var(--line-strong); animation: reveal 150ms var(--motion-ease); }
 .turn-process-body .tool-entry { margin: 5px 0; }
-.turn-process-body .thinking-record { margin: 3px 0 8px; }
-.turn-process-body .thinking-record > div { font-size: 11px; }
 .process-message > .message-body { font-size: 12px; color: var(--muted); line-height: 1.7; }
 .process-message > .message-body:empty, .process-message:empty { display: none; }
 .process-notice { padding: 6px 0; }

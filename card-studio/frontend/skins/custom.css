@@ -1,0 +1,40 @@
+/* Cardwright skin: custom (题材自定) — 令牌由装配单提供，这里只有中性的装饰。 */
+
+/* --- 面板 --- */
+.cw-block { border: 1px solid var(--line); border-radius: var(--radius); }
+.cw-block-title { letter-spacing: 0.04em; }
+
+/* --- 分页签 --- */
+.cw-tab.is-on { border-bottom-color: currentColor; }
+.cw-tab:hover { color: var(--text); }
+
+/* --- 标签 --- */
+.cw-tag { font-size: 12px; }
+
+/* --- 进度条 --- */
+.cw-bar-track { height: 5px; }
+
+/* --- 对白 --- */
+.cw-say { border-left: 2px solid var(--line); }
+.cw-say.is-player { border-left-color: var(--line-strong, var(--line)); }
+
+/* --- 按钮 --- */
+.cw-btn { border-radius: var(--radius); transition: background 200ms, border-color 200ms; }
+.cw-btn:hover { border-color: var(--line-strong, var(--line)); }
+
+/* --- 悬浮球与面板 --- */
+.cw-ball { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--text-2); cursor: pointer; font-size: 16px; }
+.cw-ball::after { content: 'CW'; font-size: 11px; }
+.cw-ball:hover { border-color: var(--line-strong, var(--line)); color: var(--text); }
+.cw-panel { position: absolute; bottom: 64px; left: 0; width: min(360px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); font: 15px/1.7 var(--sans, sans-serif); overflow: hidden; }
+.cw-panel-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.cw-panel-close { border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-2); font: inherit; cursor: pointer; padding: 2px 8px; }
+.cw-panel-close:hover { color: var(--text); }
+
+/* --- 动效 --- */
+.cw-block { animation: cw-cus-in 200ms ease-out both; }
+@keyframes cw-cus-in { from { opacity: 0; } }
+.cw-tab, .cw-btn, .cw-relation, .cw-fold summary { transition: border-color 200ms, color 200ms, background 200ms; }
+@media (prefers-reduced-motion: reduce) {
+  .cw-block { animation: none; }
+}

@@ -1,7 +1,7 @@
 import { useEffect, useState, type KeyboardEvent, type RefObject } from 'react';
 import { BookOpen, SquareSlash, X } from 'lucide-react';
 import { useApp } from '../context';
-import { commandsFor, matchCommand, slashSuggestions, type SlashCommand, type SlashItem } from '../../shared/slash-commands';
+import { changeCommandText, commandsFor, matchCommand, slashSuggestions, type SlashCommand, type SlashItem } from '../../shared/slash-commands';
 import { DEFAULT_HANDOFF, handoffThreshold } from '../../shared/card-studio/handoff';
 import { markableDispatch } from '../../shared/card-studio/view';
 import type { CardCheckReport, CardProjectView } from '../../shared/card-studio/types';
@@ -36,7 +36,8 @@ export function useStudioSlash({ card, sectionId, task, text, setText, root }: {
   useEffect(() => { setIndex(0); setClosed(false); }, [text]);
   useEffect(() => { document.getElementById(`cs-slash-${index}`)?.scrollIntoView({ block: 'nearest' }); }, [index]);
 
-  async function execute(command: SlashCommand): Promise<void> {
+  /** `argument`: what followed `/改动` in the message, which the change dialog starts with. */
+  async function execute(command: SlashCommand, argument = ''): Promise<void> {
     setText('');
     const running = !!task && (ACTIVE.includes(task.status) || !!task.workerActive);
     switch (command.name) {
@@ -73,6 +74,9 @@ export function useStudioSlash({ card, sectionId, task, text, setText, root }: {
       case '下一步':
         actions.openNextDispatch();
         return;
+      case '改动':
+        studio.openChange(card.projectId, argument);
+        return;
     }
   }
 
@@ -94,8 +98,11 @@ export function useStudioSlash({ card, sectionId, task, text, setText, root }: {
       if (event.key === 'Escape') { event.preventDefault(); setClosed(true); return true; }
       return false;
     },
-    /** A message that is exactly a card command runs that command instead of being sent. */
+    /** A message that is exactly a card command runs that command instead of being sent; `/改动 …` opens the change dialog with the rest. */
     runIfCommand(value: string): boolean {
+      const change = changeCommandText(value);
+      const changeCommand = CARD_COMMANDS.find(entry => entry.name === '改动');
+      if (change !== null && changeCommand) { void execute(changeCommand, change); return true; }
       const command = matchCommand(value, CARD_COMMANDS);
       if (!command) return false;
       void execute(command);

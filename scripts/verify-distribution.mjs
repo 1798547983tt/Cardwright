@@ -9,7 +9,10 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 const exec=promisify(execFile),root=resolve('.');
 const version=JSON.parse(await readFile('package.json','utf8')).version;
-const folder=join(root,'release',version,'installer'),portable=join(root,'release',version,'Cardwright-win32-x64');
+// The portable build the installer was made from: release/<version>/Cardwright-win32-x64, or another folder inside release/
+// (the same argument package-installer.mjs takes), e.g. when a running copy keeps the default folder locked.
+const folder=join(root,'release',version,'installer'),portable=process.argv[2]?resolve(process.argv[2]):join(root,'release',version,'Cardwright-win32-x64');
+assert.ok(portable.startsWith(join(root,'release')+sep),'The portable build must be inside release/.');
 const installer=join(folder,`Cardwright-Setup-${version}.exe`),zip=join(folder,`Cardwright-${version}-win-x64.zip`);
 const binRoot=join(process.env.LOCALAPPDATA,'electron-builder','Cache','7zip@1.0.0');
 const binFolder=(await readdir(binRoot,{withFileTypes:true})).find(item=>item.isDirectory()&&item.name.startsWith('7zip-win-x64-'));

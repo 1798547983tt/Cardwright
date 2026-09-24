@@ -1,24 +1,8 @@
-import { Children, isValidElement, useEffect, useState, type ReactNode, type RefObject } from 'react';
-import { ArrowDown, Copy } from 'lucide-react';
+import { useEffect, useState, type RefObject } from 'react';
+import { ArrowDown } from 'lucide-react';
 import { useApp } from './context';
 
-/** The plain text inside rendered Markdown children. */
-function textOf(node: ReactNode): string {
-  if (typeof node === 'string' || typeof node === 'number') return String(node);
-  if (Array.isArray(node)) return node.map(textOf).join('');
-  if (isValidElement<{ children?: ReactNode }>(node)) return textOf(node.props.children);
-  return '';
-}
-
-/** A code block with a copy button, as the desktop chat apps have it; the text goes through the bridge. */
-export function CodeBlock({ children, className = '' }: { children?: ReactNode; className?: string }) {
-  const { api, t, run } = useApp();
-  const text = textOf(Children.toArray(children)).replace(/\n$/, '');
-  return <div className={`code-block ${className}`.trim()}>
-    <pre>{children}</pre>
-    <button type="button" className="code-copy" aria-label={t('Copy code', '复制代码')} title={t('Copy code', '复制代码')} onClick={() => void run(() => api.copyText(text), t('Code copied', '已复制代码'))}><Copy size={13} /></button>
-  </div>;
-}
+// Code blocks (copy, language, highlighting, folding) are the conversation kernel's since 1.1: conversation/CodeView.tsx.
 
 /**
  * 回到最新: once the reader has scrolled well above the latest message, a button takes them back down. It sits in the

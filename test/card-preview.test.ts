@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { createContext, runInContext } from 'node:vm';
 import { displayRegex, previewDocument, regexFromString, renderReply, runRegexScript, updateBlocks, wrapQuotes, type PreviewRegex } from '../src/shared/card-studio/preview.ts';
+import { PREVIEW_MESSAGE_KEY, tavernSimScript } from '../src/shared/card-studio/tavern-sim.ts';
 
 const macros = { char: '雾港档案', user: '玩家' };
 const script = (over: Partial<PreviewRegex>): PreviewRegex => ({
@@ -131,4 +133,35 @@ test("the window's own policy admits frames from the preview scheme only, and st
   const directive = (name: string) => policy.split(';').map(part => part.trim()).find(part => part.startsWith(`${name} `))?.slice(name.length + 1).trim();
   assert.equal(directive('frame-src'), 'cardwright-preview:');
   assert.equal(directive('script-src'), "'self'");
+});
+
+test('a frontend segment with a sim gets it before the document, and the message text never does', () => {
+  const sim = tavernSimScript({ cardName: '样卡', statData: {} });
+  const withSim = previewDocument({ kind: 'frontend', html: '<!DOCTYPE html><html><body>x</body></html>', sim }, 'n1');
+  assert.ok(withSim.html.includes(`<script>${sim}</script>`), 'the sim runs as a script of its own');
+  assert.ok(withSim.html.indexOf('cardwrightSim') < withSim.html.indexOf('<!DOCTYPE html><html><body>x'), 'the sim is defined before the card script runs');
+  assert.match(withSim.csp, /script-src 'unsafe-inline'/);
+  const without = previewDocument({ kind: 'frontend', html: '<!DOCTYPE html><html><body>x</body></html>' }, 'n1');
+  assert.ok(!without.html.includes('cardwrightSim'));
+  const text = previewDocument({ kind: 'html', html: '<p>x</p>', sim }, 'n2');
+  assert.ok(!text.html.includes('cardwrightSim'), 'message text runs no card script, so it gets no sim');
+});
+
+test('the reporter keeps the parent it started with, even when the card declares one of its own', () => {
+  const { html } = previewDocument({ kind: 'frontend', html: '<!DOCTYPE html><html><body>x</body></html>' }, 'n3');
+  const reporter = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]).find(text => text.includes('securitypolicyviolation'));
+  assert.ok(reporter);
+  const posted: unknown[] = [];
+  const listeners: Record<string, (event: Record<string, unknown>) => void> = {};
+  const sandbox: Record<string, unknown> = {
+    parent: { postMessage: (data: unknown) => { posted.push(data); } },
+    addEventListener: (name: string, handler: (event: Record<string, unknown>) => void) => { listeners[name] = handler; },
+  };
+  sandbox.window = sandbox;
+  const context = createContext(sandbox);
+  runInContext(reporter, context);
+  runInContext('function parent() {}', context);
+  assert.equal(typeof sandbox.parent, 'function', 'the declaration replaced the global');
+  listeners.error({ message: '卡片出错' });
+  assert.deepEqual(JSON.parse(JSON.stringify(posted)), [{ [PREVIEW_MESSAGE_KEY]: 1, error: '卡片出错' }]);
 });

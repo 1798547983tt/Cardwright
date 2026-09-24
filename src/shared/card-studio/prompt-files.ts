@@ -14,7 +14,7 @@ const SECTION_FILES: Partial<Record<string, string>> = {
 const BOARD_FILES: Partial<Record<string, string>> = { lore: '世界书-通用.md', script: '脚本-通用.md', regex: '正则-通用.md' };
 
 export function sectionPromptFile(sectionId: string, mode?: PlanMode): string | undefined {
-  if (sectionId === 'plan') return mode === 'refine' ? '规划-完善优化卡.md' : '规划-从零开始制卡.md';
+  if (sectionId === 'plan') return mode === 'refine' ? '规划-完善优化卡.md' : mode === 'change' ? '规划-改动单.md' : '规划-从零开始制卡.md';
   return SECTION_FILES[sectionId];
 }
 
@@ -22,9 +22,9 @@ export function boardPromptFile(sectionId: string): string | undefined {
   return BOARD_FILES[boardOf(sectionId).id];
 }
 
-/** The prompt override ids a section's conversations are built from, most specific first. */
+/** The prompt override ids a section's conversations are built from, most specific first. A 改动单 has no kickoff line. */
 export function sectionPromptIds(sectionId: string, mode?: PlanMode): string[] {
   const own = sectionPromptFile(sectionId, mode);
   const board = boardPromptFile(sectionId);
-  return [...(own ? [`prompts/${own}`] : []), ...(board ? [`prompts/${board}`] : []), 'prompts/通用规则.md', ...(sectionId === 'plan' ? [`kickoff/${mode === 'refine' ? 'refine' : 'scratch'}`] : [])];
+  return [...(own ? [`prompts/${own}`] : []), ...(board ? [`prompts/${board}`] : []), 'prompts/通用规则.md', ...(sectionId === 'plan' && mode !== 'change' ? [`kickoff/${mode === 'refine' ? 'refine' : 'scratch'}`] : [])];
 }

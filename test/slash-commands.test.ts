@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { commandsFor, matchCommand, slashSuggestions } from '../src/shared/slash-commands.ts';
+import { changeCommandText, commandsFor, matchCommand, slashSuggestions } from '../src/shared/slash-commands.ts';
 import { MODES, modeLabel, nextMode } from '../src/shared/permission-modes.ts';
 import { initPrompt } from '../src/shared/init-prompt.ts';
 
@@ -10,7 +10,15 @@ const skills = [
 ];
 
 test('the card composer lists the common commands, then the card commands', () => {
-  assert.deepEqual(commandsFor('card').map(command => command.label), ['/compact', '/context', '/cost', '/model', '/help', '/检查', '/标记完成', '/换对话', '/下一步']);
+  assert.deepEqual(commandsFor('card').map(command => command.label), ['/compact', '/context', '/cost', '/model', '/help', '/检查', '/标记完成', '/换对话', '/下一步', '/改动']);
+});
+
+test('/改动 takes the rest of the message as the change', () => {
+  assert.equal(changeCommandText('/改动'), '');
+  assert.equal(changeCommandText('  /改动  创角页加自定义开局选项 \n'), '创角页加自定义开局选项');
+  assert.equal(changeCommandText('/改动\n第一行\n第二行'), '第一行\n第二行');
+  assert.equal(changeCommandText('/改动单'), null);
+  assert.equal(changeCommandText('请 /改动 这里'), null);
 });
 
 test('a slash lists skills before commands, and plain text lists nothing', () => {

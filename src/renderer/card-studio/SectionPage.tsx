@@ -5,7 +5,7 @@ import { boardOf, sectionLabel, sectionOf } from '../../shared/card-studio/board
 import { formatDispatch } from '../../shared/card-studio/dispatch';
 import { dispatchCounts, sectionState } from '../../shared/card-studio/progress';
 import { conversationsOf, markableDispatch, progressInputOf, relativeTime, runningConversation } from '../../shared/card-studio/view';
-import type { CardComponentSummary, CardDispatch, CardPieceSummary, CardProjectView, PlanMode } from '../../shared/card-studio/types';
+import type { CardComponentSummary, CardDispatch, CardPieceSummary, CardProjectView, CardVariableTableView, PlanMode } from '../../shared/card-studio/types';
 import type { Task } from '../../shared/types';
 import { useStudio } from './CardStudio';
 import { stateLabel, useNow } from './parts';
@@ -18,6 +18,7 @@ import { KickoffOptions, useKickoffChoice } from './Kickoff';
 import { PromptEditor } from './PromptEditor';
 import { JumpToLatest } from '../ReadingAids';
 import { RunBar } from './RunPanel';
+import { ChangePanel } from './ChangePanel';
 import { runIsOpen } from '../../shared/card-studio/run';
 import { sectionPromptIds } from '../../shared/card-studio/prompt-files';
 
@@ -51,6 +52,34 @@ function ComponentList({ card, sectionId }: { card: CardProjectView; sectionId: 
           <small>uid {item.uid} · {item.constant ? t('always on', '常驻') : t(`${item.keys} keywords`, `关键词 ${item.keys}`)} · {item.chars.toLocaleString()} {t('chars', '字')}{item.disabled ? ` · ${t('off', '已关闭')}` : ''}</small>
         </button>
       </li>)}</ol>}
+  </section>;
+}
+
+/** Sections that read or write variables see the 变量表 they bind to (ADR 0020). */
+const VARIABLE_SECTIONS = new Set(['script-schema', 'lore-vars', 'regex-status', 'regex-start', 'regex-update']);
+
+/** The 变量表 as a read-only table: the authored one, or the one derived from an imported card. */
+function VariableTableBrief({ card }: { card: CardProjectView }) {
+  const { api, t, run } = useApp();
+  const [table, setTable] = useState<CardVariableTableView | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void api.readCardVariableTable(card.projectId).then(value => { if (alive) setTable(value); }, () => { if (alive) setTable(null); });
+    return () => { alive = false; };
+  }, [api, card.projectId, card.updatedAt]);
+  if (!table) return null;
+  return <section className="cs-vartable">
+    <h3>{t('Variable table', '变量表')}{table.source === 'derived' && <em className="cs-badge">{t('derived', '推导的')}</em>}{table.rows.length > 0 && <em className="cs-count">{table.rows.length}</em>}</h3>
+    {table.error ? <p className="cs-note is-error">{table.error}</p>
+      : table.source === null ? <p className="cs-note">{t('No variable table yet; 脚本 · 变量结构 writes it.', '还没有变量表，由「脚本 · 变量结构」分区写出。')}</p>
+        : <>
+          {table.stale && <p className="cs-note is-warning">{t('The table changed after the variable files were generated.', '变量表改过了，生成的变量文件还是旧的。')}</p>}
+          <div className="cs-vartable-scroll"><table>
+            <thead><tr><th>{t('Path', '路径')}</th><th>{t('Type', '类型')}</th><th>{t('Default', '默认')}</th><th>{t('Owner', '维护者')}</th></tr></thead>
+            <tbody>{table.rows.map(row => <tr key={row.path} title={[row.note, row.when].filter(Boolean).join(' · ')}><td><code>{row.path}</code></td><td>{row.type}</td><td>{row.default}</td><td>{row.owner}</td></tr>)}</tbody>
+          </table></div>
+          <button type="button" className="cs-link" onClick={() => void run(() => api.openCardFolder(card.projectId, table.path))}><FileText size={12} />{t(`Open ${table.path}`, `打开 ${table.path}`)}</button>
+        </>}
   </section>;
 }
 
@@ -124,7 +153,8 @@ export function SectionPage({ card, sectionId, conversation }: { card: CardProje
   const people = sectionId === 'lore-people' ? card.design.people : null;
   const own = card.dispatches.filter(dispatch => dispatch.sectionId === sectionId);
   const waiting = own.filter(dispatch => dispatch.status === 'todo');
-  const refused = !card.design.exists && !NO_DESIGN_OK.includes(sectionId);
+  // 改动派单 work on cards without a design book too (Q15), so their conversations stay open.
+  const refused = !card.design.exists && !NO_DESIGN_OK.includes(sectionId) && !own.some(dispatch => dispatch.changeId);
   const language = data.preferences.language;
   const choice = useKickoffChoice(card, !conversationsOf(data.tasks, card.projectId, 'plan').length);
   const squad = sectionId === 'plan' && selected ? data.tasks.filter(item => item.parentId === selected.id) : [];
@@ -150,7 +180,7 @@ export function SectionPage({ card, sectionId, conversation }: { card: CardProje
     {refineReason && <small>{refineReason}</small>}
   </div></>;
 
-  const previewKind = sectionId === 'regex-body' ? 'body' : sectionId === 'regex-update' ? 'update' : null;
+  const previewKind = sectionId === 'regex-body' ? 'body' : sectionId === 'regex-update' ? 'update' : sectionId === 'regex-status' ? 'status' : sectionId === 'regex-start' ? 'start' : null;
   const preview = previewKind && <PreviewPanel key={previewKind} card={card} kind={previewKind} open={!selected} />;
 
   let body;
@@ -218,6 +248,7 @@ export function SectionPage({ card, sectionId, conversation }: { card: CardProje
         {markable && <button type="button" className="cs-btn is-small is-done" onClick={() => void run(() => api.markDispatchDone(card.projectId, markable.id), t('Dispatch marked done', '派单已标记完成'))}><Check size={13} />{t('Mark done', '标记完成')}</button>}
       </header>
       {card.run && sectionId !== 'source' && <RunBar card={card} here={selected?.id} />}
+      {selected?.card?.changeId && <ChangePanel card={card} task={selected} />}
       {running && running.id !== selected?.id && sectionId !== 'source' && !runConversation && <div className="cs-busy" role="status">
         <LoaderCircle size={13} className="spinning" />
         <span>{t(`Another conversation of this card is running: ${sectionLabel(running.card!.sectionId)} · ${running.title}. One conversation runs per card at a time.`, `这张卡的另一个对话正在运行：${sectionLabel(running.card!.sectionId)} · ${running.title}。同一张卡同一时间只运行一个对话。`)}</span>
@@ -253,6 +284,7 @@ export function SectionPage({ card, sectionId, conversation }: { card: CardProje
         {people && <section><h3>{t('People roster', '人物名单')}</h3><p className="cs-note">{t(`${people.written} written, ${people.total} on the roster in 设计书.md.`, `设计书的人物名单共 ${people.total} 人，已写 ${people.written} 人。`)}</p><button type="button" className="cs-link" onClick={() => void run(() => api.openCardFolder(card.projectId, '设计书.md'))}><FileText size={12} />{t('Open 设计书.md', '打开设计书.md')}</button></section>}
       </>}
       {sectionId.startsWith('lore-') && <ComponentList card={card} sectionId={sectionId} />}
+      {VARIABLE_SECTIONS.has(sectionId) && <VariableTableBrief card={card} />}
       {(board.id === 'regex' || board.id === 'script') && <PieceList card={card} kind={board.id} />}
       {data.preferences.developerMode && sectionId !== 'source' && sectionId !== 'build' && <section><h3>{t('Built-in prompt', '内置提示词')}</h3><button type="button" className="cs-link" onClick={() => setEditing(true)}><BookOpen size={12} />{t('Edit (developer mode)', '编辑（开发者模式）')}</button></section>}
     </aside>

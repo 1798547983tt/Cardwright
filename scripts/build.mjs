@@ -1,7 +1,7 @@
 import { build as bundle } from 'esbuild';
 import { build as frontend } from 'vite';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { deflateSync } from 'node:zlib';
 import { buildNative } from './build-native.mjs';
 
@@ -15,6 +15,10 @@ await bundle({ entryPoints: ['src/runtime/worker.ts'], outfile: 'dist/worker.mjs
 // Self-contained so the card schema sandbox can run under Node's permission model with only its own file readable.
 await bundle({ entryPoints: ['src/core/card-studio/sandbox-entry.ts'], outfile: 'dist/card-sandbox.cjs', platform: 'node', format: 'cjs', bundle: true, sourcemap: false, logLevel: 'info' });
 await frontend({ base: './', build: { outDir: 'dist/renderer', emptyOutDir: true, rolldownOptions: { input: { index: resolve('index.html'), pet: resolve('pet.html') } } }, logLevel: 'info' });
+// The OFL wants its full text to travel with the fonts. Vite bundles only the font files, so the licence texts beside
+// them in src/renderer/assets/fonts/ are copied into the renderer as well (THIRD_PARTY_NOTICES.md): dist/ ships.
+await mkdir('dist/renderer/licenses', { recursive: true });
+for (const name of await readdir('src/renderer/assets/fonts')) if (name.endsWith('.txt')) await copyFile(join('src/renderer/assets/fonts', name), join('dist/renderer/licenses', name));
 
 // Original chamfered signal mark (same geometry as src/renderer/primitives.tsx Mark).
 // PNG/ICO encoding keeps packaging independent of image tools.

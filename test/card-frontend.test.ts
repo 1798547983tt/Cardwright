@@ -4,8 +4,11 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createCardFolder } from '../src/core/card-studio/card-project.ts';
-import { buildCardFromProject, buildPiece, importCard, readProject } from '../src/core/card-studio/components.ts';
+import { importCard, readProject } from '../src/core/card-studio/components.ts';
+import { buildCardFromProject, buildPiece } from '../src/core/card-studio/assembly.ts';
 import { runChecks } from '../src/core/card-studio/checks.ts';
+
+const CTX = { frontend: null, table: null, cardName: '样卡' };
 
 const FENCE = '`'.repeat(3);
 const NL = String.fromCharCode(10);
@@ -34,7 +37,7 @@ const exported = (card: Record<string, unknown>) => ((card.data as Record<string
 
 test('an iframe front-end is wrapped in the html fence when the card is assembled, and its file keeps the bare document', async () => {
   const root = await project([statusBar(documentBody), updateReceipt(inlineReceipt)]);
-  const scripts = exported(buildCardFromProject(await readProject(root)));
+  const scripts = exported(buildCardFromProject(await readProject(root), CTX));
   assert.equal(scripts[0].replaceString, `${FENCE}html${NL}${documentBody}${NL}${FENCE}`, 'starts with the html fence and ends with </html> and the closing fence, the way the Re0 card does');
   assert.equal(scripts[1].replaceString, inlineReceipt, 'the inline update receipt stays unfenced');
   assert.equal(await readFile(join(root, '正则', '01-状态栏.html'), 'utf8'), documentBody, 'the component file holds only the HTML document');
@@ -44,21 +47,21 @@ test('an iframe front-end is wrapped in the html fence when the card is assemble
 test('a front-end that already carries the fence is not wrapped twice', async () => {
   const fenced = `${FENCE}html${NL}${documentBody}${NL}${FENCE}`;
   const root = await project([statusBar(fenced)]);
-  assert.equal(exported(buildCardFromProject(await readProject(root)))[0].replaceString, fenced);
+  assert.equal(exported(buildCardFromProject(await readProject(root), CTX))[0].replaceString, fenced);
   await clean(root);
 });
 
 test('a trailing newline in the document file does not end up inside the fence', async () => {
   const root = await project([statusBar(`${documentBody}${NL}${NL}`)]);
-  assert.equal(exported(buildCardFromProject(await readProject(root)))[0].replaceString, `${FENCE}html${NL}${documentBody}${NL}${FENCE}`);
+  assert.equal(exported(buildCardFromProject(await readProject(root), CTX))[0].replaceString, `${FENCE}html${NL}${documentBody}${NL}${FENCE}`);
   await clean(root);
 });
 
 test('a regex exported on its own carries the fence too', async () => {
   const root = await project([statusBar(documentBody), updateReceipt(inlineReceipt)]);
   const components = await readProject(root);
-  assert.equal(buildPiece(components, 'regex', '01-状态栏').replaceString, `${FENCE}html${NL}${documentBody}${NL}${FENCE}`);
-  assert.equal(buildPiece(components, 'regex', '02-变量更新').replaceString, inlineReceipt);
+  assert.equal(buildPiece(components, 'regex', '01-状态栏', CTX).replaceString, `${FENCE}html${NL}${documentBody}${NL}${FENCE}`);
+  assert.equal(buildPiece(components, 'regex', '02-变量更新', CTX).replaceString, inlineReceipt);
   await clean(root);
 });
 

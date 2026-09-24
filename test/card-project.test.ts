@@ -19,7 +19,7 @@ test('creates the card project folders and registration file', async t => {
   for (const relative of CARD_FOLDERS) assert.ok((await stat(join(folder, relative))).isDirectory(), relative);
   assert.deepEqual(file, {
     schema: 'cardwright.card-project', version: 1, cardId: 'card-fixture', name: '西游·八十一难', kind: 'fan', source: '西游记',
-    coverStyle: COVER_STYLES[4], stylePreset: null, origin: 'new', createdAt: fixed.now.toISOString(), updatedAt: fixed.now.toISOString(), dispatches: [], exports: [], nextUid: 0,
+    coverStyle: COVER_STYLES[4], stylePreset: null, origin: 'new', createdAt: fixed.now.toISOString(), updatedAt: fixed.now.toISOString(), dispatches: [], exports: [], nextUid: 0, changes: [],
   });
   assert.deepEqual(JSON.parse(await readFile(join(folder, CARD_FILE), 'utf8')), file);
 });
@@ -69,4 +69,20 @@ test('validates registration files and keeps unknown fields', async t => {
   assert.deepEqual(read.dispatches, [dispatch]);
   assert.deepEqual((read as unknown as { futureField: unknown }).futureField, { kept: true });
   assert.deepEqual((await readdir(folder)).filter(name => name.endsWith('.tmp')), []);
+});
+
+test('keeps the valid 改动单 of a registration and leaves out what does not read as one', async t => {
+  const folder = join(await temp(t), 'card');
+  const { file } = await createCardFolder({ folder, name: '汽灯与铜镜', kind: 'original', ...fixed });
+  const at = file.createdAt;
+  const change = { id: 'c1', kind: 'request', text: '创角页加自定义开局选项', status: 'draft', taskId: 't1', items: [{ id: 'i1', target: '正则/开局创角页', sectionId: 'regex-start', title: '改动 · 加自定义选项', requires: '', body: '加一个自定义选项。' }], dispatchIds: [], noDesignBook: true, createdAt: at, updatedAt: at };
+  const parsed = parseCardFile({ ...file, changes: [change, { ...change, id: 'c2', status: 'maybe' }, { ...change, id: 'c3', items: [{ id: 'i2' }] }, { ...change, id: 'c4', kind: 'wish' }, 'junk'] });
+  assert.deepEqual(parsed.changes, [change]);
+  assert.deepEqual(parseCardFile({ ...file, changes: undefined }).changes, []);
+  const dispatch = { id: 'd1', target: '正则/开局创角页', sectionId: 'regex-start', title: '改动 · 加自定义选项', requires: '', body: '', status: 'todo', createdAt: at, updatedAt: at, changeId: 'c1' };
+  assert.throws(() => parseCardFile({ ...file, dispatches: [{ ...dispatch, changeId: 7 }] }), /派单记录无效/);
+  await writeCardFile(folder, { ...file, dispatches: [dispatch], changes: [change] } as typeof file);
+  const read = await readCardFile(folder);
+  assert.deepEqual(read.changes, [change]);
+  assert.equal(read.dispatches[0].changeId, 'c1');
 });

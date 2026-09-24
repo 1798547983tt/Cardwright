@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createCardFolder } from '../src/core/card-studio/card-project.ts';
@@ -30,7 +30,7 @@ async function project(entries: Array<ReturnType<typeof entry>>): Promise<string
 const clean = (root: string) => rm(join(root, '..'), { recursive: true, force: true });
 const codes = (findings: Array<{ code: string }>) => [...new Set(findings.map(item => item.code))].sort();
 
-test('a wrapper tag written the wrong way round is an error', async () => {
+test('a wrapper tag written the wrong way round is a warning', async () => {
   const root = await project([
     entry(1, '人物总览', '</人物总览>\n昴｜男｜主角\n</人物总览>'),
     entry(2, '地点总览', '<地点总览>\n王都｜城市｜首都\n</地点总览>'),
@@ -38,17 +38,16 @@ test('a wrapper tag written the wrong way round is an error', async () => {
   const report = await runChecks(root);
   const tag = report.findings.filter(item => item.code === 'wrap-tag');
   assert.equal(tag.length, 1);
-  assert.equal(tag[0].level, 'error');
+  assert.equal(tag[0].level, 'warning', 'since 1.1.0 a wrapper problem no longer blocks the export');
   assert.equal(tag[0].uid, 1);
   assert.match(tag[0].message, /人物总览/);
-  assert.equal(report.ok, false, 'errors block the export');
   await clean(root);
 });
 
-test('a body that never closes its wrapper is an error too', async () => {
+test('a body that never closes its wrapper is a warning too', async () => {
   const root = await project([entry(1, '王都', '<王都>\n城。')]);
   const report = await runChecks(root);
-  assert.equal(report.findings.filter(item => item.code === 'wrap-tag' && item.level === 'error').length, 1);
+  assert.equal(report.findings.filter(item => item.code === 'wrap-tag' && item.level === 'warning').length, 1);
   await clean(root);
 });
 
@@ -192,7 +191,7 @@ const zodScript = [
 ].join(NL);
 const formatEntry = ['<customize_format>', '根标签 content', '</customize_format>', '', '```示例输出', '<content>', '<time>雾港历1年01月01日</time>', '主角「走吧。」', '</content>', '```'].join(NL);
 
-const fullCard = (over: { regex?: unknown[]; scripts?: unknown[]; greetings?: string[]; initvar?: string; rules?: string; rulesName?: string } = {}) => ({
+const fullCard = (over: { regex?: unknown[]; scripts?: unknown[]; greetings?: string[]; initvar?: string; rules?: string; rulesName?: string; extra?: Array<ReturnType<typeof entry>> } = {}) => ({
   spec: 'chara_card_v3', spec_version: '3.0', name: '样卡',
   data: {
     name: '样卡', first_mes: over.greetings?.[0] ?? ['<content>', '<time>雾港历1年01月01日</time>', '</content>'].join(NL),
@@ -202,6 +201,7 @@ const fullCard = (over: { regex?: unknown[]; scripts?: unknown[]; greetings?: st
       entry(1, '[initvar] 初始', over.initvar ?? ['主角:', '  姓名: 林砚', '  生命: 90'].join(NL), { insertion_order: 1002 }),
       entry(2, '变量列表', FIXED_VARIABLE_LIST, { insertion_order: 9994 }),
       entry(3, over.rulesName ?? '变量规则', over.rules ?? ['总则：只按已发生的事实更新。', 'replace /主角/生命', 'replace /主角/不存在的字段'].join(NL), { insertion_order: 9995 }),
+      ...(over.extra ?? []),
     ] },
     extensions: {
       world: '样卡世界书',
@@ -365,4 +365,269 @@ test('the fixed pieces are compared with their exact text', async () => {
   const report = await runChecks(root, { sandbox });
   assert.ok(report.findings.some(item => item.code === 'fixed-piece' && item.message.includes('变量列表')));
   await clean(root);
+});
+
+import { syncVariableArtifacts, writeDerivedTable, VARIABLE_TABLE_FILE } from '../src/core/card-studio/variable-artifacts.ts';
+import { SAMPLE_TABLE } from './variable-table-sample.ts';
+
+test('an enabled [initvar] is a warning: MVU treats it as a prompt', async () => {
+  const root = await fullProject();
+  const report = await runChecks(root, { sandbox });
+  const params = report.findings.find(item => item.code === 'initvar-params');
+  assert.equal(params?.level, 'warning');
+  assert.match(params!.message, /没有关闭/);
+  await clean(root);
+});
+
+test('a variable table that does not parse blocks the export, with every problem named', async () => {
+  const root = await fullProject();
+  await writeFile(join(root, VARIABLE_TABLE_FILE), ['版本: 1', '变量:', '  - 路径: /主角/生命', '    类型: 数值', '  - 路径: /主角/生命', '    类型: 文本'].join(NL));
+  const report = await runChecks(root, { sandbox });
+  const invalid = report.findings.filter(item => item.code === 'variable-table-invalid');
+  assert.equal(invalid.length, 2, JSON.stringify(invalid));
+  assert.ok(invalid.every(item => item.level === 'error' && item.path === VARIABLE_TABLE_FILE));
+  assert.match(invalid.map(item => item.message).join('|'), /路径重复/);
+  assert.match(invalid.map(item => item.message).join('|'), /上级 \/主角 没有在表里定义/);
+  assert.equal(report.ok, false);
+  await writeFile(join(root, VARIABLE_TABLE_FILE), ': : :');
+  const broken = await runChecks(root, { sandbox });
+  assert.equal(broken.findings.filter(item => item.code === 'variable-table-parse' && item.level === 'error').length, 1);
+  await clean(root);
+});
+
+test('generated files that were edited by hand, and a table that changed since, are warnings', async () => {
+  const root = await fullProject();
+  await writeFile(join(root, VARIABLE_TABLE_FILE), SAMPLE_TABLE);
+  const before = await runChecks(root, { sandbox });
+  assert.equal(before.findings.find(item => item.code === 'variable-table-stale')?.level, 'warning', 'a table nobody generated from yet');
+  await syncVariableArtifacts(root, { cardName: '样卡' });
+  const synced = await runChecks(root, { sandbox });
+  assert.equal(synced.findings.some(item => item.code === 'variable-table-stale' || item.code === 'generated-edited'), false, JSON.stringify(synced.findings.filter(item => item.level !== 'info')));
+  assert.ok(synced.findings.some(item => item.code === 'initvar-ok'), 'the generated [initvar] passes the generated Zod');
+  assert.equal(synced.findings.some(item => item.code === 'initvar-params'), false, 'the generated [initvar] is disabled');
+  const zod = join(root, '脚本', '01-ZOD.js');
+  await writeFile(zod, `${await readFile(zod, 'utf8')}\n// 手改\n`);
+  await writeFile(join(root, VARIABLE_TABLE_FILE), SAMPLE_TABLE.replace('上限: 12', '上限: 9'));
+  const after = await runChecks(root, { sandbox });
+  const edited = after.findings.find(item => item.code === 'generated-edited');
+  assert.equal(edited?.level, 'warning');
+  assert.equal(edited?.path, '脚本/01-ZOD.js');
+  assert.equal(after.findings.find(item => item.code === 'variable-table-stale')?.level, 'warning');
+  await clean(root);
+});
+
+const statusBar = (reads: string) => ({ id: 'r9', scriptName: '状态栏', findRegex: String.raw`/<StatusPlaceHolderImpl\/>/g`, replaceString: ['<!DOCTYPE html>', '<html><head><style>:root{--bg:#111;--text:#eee;--a:1;--b:2;--c:3;--d:4;--e:5;--f:6;--g:7;--h:8;--i:9;--j:10}body{color:var(--text);background:var(--bg)}button:hover{opacity:.9}@media(max-width:375px){body{display:block}}</style></head>', `<body><script>const data = { stat_data: {} }; const view = [${reads}]; document.body.textContent = view.join(' ');</script></body></html>`].join(NL), placement: [2], disabled: false, markdownOnly: true, promptOnly: false, runOnEdit: true, substituteRegex: 0, minDepth: null, maxDepth: 0 });
+
+test('a hand-written status bar that reads a path the table lacks is an error with an authored table, a warning with a derived one', async () => {
+  const reads = "data.stat_data.主角.生命, data.stat_data['主角']['姓名'].length, data.stat_data.主角.魔力.toFixed(1), data?.stat_data?.人物?.张三?.好感, data.stat_data.人物.张三.身高";
+  const root = await fullProject({ regex: [statusBar(reads)] });
+  await writeFile(join(root, VARIABLE_TABLE_FILE), SAMPLE_TABLE);
+  await syncVariableArtifacts(root, { cardName: '样卡' });
+  const authored = await runChecks(root, { sandbox });
+  const errors = authored.findings.filter(item => item.code === 'variable-binding');
+  assert.deepEqual(errors.map(item => item.level), ['error', 'error'], JSON.stringify(errors));
+  assert.match(errors[0].message, /正则「状态栏」读的 \/主角\/魔力 不在变量表里/);
+  assert.match(errors[1].message, /\/人物\/张三\/身高/);
+  assert.equal(errors[0].path, '正则/01-状态栏.html');
+  await rm(join(root, VARIABLE_TABLE_FILE));
+  await writeDerivedTable(root);
+  const derived = await runChecks(root, { sandbox });
+  const warnings = derived.findings.filter(item => item.code === 'variable-binding');
+  assert.ok(warnings.length >= 1, JSON.stringify(derived.findings));
+  assert.ok(warnings.every(item => item.level === 'warning' && /推导的变量表/.test(item.message)));
+  await clean(root);
+});
+
+test('a rule that keeps a different number of records than the table is a warning', async () => {
+  const root = await fullProject({ rules: '各容器规则：\n- 人物：只保留最近 10 条，超出删最早的。\n- 事件记录：最多 8 条。' });
+  await writeFile(join(root, VARIABLE_TABLE_FILE), SAMPLE_TABLE);
+  await syncVariableArtifacts(root, { cardName: '样卡' });
+  const report = await runChecks(root, { sandbox });
+  const limits = report.findings.filter(item => item.code === 'variable-limit');
+  assert.equal(limits.length, 1, JSON.stringify(limits));
+  assert.equal(limits[0].level, 'warning');
+  assert.match(limits[0].message, /「人物」保留 10 条，变量表的上限是 12 条/);
+  await clean(root);
+});
+
+const updateFormatEntry = (patch: string) => entry(4, '变量输出格式', ['每次回复末尾输出：', '<UpdateVariable>', '<Analysis>', '一、主角：本轮变化', '</Analysis>', '<JSONPatch>', patch, '</JSONPatch>', '</UpdateVariable>'].join(NL), { insertion_order: 9996 });
+const renderer = (findRegex: string) => ({ id: 'r7', scriptName: '变量更新完成', findRegex, replaceString: '<details><summary>本轮变量已更新</summary></details>', placement: [2], disabled: false, markdownOnly: true, promptOnly: false, runOnEdit: false, substituteRegex: 0, minDepth: null, maxDepth: null });
+
+test('an example patch in the output format that cannot apply to [initvar] is an error', async () => {
+  const bad = await fullProject({ extra: [updateFormatEntry('[{"op":"replace","path":"/主角/魔力","value":1}]')] });
+  const report = await runChecks(bad, { sandbox });
+  const patch = report.findings.find(item => item.code === 'variable-patch');
+  assert.equal(patch?.level, 'error');
+  assert.match(patch!.message, /replace 的路径不存在/);
+  await clean(bad);
+  const good = await fullProject({ extra: [updateFormatEntry('[{"op":"replace","path":"/主角/生命","value":80}]')] });
+  assert.equal((await runChecks(good, { sandbox })).findings.some(item => item.code === 'variable-patch'), false);
+  await clean(good);
+  const template = await fullProject({ extra: [updateFormatEntry('${只输出合法 JSON 数组；无变化时输出 []}')] });
+  assert.equal((await runChecks(template, { sandbox })).findings.some(item => item.code === 'variable-patch'), false, 'a placeholder is not an example');
+  await clean(template);
+});
+
+test('a display regex for the update block must match the block the output format defines', async () => {
+  const miss = await fullProject({ extra: [updateFormatEntry('[]')], regex: [renderer(String.raw`/<UpdateVariable>\s*<analysis>[\s\S]*?<\/UpdateVariable>/g`)] });
+  const report = await runChecks(miss, { sandbox });
+  const render = report.findings.find(item => item.code === 'variable-render');
+  assert.equal(render?.level, 'error');
+  assert.match(render!.message, /「变量更新完成」/);
+  await clean(miss);
+  const hit = await fullProject({ extra: [updateFormatEntry('${只输出合法 JSON 数组}')], regex: [renderer(String.raw`/<UpdateVariable>\s*<Analysis>\s*([\s\S]*?)\s*<\/Analysis>\s*<JSONPatch>\s*(\[[\s\S]*?\])\s*<\/JSONPatch>\s*<\/UpdateVariable>/g`)] });
+  assert.equal((await runChecks(hit, { sandbox })).findings.some(item => item.code === 'variable-render'), false, 'the placeholder inside <JSONPatch> is sampled as []');
+  await clean(hit);
+});
+
+import { createComponent } from '../src/core/card-studio/components.ts';
+import { FLOATING_SUFFIX } from '../src/core/card-studio/assembly.ts';
+import { loadFrontendResources } from '../src/core/card-studio/frontend-resources.ts';
+import { BODY_SHEET, STATUS_SHEET } from './assembly-sheet-samples.ts';
+
+const frontend = await loadFrontendResources(fileURLToPath(new URL('../card-studio', import.meta.url)));
+/** A card with an authored 变量表 and sheet-bodied regex; `params` patches each regex's parameters. */
+async function sheetProject(sheets: Record<string, string>, params: Record<string, Record<string, unknown>> = {}, table: string | null = SAMPLE_TABLE): Promise<string> {
+  const root = join(await mkdtemp(join(tmpdir(), 'cardwright-checks-sheet-')), '卡项目');
+  await createCardFolder({ folder: root, name: '样卡', kind: 'original', random: () => 0 });
+  if (table) await writeFile(join(root, '变量表.yaml'), table);
+  for (const [name, body] of Object.entries(sheets)) {
+    const made = await createComponent(root, { board: 'regex', name, format: 'sheet' });
+    await writeFile(join(root, made.bodyPath), body);
+    if (params[name]) { const file = join(root, made.paramsPath); await writeFile(file, JSON.stringify({ ...JSON.parse(await readFile(file, 'utf8')), ...params[name] }, null, 2)); }
+  }
+  return root;
+}
+
+test('a placeholder status bar must render only the latest floor: maxDepth 0', async () => {
+  const root = await sheetProject({ 状态栏: STATUS_SHEET });
+  const report = await runChecks(root, { frontend });
+  const form = report.findings.find(item => item.code === 'status-form');
+  assert.equal(form?.level, 'error');
+  assert.match(form!.message, /maxDepth: 0/);
+  assert.ok(!report.findings.some(item => item.code.startsWith('frontend-') && item.level === 'error'), JSON.stringify(report.findings.filter(item => item.code.startsWith('frontend-'))));
+  assert.ok(!report.findings.some(item => item.code === 'regex-empty'));
+  await clean(root);
+  const fixed = await sheetProject({ 状态栏: STATUS_SHEET }, { 状态栏: { maxDepth: 0 } });
+  assert.ok(!(await runChecks(fixed, { frontend })).findings.some(item => item.code === 'status-form'));
+  await clean(fixed);
+});
+
+test('sheet problems land on the component: parse errors, bindings by table source, a missing table', async () => {
+  const root = await sheetProject({ 状态栏: STATUS_SHEET.replace('/主角/在逃', '/主角/魔力').replace('形态: placeholder', '形态: header'), 正文美化: BODY_SHEET.replace('状态头: false', '状态头: true').replace('楼层: 10', '楼层: 十') }, { 状态栏: { maxDepth: 0 } });
+  const report = await runChecks(root, { frontend });
+  const binding = report.findings.find(item => item.code === 'variable-binding');
+  assert.equal(binding?.level, 'error', 'an authored table makes a missing path an error');
+  assert.equal(binding?.path, '正则/01-状态栏.yaml');
+  assert.match(binding!.message, /\/主角\/魔力/);
+  const invalid = report.findings.filter(item => item.code === 'sheet-invalid');
+  assert.ok(invalid.some(item => item.path === '正则/02-正文美化.yaml' && /楼层/.test(item.message)), JSON.stringify(invalid));
+  assert.ok(invalid.some(item => item.path === '正则/01-状态栏.yaml' && /正文美化/.test(item.message)), 'a header status bar without a usable body sheet');
+  assert.ok(!report.findings.some(item => item.code === 'regex-empty'), 'a header status bar is meant to be empty');
+  await clean(root);
+  const bare = await sheetProject({ 状态栏: STATUS_SHEET }, { 状态栏: { maxDepth: 0 } }, null);
+  const missing = (await runChecks(bare, { frontend })).findings.find(item => item.code === 'variable-table-missing');
+  assert.equal(missing?.level, 'warning');
+  await clean(bare);
+});
+
+test('regex dialect and catastrophic backtracking are reported on the parameters', async () => {
+  const root = await sheetProject({}, {});
+  await createComponent(root, { board: 'regex', name: '方言' });
+  const dialect = join(root, '正则/01-方言.json');
+  await writeFile(dialect, JSON.stringify({ ...JSON.parse(await readFile(dialect, 'utf8')), findRegex: '/(?i)<mood>(.*?)<\\/mood>/' }, null, 2));
+  await createComponent(root, { board: 'regex', name: '回溯' });
+  const backtrack = join(root, '正则/02-回溯.json');
+  await writeFile(backtrack, JSON.stringify({ ...JSON.parse(await readFile(backtrack, 'utf8')), findRegex: '/(a+)+$/' }, null, 2));
+  // SillyTavern substitutes the macros before it compiles (substituteRegex 1). With this card name the expression no longer
+  // compiles, so SillyTavern skips it and so does the probe; read unsubstituted, its (a+)+$ branch would hang.
+  await createComponent(root, { board: 'regex', name: '宏' });
+  const macro = join(root, '正则/03-宏.json');
+  await writeFile(macro, JSON.stringify({ ...JSON.parse(await readFile(macro, 'utf8')), findRegex: '/{{char}}|(a+)+$/', substituteRegex: 1 }, null, 2));
+  const report = await runChecks(root, { context: { frontend, table: null, cardName: '样卡(', preset: null } });
+  const warned = report.findings.find(item => item.code === 'regex-dialect');
+  assert.equal(warned?.level, 'warning'); assert.equal(warned?.path, '正则/01-方言.json');
+  assert.ok(report.findings.some(item => item.code === 'regex-compile' && item.path === '正则/01-方言.json'), 'the dialect warning still explains an expression that does not compile');
+  const hung = report.findings.filter(item => item.code === 'regex-backtrack');
+  assert.deepEqual(hung.map(item => `${item.level}@${item.path}`), ['error@正则/02-回溯.json']);
+  assert.match(hung[0].message, /300 毫秒/);
+  assert.ok(!report.findings.some(item => item.code === 'regex-probe'), 'every probe started');
+  await clean(root);
+});
+
+test('a body sheet renders the floors its regex reaches: maxDepth is 楼层 minus one', async () => {
+  const three = await sheetProject({ 正文美化: BODY_SHEET.replace('楼层: 10', '楼层: 3') });
+  const floors = (await runChecks(three, { frontend })).findings.filter(item => item.code === 'body-floors');
+  assert.deepEqual(floors.map(item => `${item.level}@${item.path}`), ['warning@正则/01-正文美化.json']);
+  assert.equal(floors[0].message, '「正文美化」的装配单写的是只渲染最近 3 楼，正则的 maxDepth 应是 2（现在是 9）。');
+  await clean(three);
+  const ten = await sheetProject({ 正文美化: BODY_SHEET });
+  assert.ok(!(await runChecks(ten, { frontend })).findings.some(item => item.code === 'body-floors'), '楼层 10 with the maxDepth 9 a new body sheet starts with');
+  await clean(ten);
+  const open = await sheetProject({ 正文美化: BODY_SHEET }, { 正文美化: { maxDepth: null } });
+  const unlimited = (await runChecks(open, { frontend })).findings.find(item => item.code === 'body-floors');
+  assert.match(unlimited?.message ?? '', /应是 9（现在是没有限制）/);
+  await clean(open);
+});
+
+test('a damaged skeleton is one finding without a path, and the checks still finish', async () => {
+  const root = await sheetProject({ 状态栏: STATUS_SHEET }, { 状态栏: { maxDepth: 0 } });
+  const report = await runChecks(root, { frontend: { ...frontend, core: `${frontend.core}\nconst broken = '$1';` } });
+  const invalid = report.findings.filter(item => item.code === 'sheet-invalid');
+  const damaged = invalid.filter(item => item.path === undefined);
+  assert.equal(damaged.length, 1, JSON.stringify(invalid));
+  assert.equal(damaged[0].level, 'error');
+  assert.match(damaged[0].message, /^前端骨架资源损坏，装配单编译不了：运行时 core\.js里有会被酒馆正则替换掉的 \$ 写法，运行时不能这样写。请重新安装 Cardwright。$/);
+  assert.equal(invalid.length, 1, 'the damaged skeleton is the one finding: the sheet is not reported again on its component');
+  assert.ok(report.findings.some(item => item.code === 'export-readback' && item.level === 'info'), 'the card still reads back');
+  await clean(root);
+});
+
+test('an empty sheet is sheet-invalid only, and a sheet in an .html body is not read for stat_data', async () => {
+  const empty = await sheetProject({ 状态栏: '' }, { 状态栏: { maxDepth: 0 } });
+  const report = await runChecks(empty, { frontend });
+  assert.ok(report.findings.some(item => item.code === 'sheet-invalid' && item.path === '正则/01-状态栏.yaml'), JSON.stringify(report.findings));
+  assert.ok(!report.findings.some(item => item.code === 'regex-empty'), 'an empty sheet is not an empty replacement');
+  await clean(empty);
+  const html = await sheetProject({});
+  const made = await createComponent(html, { board: 'regex', name: '状态栏' });
+  await writeFile(join(html, made.bodyPath), STATUS_SHEET.replace('标题: 样卡', '标题: stat_data.主角.魔力'));
+  await writeFile(join(html, made.paramsPath), JSON.stringify({ ...JSON.parse(await readFile(join(html, made.paramsPath), 'utf8')), findRegex: String.raw`/<StatusPlaceHolderImpl\/>/g`, maxDepth: 0 }, null, 2));
+  const bindings = (await runChecks(html, { frontend })).findings.filter(item => item.code === 'variable-binding');
+  assert.deepEqual(bindings, [], 'the compiler checks a sheet against the table; its title is not a stat_data read');
+  await clean(html);
+});
+
+test('a synthesized floating script joins the script id check, and a hand-written script of its name is a warning', async () => {
+  const root = await sheetProject({ 状态栏: STATUS_SHEET.replace('形态: placeholder', '形态: floating') });
+  const regex = JSON.parse(await readFile(join(root, '正则/01-状态栏.json'), 'utf8')) as { id: string };
+  const copy = `脚本/01-状态栏${FLOATING_SUFFIX}`;
+  await writeFile(join(root, `${copy}.json`), JSON.stringify({ type: 'script', enabled: true, name: `状态栏${FLOATING_SUFFIX}`, id: `${regex.id}-floating`, info: '', button: { enabled: false, buttons: [] }, data: {}, export_with: { data: false, button: false } }));
+  await writeFile(join(root, `${copy}.js`), 'console.log(1);');
+  const found = (await runChecks(root, { frontend })).findings.filter(item => item.code === 'script-id');
+  assert.deepEqual(found.map(item => `${item.level}@${item.path}`), [`error@${copy}.json`, `warning@${copy}.json`], JSON.stringify(found));
+  assert.match(found[0].message, /由装配单合成/);
+  assert.match(found[1].message, /同名/);
+  await clean(root);
+});
+
+test('the checks use the assembly context they are given', async () => {
+  const root = await sheetProject({ 状态栏: STATUS_SHEET }, { 状态栏: { maxDepth: 0 } });
+  const given = await runChecks(root, { context: { frontend, table: null, cardName: '样卡', preset: 'sakura' } });
+  assert.equal(given.findings.find(item => item.code === 'variable-table-missing')?.path, '正则/01-状态栏.yaml', 'the given context has no table, though the card has one');
+  assert.ok(!(await runChecks(root, { frontend })).findings.some(item => item.code === 'variable-table-missing'));
+  await clean(root);
+});
+
+test('a container name inside running prose is not a limit statement; the second block of a two-shape format is checked too', async () => {
+  const table = SAMPLE_TABLE.replace('  - 路径: /事件记录\n    类型: 列表\n    元素: 文本\n    上限: 8', '  - 路径: /事件\n    类型: 列表\n    元素: 文本\n    上限: 8');
+  const prose = await fullProject({ rules: '各容器规则：\n- 人物：每个事件最多 3 个人物参与，保留最近 12 条。\n- 事件：只保留最近 8 条。' });
+  await writeFile(join(prose, VARIABLE_TABLE_FILE), table);
+  await syncVariableArtifacts(prose, { cardName: '样卡' });
+  assert.equal((await runChecks(prose, { sandbox })).findings.some(item => item.code === 'variable-limit'), false, '「事件最多 3 个人物」 is about participants, not the 事件 list');
+  await clean(prose);
+  const twoBlocks = await fullProject({ extra: [entry(4, '变量输出格式', ['生成中：', '<UpdateVariable>', '<Analysis>', '${分析}', '</Analysis>', '<JSONPatch>', '${数组}', '</JSONPatch>', '</UpdateVariable>', '完成后：', '<UpdateVariable>', '<Analysis>', '一、主角', '</Analysis>', '<JSONPatch>', '[{"op":"replace","path":"/主角/魔力","value":1}]', '</JSONPatch>', '</UpdateVariable>'].join(NL), { insertion_order: 9996 })] });
+  const report = await runChecks(twoBlocks, { sandbox });
+  assert.equal(report.findings.find(item => item.code === 'variable-patch')?.level, 'error', 'the finished block carries the real example');
+  await clean(twoBlocks);
 });

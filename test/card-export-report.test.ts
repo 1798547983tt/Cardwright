@@ -4,7 +4,8 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createCardFolder } from '../src/core/card-studio/card-project.ts';
-import { buildCardFromProject, importCard, readProject } from '../src/core/card-studio/components.ts';
+import { importCard, readProject } from '../src/core/card-studio/components.ts';
+import { buildCardFromProject } from '../src/core/card-studio/assembly.ts';
 import { bookName, diffFingerprints, exportReport, fingerprintProject, piecesFolderName, readCardMeta, writeCardMeta } from '../src/core/card-studio/export-report.ts';
 
 async function project(): Promise<string> {
@@ -33,7 +34,7 @@ test('card metadata lives in the envelope and reaches the export without touchin
   const lore = await readFile(join(root, '世界书/人设/100-林砚.md'), 'utf8');
   await writeCardMeta(root, { name: '雾港档案·终版', creator: '示例作者', version: 'v2', notes: '新备注', tags: ['测试', '悬疑', ' ', '悬疑'] });
   assert.deepEqual(await readCardMeta(root), { name: '雾港档案·终版', creator: '示例作者', version: 'v2', notes: '新备注', tags: ['测试', '悬疑'] }, 'blank and repeated tags are dropped');
-  const card = buildCardFromProject(await readProject(root)) as { name: string; data: Record<string, unknown> };
+  const card = buildCardFromProject(await readProject(root), { frontend: null, table: null, cardName: '样卡' }) as { name: string; data: Record<string, unknown> };
   assert.equal(card.data.name, '雾港档案·终版');
   assert.equal(card.data.character_version, 'v2');
   assert.equal(card.data.creator_notes, '新备注');

@@ -4,7 +4,7 @@ import type { RendererErrorReport } from './diagnostics.ts';
 import type { HooksConfig } from '../core/hooks-config.ts';
 import type { ThemeDefinition } from './themes.ts';
 import type { PetTarget, SpriteLayout } from './pets.ts';
-import type { CardRun, CardRunScope, CardRunSettings, CardSettings, PromptOverrideDetail, PromptOverrideItem, CardMeta, CardPieceImport, CardPreview, CardPieceSummary, CardCheckReport, CardComponentResult, CardComponentSummary, CardExportResult, CardImportPreview, CardImportReport, CardProjectView, CardStudioSnapshot, CardTaskInfo, CoverSource, NewCardComponent, NewCardProject, PlanMode, SourceImportReport, SourceRecord, StartCardConversation } from './card-studio/types.ts';
+import type { CardChange, NewCardChange, CardRun, CardRunScope, CardRunSettings, CardSettings, PromptOverrideDetail, PromptOverrideItem, CardMeta, CardPieceImport, CardPreview, CardPreviewKind, CardPieceSummary, CardCheckReport, CardComponentResult, CardComponentSummary, CardExportResult, CardImportPreview, CardImportReport, CardLoreSuggestion, CardProjectView, CardStudioSnapshot, CardTaskInfo, CardVariableTableView, CoverSource, NewCardComponent, NewCardProject, PlanMode, SourceImportReport, SourceRecord, StartCardConversation } from './card-studio/types.ts';
 export type PermissionMode = 'ask' | 'edit' | 'full';
 export type TaskStatus = 'idle' | 'queued' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled';
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
@@ -53,6 +53,8 @@ export interface Preferences {
   developerMode?: boolean;
   /** 桌宠: off by default; the pet, when none is chosen, is the theme's; where its floating window was dragged to. */
   petEnabled?: boolean; petId?: string; petPosition?: { x: number; y: number };
+  /** 新版本提醒 (1.1): once a day the version number of the latest GitHub release; on unless false. */
+  releaseCheck?: boolean;
 }
 /** 一键自检 of a gateway: the model list, then one completion of a single token; each step on its own. */
 export interface GatewaySelfTest { ok: boolean; steps: Array<{ step: 'models' | 'completion'; ok: boolean; detail: string; ms: number }> }
@@ -85,7 +87,7 @@ export interface MemoryItem { id: string; content: string; category?: string; so
 export interface BackupPreview { files: string[]; bytes: number; createdAt: string; excludes: string[] }
 export interface Project { id: string; name: string; path: string; isGit: boolean; createdAt: string; collapsed?: boolean; pinned?: boolean; /** Card studio projects appear only in the card library. */ kind?: 'card'; cardSettings?: CardSettings; /** The card's 一键制作 / 全部开做 run, if any. */ cardRun?: CardRun }
 export interface Usage { input: number; output: number; cacheRead: number; cacheWrite: number; cost: number }
-export interface ChatMessage { id: string; role: 'user' | 'assistant' | 'system'; text: string; thinking?: string; at: string; usage?: Usage; model?: string; turnId?: string; sessionEntryId?: string; pending?: boolean; attachments?: AttachmentInfo[]; /** The card dispatch this message started; 撤回 sends it back to 未派. */ dispatchId?: string }
+export interface ChatMessage { id: string; role: 'user' | 'assistant' | 'system'; text: string; thinking?: string; /** When the thinking began, moved on by earlier thinking time when the model thinks again, so now minus this is the total while it thinks. */ thinkingStartedAt?: string; /** How long the model thought, set once it stops thinking. */ thinkingMs?: number; at: string; usage?: Usage; model?: string; turnId?: string; sessionEntryId?: string; pending?: boolean; attachments?: AttachmentInfo[]; /** The card dispatch this message started; 撤回 sends it back to 未派. */ dispatchId?: string }
 export interface ToolCall { id: string; toolCallId?: string; name: string; args: Record<string, unknown>; output: string; status: 'running' | 'waiting' | 'completed' | 'failed'; patch?: string; at: string; search?: SearchOutput; turnId?: string }
 /** A phase of a long conversation, marked by the agent (§6.3). */
 export interface TaskChapter { id: string; title: string; turnId: string; at: string }
@@ -232,6 +234,8 @@ export interface Bridge extends StudioBridge {
   openLogFolder(): Promise<void>;
   /** The system clipboard, written by the desktop process: the permission handler refuses the page's own clipboard writes. */
   copyText(text: string): Promise<void>;
+  /** 新版本提醒 (1.1): this build, whether the latest release is newer, when the daily check last succeeded, and that release with its page only while it is newer. */
+  readReleaseCheck(): Promise<{ current: string; newer: boolean; latest?: string; url?: string; checkedAt?: string }>;
   /** True only when the app was started with CARDWRIGHT_SMOKE_RENDER_FAULT=1, so the packaged smoke can make a page fail. */
   smokeRenderFault?: boolean;
   // Card studio
@@ -268,6 +272,14 @@ export interface Bridge extends StudioBridge {
   resumeCardRun(projectId: string): Promise<void>;
   stopCardRun(projectId: string): Promise<void>;
   dismissCardRun(projectId: string): Promise<void>;
+  /** 提改动 (§5.4): a draft 改动单 and the change AI's planning conversation, which lists the 影响清单. */
+  startCardChange(projectId: string, input: NewCardChange): Promise<{ change: CardChange; task: Task }>;
+  removeCardChangeItem(projectId: string, changeId: string, itemId: string): Promise<void>;
+  dropCardChange(projectId: string, changeId: string): Promise<void>;
+  /** 照单开做: the 影响清单 becomes 改动派单 that one-click making runs in dependency order. */
+  confirmCardChange(projectId: string, changeId: string, settings: CardRunSettings): Promise<void>;
+  /** 继续跑: the change's paused run goes on, or a new one takes the 改动派单 not yet done. */
+  resumeCardChange(projectId: string, changeId: string, settings?: CardRunSettings): Promise<void>;
   readCardPrompt(projectId: string, sectionId: string, mode?: PlanMode): Promise<string>;
   pickCardSources(projectId: string): Promise<SourceImportReport | null>;
   importCardSources(projectId: string, paths: string[]): Promise<SourceImportReport>;
@@ -278,6 +290,11 @@ export interface Bridge extends StudioBridge {
   importCardLorebook(projectId: string, replace?: boolean): Promise<CardImportReport | null>;
   newCardComponent(projectId: string, input: NewCardComponent): Promise<CardComponentResult>;
   readCardComponents(projectId: string): Promise<CardComponentSummary[]>;
+  /** 整理未分类: moves world book components into a section's folder (uid, order and body stay); returns their new parameter paths. */
+  moveCardLore(projectId: string, paramsPaths: string[], section: string): Promise<string[]>;
+  /** AI 归类建议: one model call over up to 200 unclassified entries (these uids, else the first); suggestions only, nothing moves. */
+  suggestCardLoreSections(projectId: string, uids?: number[]): Promise<CardLoreSuggestion[]>;
+  readCardVariableTable(projectId: string): Promise<CardVariableTableView>;
   readCardPieces(projectId: string): Promise<CardPieceSummary[]>;
   runCardChecks(projectId: string): Promise<CardCheckReport>;
   exportCardProject(projectId: string, kind: 'card' | 'lorebook'): Promise<CardExportResult>;
@@ -285,7 +302,7 @@ export interface Bridge extends StudioBridge {
   exportAllCardPieces(projectId: string): Promise<{ folder: string; files: string[] }>;
   readCardMeta(projectId: string): Promise<CardMeta>;
   saveCardMeta(projectId: string, meta: CardMeta): Promise<CardMeta>;
-  previewCard(projectId: string, kind: 'body' | 'update'): Promise<CardPreview>;
+  previewCard(projectId: string, kind: CardPreviewKind): Promise<CardPreview>;
   exportCardPiece(projectId: string, kind: 'regex' | 'script', name: string): Promise<CardExportResult>;
   importCardPiece(projectId: string): Promise<CardPieceImport | null>;
   pickCardCover(): Promise<CoverSource | null>;

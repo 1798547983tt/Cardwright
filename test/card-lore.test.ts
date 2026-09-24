@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bookEntryToParams, cardEntryToParams, defaultLoreParams, loreFileName, paramsToBookEntry, paramsToCardEntry, sectionOfParams } from '../src/shared/card-studio/lore.ts';
+import { loreSuggestionRequest, parseLoreSuggestions } from '../src/shared/card-studio/lore-suggest.ts';
 
 // A card entry in the shape SillyTavern writes into data.character_book.entries (verified against 1.19.0).
 const cardEntry = (overrides: Record<string, unknown> = {}, extensions: Record<string, unknown> = {}) => ({
@@ -135,6 +136,53 @@ test('entries land in the section their parameters imply', () => {
   assert.equal(at(1002, 0, '[initvar] 初始'), 'lore-vars');
   assert.equal(at(9995, 0, '变量规则'), 'lore-vars');
   assert.equal(at(7000, 1, '不认识的条目'), 'lore-other');
+});
+
+// 1.1 Q22: imported cards number freely (龙族's [initvar] at 100, 煌天厚土's 人物总览 at 180), so the name decides first.
+test('a marker in the name places an entry whatever its order', () => {
+  const at = (order: number, comment: string, position = 0) => sectionOfParams({ uid: 0, key: [], comment, constant: true, order, position });
+  assert.equal(at(100, '[InitVar]变量初始化'), 'lore-vars', 'an [initvar] numbered like a person');
+  assert.equal(at(7000, '[mvu_update]变量更新规则'), 'lore-vars');
+  assert.equal(at(4, '变量输出格式'), 'lore-vars');
+  assert.equal(at(200, '变量列表'), 'lore-vars');
+  assert.equal(at(101, '初始变量'), 'lore-vars');
+  assert.equal(at(180, '人物总览'), 'lore-people', '人物总览 belongs to 人设, which keeps it');
+  assert.equal(at(180, '角色总览'), 'lore-people');
+  assert.equal(at(0, '人物一览', 4), 'lore-people');
+  assert.equal(at(101, '地点总览'), 'lore-overview');
+  assert.equal(at(214, '势力总览'), 'lore-overview');
+  assert.equal(at(300, '地图总览', 4), 'lore-overview');
+  assert.equal(at(50, '世界总览'), 'lore-overview');
+  assert.equal(at(101, '楚子航'), 'lore-other', 'without a marker the order still decides');
+  assert.equal(at(50, '变量规则说明'), 'lore-setting', 'a name that only starts like a marker is not claimed');
+});
+
+test('AI sorting suggestions are read leniently and kept only for the entries asked about', () => {
+  const reply = [
+    '好的，归类如下：',
+    '```json',
+    '{"uid": 12, "section": "lore-people", "reason": "单个角色的档案"}',
+    '{"uid": "13", "section": "世界书/设定", "reason": "写了{势力}的设定"}',
+    '{"uid": 14, "section": "lore-other", "reason": "拿不准"}',
+    '{"uid": 99, "section": "lore-plot", "reason": "没问过这一条"}',
+    '{"uid": 12, "section": "lore-plot", "reason": "重复的第二个回答"}',
+    '{"uid": 15, "section": "lore-vars", "reason": "被截断',
+    '{"uid": 16,',
+    '  "section": "lore-overview"}',
+    '```',
+  ].join('\n');
+  assert.deepEqual(parseLoreSuggestions(reply, [12, 13, 14, 15, 16]), [
+    { uid: 12, section: 'lore-people', reason: '单个角色的档案' },
+    { uid: 13, section: 'lore-setting', reason: '写了{势力}的设定' },
+    { uid: 16, section: 'lore-overview', reason: '' },
+  ]);
+  assert.deepEqual(parseLoreSuggestions('{"suggestions": [{"uid": 1, "section": "人设", "reason": "角色"}]}', [1]), [{ uid: 1, section: 'lore-people', reason: '角色' }]);
+  assert.deepEqual(parseLoreSuggestions('没有可用的 JSON {uid: 1}', [1]), []);
+
+  const request = loreSuggestionRequest([{ uid: 7, name: '楚子航', keys: ['楚子航', '师兄', '', '狮心会', '卡塞尔', '村雨', '第七个'], content: `<楚子航>\n${'很长的正文'.repeat(40)}` }]);
+  assert.match(request.systemPrompt, /lore-people（人设）/);
+  assert.match(request.prompt, /^共 1 条：\nuid 7｜名称：楚子航｜关键词：楚子航、师兄、狮心会、卡塞尔、村雨｜正文：<楚子航> 很长的正文/);
+  assert.ok(request.prompt.endsWith('…'), 'the body is cut to its start');
 });
 
 test('file names read at a glance and never collide', () => {

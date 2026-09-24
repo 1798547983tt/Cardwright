@@ -1,0 +1,76 @@
+/* Cardwright skin: gilded (鎏金典狱) */
+:root {
+  --bg: #141a14;
+  --panel: #19211a;
+  --panel-2: #1f2a20;
+  --text: #efe6d2;
+  --text-2: #b8a98a;
+  --text-3: #7d7460;
+  --accent: #d9bb7a;
+  --accent-2: #b8955a;
+  --line: rgba(184, 149, 90, .45);
+  --line-soft: rgba(184, 149, 90, .22);
+  --ok: #7fae7a; --warn: #d9a441; --danger: #c8584f;
+  --radius: 2px;
+  --serif: "Noto Serif SC", "Source Han Serif SC", "STZhongsong", SimSun, serif;
+  --sans: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --display: "Sitka Banner", Georgia, "Times New Roman", serif;
+}
+
+/* --- 面板 --- */
+.cw-block { border: 1px solid var(--line); border-radius: var(--radius); position: relative; outline: 1px solid var(--line-soft); outline-offset: -3px; }
+.cw-block-title { font-family: var(--serif); letter-spacing: 0.08em; }
+.cw-chapter { font-family: var(--serif); letter-spacing: 0.1em; }
+.cw-head { font-family: var(--serif); }
+
+/* --- 分页签 --- */
+.cw-tab { font-family: var(--serif); font-size: 13px; letter-spacing: 0.04em; }
+.cw-tab.is-on { color: var(--accent); border-bottom-color: currentColor; }
+.cw-tab:hover { color: var(--text); }
+
+/* --- 标签 --- */
+.cw-tag { border-radius: 999px; border-color: var(--accent-2); color: var(--text-2); font-family: var(--serif); font-size: 11px; }
+
+/* --- 进度条 --- */
+.cw-bar-track { border-radius: 2px; height: 5px; }
+.cw-bar-fill { border-radius: 2px; background: var(--accent-2); }
+
+/* --- 对白 --- */
+.cw-say { border-left: 1px solid var(--line); }
+.cw-say.is-player { border-left-color: var(--line-strong, var(--line)); }
+.cw-speaker { font-family: var(--serif); }
+
+/* --- 按钮 --- */
+.cw-btn { border-radius: 2px; font-family: var(--serif); transition: border-color 200ms, background 200ms; }
+.cw-btn:hover { border-color: var(--accent-2); }
+.cw-btn.is-primary { background: var(--accent); color: var(--bg); }
+.cw-btn.is-primary:hover { opacity: 0.92; }
+
+/* --- 悬浮球与面板 --- */
+.cw-ball { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--accent-2); background: var(--panel); color: var(--accent); cursor: pointer; font-family: var(--serif); font-size: 14px; }
+.cw-ball::after { content: '狱'; }
+.cw-ball:hover { border-color: var(--text-2); }
+.cw-panel { position: absolute; bottom: 64px; left: 0; width: min(360px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); font: 15px/1.7 var(--sans); overflow: hidden; }
+.cw-panel-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.cw-panel-close { border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-2); font: inherit; cursor: pointer; padding: 2px 8px; }
+.cw-panel-close:hover { color: var(--text); border-color: var(--accent-2); }
+
+/* --- 装饰：角饰 --- */
+.cw-block::before,
+.cw-block::after { content: ''; position: absolute; width: 7px; height: 7px; border: 1px solid var(--accent-2); }
+.cw-block::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+.cw-block::after { top: -1px; right: -1px; border-left: 0; border-bottom: 0; }
+
+/* --- 装饰：点线引导 --- */
+.cw-stats-grid dd { border-bottom: 1px dotted var(--line-soft); }
+
+/* --- 装饰：菱形分隔 --- */
+.cw-status-bar::after { content: ''; display: inline-block; width: 5px; height: 5px; border: 1px solid var(--accent-2); transform: rotate(45deg); margin-left: 8px; }
+
+/* --- 动效 --- */
+.cw-block { animation: cw-gld-in 320ms ease-out both; }
+@keyframes cw-gld-in { from { opacity: 0; transform: translateY(2px); } }
+.cw-tab, .cw-btn, .cw-relation, .cw-fold summary { transition: border-color 200ms, color 200ms, background 200ms; }
+@media (prefers-reduced-motion: reduce) {
+  .cw-block { animation: none; }
+}

@@ -6,7 +6,9 @@ import { findBoard, sectionLabel } from '../../shared/card-studio/boards';
 import { pageLabel } from '../../shared/diagnostics';
 import { setDiagnosticPage } from '../diagnostics';
 import { ErrorBoundary, SmokeFault, smokeFaults } from '../ErrorBoundary';
+import { ReleasePill } from '../Notices';
 import type { CardProjectView } from '../../shared/card-studio/types';
+import { ChangeDialog } from './ChangeDialog';
 import { Library } from './Library';
 import { ProjectHome } from './ProjectHome';
 import { SectionPage } from './SectionPage';
@@ -28,6 +30,8 @@ interface StudioNavigation {
   composerText(taskId: string): string;
   setComposerText(taskId: string, text: string): void;
   preview(color: string | null): void;
+  /** 提改动 and /改动: the dialog that starts a 改动单, with any text already typed. */
+  openChange(projectId: string, text?: string): void;
 }
 
 const StudioContext = createContext<StudioNavigation | null>(null);
@@ -48,6 +52,7 @@ export function CardStudio({ onExit, target }: { onExit: (origin: HTMLElement | 
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [previewColor, setPreviewColor] = useState<string | null>(null);
+  const [changing, setChanging] = useState<{ projectId: string; text: string } | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const cards = data.cardStudio?.cards ?? [];
   useEffect(() => (root.current ? installClickSounds(root.current) : undefined), []);
@@ -88,6 +93,7 @@ export function CardStudio({ onExit, target }: { onExit: (origin: HTMLElement | 
     clearDraft: (projectId, sectionId) => setDrafts(current => { const next = { ...current }; delete next[key(projectId, sectionId)]; return next; }),
     setComposerText: (taskId, text) => setTexts(current => ({ ...current, [taskId]: text })),
     preview: color => setPreviewColor(color),
+    openChange: (projectId, text) => setChanging({ projectId, text: text ?? '' }),
   }), [view, draft, composerText, api]);
 
   const card: CardProjectView | undefined = view.page === 'library' ? undefined : cards.find(item => item.projectId === view.projectId);
@@ -108,6 +114,7 @@ export function CardStudio({ onExit, target }: { onExit: (origin: HTMLElement | 
           {card && <><i aria-hidden="true">／</i>{view.page === 'project' ? <b aria-current="page">{card.name}</b> : <button type="button" onClick={() => navigation.openProject(card.projectId)}>{card.name}</button>}</>}
           {card && view.page === 'section' && <><i aria-hidden="true">／</i><b aria-current="page">{sectionLabel(view.sectionId)}</b></>}
         </nav>
+        <ReleasePill />
         <button type="button" className="cs-exit" onClick={event => onExit(event.currentTarget)}><ArrowLeft size={14} />{t('Back to workspace', '返回工作台')}</button>
         <span className="cs-window">
           <button type="button" aria-label={t('Minimize', '最小化')} onClick={() => void run(() => api.window('minimize'))}><Minus size={15} /></button>
@@ -124,6 +131,10 @@ export function CardStudio({ onExit, target }: { onExit: (origin: HTMLElement | 
           {smoke && <SmokeFault where="studio" />}
         </ErrorBoundary>
       </div>
+      {changing && (() => {
+        const target = cards.find(item => item.projectId === changing.projectId);
+        return target ? <ChangeDialog key={`${changing.projectId}:${changing.text}`} card={target} initialText={changing.text} onClose={() => setChanging(null)} /> : null;
+      })()}
     </div>
   </StudioContext.Provider>;
 }

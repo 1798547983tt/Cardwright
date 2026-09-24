@@ -1,6 +1,11 @@
 /* Card studio 0.8「卷宗 · 纵深」: tokens, shell, covers, library, project home, entry block and the transition.
    The studio is always dark and scoped to .card-studio, .studio-modal, .studio-transition and .studio-entry, so the 0.7.1 workbench is untouched. */
 
+/* The studio's own serif (Q12c), bundled so the dossier reads the same on every machine: Noto Serif SC (SIL OFL 1.1),
+   subset with its wght axis, see assets/fonts/README-CardwrightSerifSC.md. Studio-only and 2.5 MB, so it is not preloaded;
+   characters outside the subset fall through, one by one, to the rest of --cs-serif. */
+@font-face { font-family: 'Cardwright Serif'; src: url('../assets/fonts/CardwrightSerifSC.woff2') format('woff2'); font-weight: 200 900; font-style: normal; font-display: swap; }
+
 @property --board { syntax: '<color>'; inherits: true; initial-value: #b0915c; }
 
 .card-studio, .studio-modal, .studio-transition, .studio-entry {
@@ -10,7 +15,7 @@
   --cs-hair: rgba(233, 226, 211, .1); --cs-hair-2: rgba(233, 226, 211, .16);
   --cs-text: #ebe5d8; --cs-text-2: #bdb6a8; --cs-muted: #8a8478; --cs-dim: #5d5a53;
   --cs-plan: #d2ad62; --cs-err: #d4545f; --cs-warn: #e3a13c;
-  --cs-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'STZhongsong', 'STSong', 'SimSun', serif;
+  --cs-serif: 'Cardwright Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'STZhongsong', 'STSong', 'SimSun', serif;
   --cs-sans: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
   --cs-mono: 'Cascadia Mono', 'Cascadia Code', Consolas, monospace;
   --cs-latin: 'Sitka Banner', Georgia, serif;
@@ -73,6 +78,15 @@ html[data-studio-tint] :is(.card-studio, .studio-modal, .studio-transition, .stu
 .cs-crumbs b { min-width: 0; font-weight: 500; color: var(--cs-text); overflow: hidden; text-overflow: ellipsis; }
 .cs-exit { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 12.5px; color: var(--cs-text-2); border: 1px solid var(--cs-hair-2) !important; white-space: nowrap; }
 .cs-exit:hover { color: var(--cs-text); border-color: var(--cs-gold-line) !important; }
+/* 新版本提醒 (1.1): the top bar's pill (workbench.css) in the dossier's ink, squared like 返回工作台 beside it. */
+.cs-top .release-pill { margin-left: auto; height: 34px; font-size: 12.5px; background: none; border-color: var(--cs-hair); border-radius: 0; }
+.cs-top .release-pill + .cs-exit { margin-left: 0; }
+.cs-top .release-pill button { border-radius: 0; }
+.cs-top .release-pill .release-pill-open { padding: 0 6px 0 12px; color: var(--cs-text-2); }
+.cs-top .release-pill .release-pill-open:hover { color: var(--cs-text); }
+.cs-top .release-pill-open i { border-radius: 0; transform: rotate(45deg); background: var(--cs-gold-2); }
+.cs-top .release-pill .release-pill-close { width: 28px; color: var(--cs-muted); }
+.cs-top .release-pill .release-pill-close:hover { color: var(--cs-text); }
 .cs-window { flex: none; display: flex; align-self: stretch; margin-left: 6px; }
 .cs-window button { display: grid; place-items: center; width: 46px; height: 100%; color: var(--cs-muted); }
 .cs-window button:hover { color: var(--cs-text); background: rgba(255, 255, 255, .06); }
@@ -518,3 +532,29 @@ button.cs-run-current:hover { color: var(--cs-gold-2); }
 .studio-entry-run.is-paused { border-color: rgba(227, 161, 60, .45); color: var(--cs-warn) !important; }
 .studio-entry-run.is-paused i { background: var(--cs-warn); animation: none; }
 @media (max-width: 860px) { .cs-stage > .cs-run-bar { margin-left: 16px; margin-right: 16px; } }
+
+/* ---------- 改动单 (1.1): 提改动 beside 下一步, the open changes, the dialog ---------- */
+.cs-next-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.cs-change-open { display: inline-flex; align-items: center; gap: 12px; padding: 12px 18px !important; text-align: left; color: var(--cs-text-2) !important;
+  border: 1px solid var(--cs-hair-2) !important; background: var(--cs-panel) !important; transition: border-color .3s, color .3s; }
+.cs-change-open:hover { color: var(--cs-text) !important; border-color: var(--cs-gold-line) !important; }
+.cs-change-open svg { flex: none; color: var(--cs-gold-2); }
+.cs-change-open span { display: grid; gap: 1px; }
+.cs-change-open b { font-size: 14.5px; font-weight: 600; letter-spacing: .08em; white-space: nowrap; }
+.cs-change-open small { font-size: 11.5px; color: var(--cs-muted); }
+.cs-changes { display: grid; gap: 1px; margin-top: 10px; }
+.cs-changes button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; width: 100%; padding: 7px 12px !important; text-align: left; font-size: 13px;
+  color: var(--cs-text-2) !important; background: var(--cs-panel) !important; border-left: 2px solid var(--cs-gold-line) !important; }
+.cs-changes button:hover { color: var(--cs-text) !important; }
+.cs-changes svg { color: var(--cs-gold-2); }
+.cs-changes b { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-changes em { font-style: normal; font-size: 12px; color: var(--cs-muted); white-space: nowrap; }
+.cs-changes em.is-running { color: var(--cs-gold-2); }
+.cs-changes em.is-paused { color: var(--cs-warn); }
+.cs-change-dialog { width: min(640px, calc(100vw - 48px)); }
+.cs-change-dialog > .cs-note { margin-top: 8px; }
+.cs-change-form { display: grid; gap: 16px; margin-top: 16px; }
+.cs-change-form .cs-kickoff-options { margin: 0; }
+.cs-change-text { width: 100%; min-height: 96px; padding: 10px 12px; resize: vertical; font: 14px/1.6 var(--cs-sans); color: var(--cs-text); background: #0a0d11; border: 1px solid var(--cs-hair-2); border-radius: 0; outline: 0; }
+.cs-change-text:focus { border-color: var(--cs-gold-line); }
+@media (max-width: 760px) { .cs-next-row { grid-template-columns: minmax(0, 1fr); } }

@@ -122,7 +122,6 @@
 .cs-kickoff::before, .cs-kickoff::after { content: ''; flex: 1; height: 1px; background: var(--cs-hair); }
 .cs-kickoff time { order: 3; font: 11px var(--cs-mono); }
 .cs-kickoff::after { order: 2; }
-.cs-working-label { animation: cs-fade 1.2s ease-in-out infinite alternate; }
 .cs-notice { font-size: 12.5px; color: var(--cs-muted); }
 
 .cs-md { display: grid; gap: 10px; font-size: 14.5px; line-height: 1.8; color: var(--cs-text); overflow-wrap: anywhere; }
@@ -144,14 +143,13 @@
 .cs-md hr { width: 100%; height: 1px; border: 0; background: var(--cs-hair); }
 
 .cs-process { font-size: 12.5px; color: var(--cs-muted); }
-.cs-process > summary, .cs-write > summary, .cs-thinking > summary { cursor: pointer; list-style: none; }
-.cs-process > summary::-webkit-details-marker, .cs-write > summary::-webkit-details-marker, .cs-thinking > summary::-webkit-details-marker { display: none; }
+.cs-process > summary, .cs-write > summary { cursor: pointer; list-style: none; }
+.cs-process > summary::-webkit-details-marker, .cs-write > summary::-webkit-details-marker { display: none; }
 .cs-process > summary { display: inline-flex; align-items: center; gap: 6px; }
 .cs-process > summary small { color: var(--cs-dim); }
 .cs-process > summary svg:first-child, .cs-write > summary svg:first-child { transition: transform .2s; }
 .cs-process[open] > summary svg:first-child, .cs-write[open] > summary svg:first-child { transform: rotate(90deg); }
 .cs-process-body { display: grid; gap: 6px; margin-top: 8px; padding-left: 12px; border-left: 1px solid var(--cs-hair); }
-.cs-thinking > div { margin-top: 4px; padding: 8px 10px; font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; color: var(--cs-muted); background: rgba(255, 255, 255, .02); }
 
 .cs-writes { display: grid; border-top: 1px solid var(--cs-hair); border-bottom: 1px solid var(--cs-hair); }
 .cs-writes > header { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; color: var(--cs-muted); letter-spacing: .08em; }
@@ -181,6 +179,8 @@
 .cs-dispatch-body { max-height: 5.4em; overflow: hidden; font-size: 13px; line-height: 1.8; color: var(--cs-text-2); white-space: pre-wrap;
   -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
 .cs-dispatch > footer { display: flex; gap: 8px; margin-top: 4px; }
+/* A change AI's 影响清单 item: the 改动单 above the thread prunes and starts it, so the card only says where it went. */
+.cs-dispatch-listed { align-self: center; font-size: 12px; }
 .cs-dispatch.is-broken { border-left-color: var(--cs-err); }
 .cs-dispatch.is-broken > header em { color: #f0b8bc; }
 :is(.cs-dispatch, .cs-handoff).is-broken pre { max-height: 160px; overflow: auto; font: 12px/1.6 var(--cs-mono); color: var(--cs-muted); white-space: pre-wrap; }
@@ -206,8 +206,6 @@
 .cs-approval p { font-size: 13px; color: var(--cs-text-2); }
 .cs-approval pre { max-height: 220px; overflow: auto; padding: 8px 10px; font: 12px/1.6 var(--cs-mono); color: var(--cs-muted); background: #07090c; white-space: pre-wrap; }
 .cs-approval .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
-.cs-error { padding: 10px 12px; font-size: 13px; color: #f0b8bc; background: rgba(212, 84, 95, .08); border-left: 2px solid var(--cs-err); }
-.cs-error strong { display: block; margin-bottom: 2px; color: #f6d0d3; }
 .cs-working { display: inline-flex; align-items: center; gap: 8px; justify-self: start; font-size: 12.5px; color: var(--cs-muted); }
 .cs-thread .tool-entry { font-size: 12.5px; }
 .cs-thread .inline-interaction { border-radius: 0; background: var(--cs-panel); border: 1px solid var(--cs-gold-line); }
@@ -357,7 +355,7 @@
 .cs-meta-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
 @media (max-width: 900px) { .cs-meta form { grid-template-columns: minmax(0, 1fr); } }
 
-/* ---------- local preview of 正文美化 and 变量更新 ---------- */
+/* ---------- local preview of 正文美化, 变量更新, 状态栏 and 开局创角页 ---------- */
 .cs-preview { border: 1px solid var(--cs-hair-2); background: rgba(255, 255, 255, .015); }
 .cs-preview summary { display: flex; align-items: baseline; gap: 12px; padding: 10px 14px; cursor: pointer; font: 600 13px var(--cs-serif); letter-spacing: .16em; color: var(--cs-text-2); list-style: none; }
 .cs-preview summary::-webkit-details-marker { display: none; }
@@ -391,6 +389,31 @@
 .cs-preview-warn { display: flex; align-items: flex-start; gap: 6px; font-size: 12.5px; line-height: 1.6; color: var(--cs-warn); }
 .cs-preview-warn svg { flex: none; margin-top: 3px; }
 .cs-preview-foot { font-size: 12px; line-height: 1.7; }
+.cs-preview-widths { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--cs-hair-2); }
+.cs-preview-widths .cs-link { padding: 2px 8px; }
+.cs-preview-widths .cs-link.is-on { color: var(--cs-gold-2); background: rgba(194, 163, 107, .08); }
+.cs-preview-form { font: 12px var(--cs-mono); letter-spacing: .04em; color: var(--cs-dim); }
+.cs-preview-frames { display: grid; gap: 12px; }
+/* The desktop preset keeps the full width above; the phone and tablet ones never push the studio into a horizontal
+   scroll: narrower than the preset, the frame takes the window's width (less its border, as above). */
+.cs-preview-frames.is-phone .cs-preview-frame iframe, .cs-preview-frames.is-tablet .cs-preview-frame iframe { max-width: calc(100% - 2px); }
+.cs-preview-frames.is-phone .cs-preview-frame iframe { width: 375px; }
+.cs-preview-frames.is-tablet .cs-preview-frame iframe { width: 768px; }
+.cs-preview-vars { border: 1px solid var(--cs-hair-2); }
+.cs-preview-vars summary { display: flex; align-items: baseline; gap: 10px; padding: 8px 12px; cursor: pointer; font: 600 12.5px var(--cs-serif); letter-spacing: .12em; color: var(--cs-text-2); list-style: none; }
+/* The panel's own marker rules reach this nested summary too: it follows its own details, not the panel's. */
+.cs-preview .cs-preview-vars summary::before { content: '＋'; }
+.cs-preview .cs-preview-vars[open] summary::before { content: '－'; }
+.cs-preview-vars summary small { font: 12px var(--cs-sans); letter-spacing: 0; color: var(--cs-dim); }
+.cs-preview-vars textarea { display: block; width: 100%; box-sizing: border-box; margin: 0 0 8px; padding: 8px 10px; font: 12.5px/1.5 var(--cs-mono); color: var(--cs-text); background: rgba(0, 0, 0, .25); border: 0; border-top: 1px solid var(--cs-hair-2); resize: vertical; }
+.cs-preview-vars .cs-btn { margin: 0 12px 12px; }
+.cs-preview-writes { display: grid; gap: 4px; padding: 8px 10px; border-left: 2px solid var(--cs-gold-2); background: rgba(194, 163, 107, .05); }
+.cs-preview-writes h5 { display: flex; align-items: baseline; gap: 10px; margin: 0; font: 600 12.5px var(--cs-serif); letter-spacing: .12em; color: var(--cs-gold-2); }
+.cs-preview-writes h5 small { font: 12px var(--cs-sans); letter-spacing: 0; color: var(--cs-dim); }
+.cs-preview-writes ol { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.cs-preview-writes li { display: grid; grid-template-columns: 6em minmax(0, 1fr); gap: 8px; font-size: 12.5px; }
+.cs-preview-writes li b { color: var(--cs-text-2); }
+.cs-preview-writes li span { color: var(--cs-dim); overflow-wrap: anywhere; white-space: pre-wrap; }
 
 /* ---------- component list in the brief ---------- */
 .cs-components { display: grid; gap: 1px; justify-self: stretch; }
@@ -431,3 +454,51 @@
 .cs-squad { display: grid; gap: 4px; padding: 0; list-style: none; font-size: 12.5px; }
 .cs-squad li { display: flex; justify-content: space-between; gap: 8px; color: var(--cs-text-2); }
 .cs-squad em { font-style: normal; color: var(--cs-muted); }
+
+/* 变量表 in the brief (ADR 0020): a dense read-only table in the dossier's ink and hairlines. */
+.cs-vartable .cs-badge { margin-left: 6px; font: 500 11px/1 var(--cs-sans); letter-spacing: .08em; color: var(--cs-gold-2); }
+.cs-vartable-scroll { max-height: 280px; overflow: auto; border: 1px solid var(--cs-hair); }
+.cs-vartable table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cs-vartable th, .cs-vartable td { padding: 4px 6px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--cs-hair); color: var(--cs-text-2); }
+.cs-vartable th { position: sticky; top: 0; background: var(--cs-panel); font-weight: 500; color: var(--cs-muted); }
+.cs-vartable code { font: 11.5px/1.4 var(--cs-mono); color: var(--cs-text); overflow-wrap: anywhere; }
+.cs-vartable .cs-note.is-warning { color: var(--cs-warn); }
+.cs-vartable .cs-note.is-error { color: var(--cs-err); }
+
+/* 改动单 (1.1): the change AI's conversation shows its 影响清单 and where the change stands above the thread. */
+.cs-change { flex: none; display: grid; gap: 10px; min-width: 0; max-height: 46vh; margin: 12px 40px 0; padding: 14px 16px; overflow: auto;
+  border: 1px solid var(--cs-gold-line); background: linear-gradient(90deg, rgba(194, 163, 107, .07), transparent 70%), var(--cs-panel); }
+.cs-change.is-paused { border-color: rgba(227, 161, 60, .55); }
+.cs-change.is-done, .cs-change.is-dropped { border-color: var(--cs-hair-2); background: var(--cs-panel); }
+.cs-change > header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; }
+.cs-change > header b { font: 600 15px var(--cs-serif); letter-spacing: .1em; }
+.cs-change-icon { color: var(--cs-gold-2); }
+.cs-change-state { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--cs-gold-2); }
+.cs-change.is-paused .cs-change-state { color: var(--cs-warn); }
+.cs-change.is-done .cs-change-state, .cs-change.is-dropped .cs-change-state { color: var(--cs-muted); }
+.cs-change-flag { padding: 1px 8px; font-size: 11.5px; color: var(--cs-warn); border: 1px solid rgba(227, 161, 60, .4); }
+.cs-change-ask { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; color: var(--cs-text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cs-change .cs-note { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.cs-change-note { font-size: 12.5px; color: var(--cs-text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cs-change.is-paused .cs-change-note { color: var(--cs-warn); }
+.cs-change-items { display: grid; gap: 1px; background: var(--cs-hair); border: 1px solid var(--cs-hair); }
+.cs-change-items li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 8px 6px 10px; background: #0f1318; }
+.cs-change-items .no { font: 11.5px var(--cs-mono); color: var(--cs-dim); }
+.cs-change-items .row { display: grid; gap: 2px; min-width: 0; text-align: left; }
+.cs-change-items .head { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; }
+.cs-change-items .head em { flex: none; font-style: normal; font-size: 12px; color: var(--cs-muted); }
+.cs-change-items .head svg { flex: none; color: var(--cs-dim); }
+.cs-change-items .head b { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-change-items small { font-size: 12px; color: var(--cs-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-change-items li.is-stray .head em { color: var(--cs-err); }
+.cs-change-items .st { font-style: normal; font-size: 12px; color: var(--cs-muted); white-space: nowrap; }
+.cs-change-items li.is-done .st { color: var(--cs-gold-2); }
+.cs-change-items li.is-active .st { color: var(--cs-text-2); }
+.cs-change-items.is-dispatches .row:hover:not(:disabled) b { color: var(--cs-text); }
+.cs-change-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.cs-change-actions .cs-note { flex: 1 1 220px; min-width: 0; }
+.cs-change .cs-link.is-quiet { font-size: 12.5px; color: var(--cs-muted) !important; }
+.cs-change .cs-link.is-quiet:hover:not(:disabled) { color: var(--cs-err) !important; }
+.cs-change-files { display: grid; gap: 4px; }
+.cs-change-files .cs-link { font: 12px var(--cs-mono); }
+@media (max-width: 860px) { .cs-change { margin-left: 16px; margin-right: 16px; } }

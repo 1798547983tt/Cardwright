@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import type { Task } from '../shared/types';
 import { useApp } from './context';
@@ -52,5 +52,44 @@ export function UpgradeNotice() {
     <p>{t('Maximum output for these models changed from 8,192 to 128K (or their context window), so reasoning no longer uses up the reply:', '以下模型的最大输出已从 8,192 调到 128K（不超过其上下文窗口），避免思考占满整轮回复：')} <b>{notice.models.join('、')}</b></p>
     <button type="button" className="text-button" onClick={() => settings('code')}>{t('Review models', '查看模型设置')}</button>
     <IconButton label={t('Dismiss', '关闭')} onClick={() => void run(() => api.dismissNotice())}><X size={16} /></IconButton>
+  </div>;
+}
+
+/** The version whose pill was closed, kept in localStorage; a later version brings the pill back. */
+const RELEASE_CLOSED = 'cardwright.release-pill.closed';
+let closedThisRun: string | null = null;
+function closedRelease(): string | null {
+  if (closedThisRun) return closedThisRun;
+  try { return localStorage.getItem(RELEASE_CLOSED); } catch { return null; }
+}
+const HOUR = 60 * 60 * 1000;
+
+/**
+ * 新版本提醒 in the top bar of the workbench and of the card studio (1.1). The desktop notification waits for the
+ * notification switch, which starts off, so the newer release the daily check found is also this quiet pill: it opens
+ * the release page, and × hides it until a later version comes.
+ */
+export function ReleasePill() {
+  const { data, api, run, t } = useApp();
+  const enabled = data.preferences.releaseCheck !== false;
+  const [release, setRelease] = useState<{ latest: string; url: string } | null>(null);
+  const [closed, setClosed] = useState(closedRelease);
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    const read = () => void api.readReleaseCheck().then(view => { if (live) setRelease(view.newer && view.latest && view.url ? { latest: view.latest, url: view.url } : null); }, () => undefined);
+    read();
+    const timer = setInterval(read, HOUR);
+    return () => { live = false; clearInterval(timer); };
+  }, [api, enabled]);
+  if (!enabled || !release || release.latest === closed) return null;
+  const { latest, url } = release;
+  function close() {
+    closedThisRun = latest; setClosed(latest);
+    try { localStorage.setItem(RELEASE_CLOSED, latest); } catch { /* without storage it stays closed until the app restarts */ }
+  }
+  return <div className="release-pill" role="status">
+    <button type="button" className="release-pill-open" title={url} onClick={() => void run(() => api.openExternal(url))}><i aria-hidden="true" />{t(`New version ${latest} · Open the release page`, `有新版本 ${latest} · 打开发布页`)}</button>
+    <button type="button" className="release-pill-close" aria-label={t(`Hide the reminder for ${latest}`, `不再提醒 ${latest}`)} title={t('Hide until a later version', '有更新的版本前不再显示')} onClick={close}><X size={12} /></button>
   </div>;
 }

@@ -60,7 +60,7 @@ test('lists a section conversations newest first and finds the running conversat
 });
 
 const dispatch = (id: string, sectionId: string, status: CardDispatch['status']): CardDispatch => ({ id, target: '', sectionId, title: id, requires: '', body: '', status, createdAt: '', updatedAt: '' });
-const view = (dispatches: CardDispatch[]): CardProjectView => ({ projectId: 'p1', path: 'E:\\Cards\\西游', cardId: 'c', name: '西游', kind: 'fan', source: '西游记', coverStyle: 'vermilion', stylePreset: null, origin: 'new', createdAt: '', updatedAt: '', lastEditedAt: '', dispatches, design: { exists: true, people: null }, sources: 2 });
+const view = (dispatches: CardDispatch[]): CardProjectView => ({ projectId: 'p1', path: 'E:\\Cards\\西游', cardId: 'c', name: '西游', kind: 'fan', source: '西游记', coverStyle: 'vermilion', stylePreset: null, origin: 'new', createdAt: '', updatedAt: '', lastEditedAt: '', dispatches, design: { exists: true, people: null }, changes: [], sources: 2, unclassified: 0 });
 
 test('builds progress input and picks the dispatch that 标记完成 applies to', () => {
   const card = view([dispatch('d1', 'lore-people', 'done'), dispatch('d2', 'lore-people', 'active'), dispatch('d3', 'lore-people', 'active'), dispatch('d4', 'lore-plot', 'todo')]);

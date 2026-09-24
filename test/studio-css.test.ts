@@ -57,3 +57,19 @@ test('font-stretch never shares a block with a literal font shorthand', () => {
     }
   }
 });
+
+// Q12c: the studio bundles its serif, a subset of Noto Serif SC under the OFL, so the dossier looks the same on every
+// machine. It is studio-only and large, so index.html must not preload it.
+test('the studio bundles its serif with its licence and puts it first in --cs-serif', () => {
+  const fonts = join(renderer, 'assets', 'fonts');
+  const woff2 = readFileSync(join(fonts, 'CardwrightSerifSC.woff2'));
+  assert.equal(woff2.subarray(0, 4).toString('latin1'), 'wOF2');
+  assert.ok(woff2.length <= 4 * 1024 * 1024, `CardwrightSerifSC.woff2 is ${woff2.length} bytes, over the 4 MB budget`);
+  assert.ok(readFileSync(join(fonts, 'OFL-NotoSerifSC.txt'), 'utf8').includes('SIL OPEN FONT LICENSE Version 1.1'));
+  const css = readFileSync(join(renderer, 'card-studio', 'card-studio.css'), 'utf8');
+  const face = [...css.matchAll(/@font-face[ ]*[{]([^}]*)[}]/g)].map(match => match[1]).find(body => body.includes("font-family: 'Cardwright Serif'"));
+  assert.ok(face, "card-studio.css declares @font-face for 'Cardwright Serif'");
+  for (const part of ["url('../assets/fonts/CardwrightSerifSC.woff2') format('woff2')", 'font-weight: 200 900', 'font-display: swap']) assert.ok(face.includes(part), `the @font-face lacks ${part}`);
+  assert.ok(/--cs-serif:([^;]*);/.exec(css)?.[1].trim().startsWith("'Cardwright Serif',"), "--cs-serif starts with 'Cardwright Serif'");
+  assert.ok(!readFileSync(join(renderer, '..', '..', 'index.html'), 'utf8').includes('CardwrightSerifSC'), 'index.html preloads the studio serif');
+});

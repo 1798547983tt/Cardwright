@@ -136,10 +136,23 @@ export function paramsToBookEntry(params: LoreParams, content: string): Record<s
   return entry;
 }
 
-/** Which section a world book entry belongs to, from the order table in the handoff (§6). */
+/**
+ * Names that place an entry whatever its order (1.1 Q22): imported cards number freely, so an `[initvar]` at 100 went to
+ * 人设 and a 人物总览 at 180 to 未分类. The variable names match the way the variable sync finds its entries (at the end,
+ * so a 「变量规则说明」 is not claimed); 人物总览 belongs to 人设, whose section keeps it, the other overviews to 总览.
+ */
+const NAME_MARKERS: ReadonlyArray<{ test: RegExp; section: string }> = [
+  { test: /\[initvar\]|\[mvu_update\]|初始变量|变量(?:更新)?规则$|变量输出格式$|变量列表$/i, section: 'lore-vars' },
+  { test: /人物总览|角色总览|人物一览/, section: 'lore-people' },
+  { test: /地点总览|地图总览|势力总览|世界总览/, section: 'lore-overview' },
+];
+
+/** Which section a world book entry belongs to: a marker in its name first, else the order table in the handoff (§6). */
 export function sectionOfParams(params: { order?: unknown; position?: unknown; comment?: string; [field: string]: unknown }): string {
   const order = Number(params.order); const position = Number(params.position);
-  const comment = params.comment ?? '';
+  const comment = String(params.comment ?? '').trim();
+  const marked = NAME_MARKERS.find(marker => marker.test.test(comment));
+  if (marked) return marked.section;
   if (!Number.isFinite(order)) return 'lore-other';
   if (order === 0 && position === 4) return 'lore-format';
   if (order >= 1 && order <= 9) return 'lore-rules';
@@ -155,7 +168,7 @@ export function sectionOfParams(params: { order?: unknown; position?: unknown; c
 const ILLEGAL = /[\\/:*?"<>|\u0000-\u001f]/g;
 
 /** `100-爱蜜莉雅`: the order first so a folder listing reads in prompt order, the comment after it. */
-export function loreFileName(params: { uid: number; order?: unknown; comment?: string; [field: string]: unknown }, taken: ReadonlySet<string>): string {
+export function loreFileName(params: { uid: number; order?: unknown; comment?: string; [field: string]: unknown }, taken: Pick<ReadonlySet<string>, 'has'>): string {
   const cleaned = [...(params.comment ?? '').replace(ILLEGAL, '_').trim()].slice(0, 40).join('').replace(/[. ]+$/, '');
   const base = `${Number.isFinite(Number(params.order)) ? params.order : 0}-${cleaned || '未命名'}`;
   return taken.has(base) ? `${base}~${params.uid}` : base;

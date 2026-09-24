@@ -1,0 +1,83 @@
+/* Cardwright skin: neon (霓虹夜) */
+:root {
+  --bg: #0a0b12;
+  --panel: #11131f;
+  --panel-2: #171a2a;
+  --line: rgba(130, 150, 255, .18);
+  --line-strong: rgba(130, 150, 255, .34);
+  --text: #e7eaf6;
+  --text-2: #9ba3c6;
+  --text-3: #69719a;
+  --accent: #2fe0f0;
+  --accent-2: #a970ff;
+  --ok: #39d98a; --warn: #ffb547; --danger: #ff5577;
+  --glow: 0 0 10px rgba(47, 224, 240, .35);
+  --radius: 6px;
+  --sans: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --mono: "Cascadia Mono", Consolas, "Noto Sans Mono", monospace;
+  --latin: "Bahnschrift", "DIN Alternate", Arial Narrow, sans-serif;
+}
+
+/* --- 面板 --- */
+.cw-block { border: 1px solid var(--line); border-radius: var(--radius); }
+.cw-block-title { font-family: var(--sans); font-weight: 700; letter-spacing: 0.04em; }
+.cw-chapter { font-family: var(--sans); font-weight: 700; }
+.cw-head { font-family: var(--mono); }
+
+/* --- 分页签 --- */
+.cw-tab { font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em; }
+.cw-tab.is-on { color: var(--accent); border-bottom-color: currentColor; box-shadow: var(--glow); }
+.cw-tab:hover { color: var(--text); border-color: var(--line-strong); }
+
+/* --- 标签 --- */
+.cw-tag { border-radius: var(--radius); border-color: var(--line-strong); font-family: var(--mono); font-size: 11px; }
+.cw-tag::before { content: '[ '; }
+.cw-tag::after { content: ' ]'; }
+
+/* --- 进度条 --- */
+.cw-bar-track { border-radius: var(--radius); height: 5px; }
+.cw-bar-fill { border-radius: var(--radius); background: var(--accent-2); }
+
+/* --- 对白 --- */
+.cw-say { border-left: 2px solid var(--line); }
+.cw-say.is-player { border-left-color: var(--line-strong); }
+.cw-speaker { font-family: var(--mono); font-size: 12px; }
+
+/* --- 按钮 --- */
+.cw-btn { border-radius: var(--radius); font-family: var(--sans); transition: border-color 150ms, box-shadow 150ms, background 150ms; }
+.cw-btn:hover { border-color: var(--accent-2); box-shadow: var(--glow); }
+.cw-btn.is-primary { background: var(--accent); color: var(--bg); border-color: transparent; }
+.cw-btn.is-primary:hover { box-shadow: var(--glow); }
+
+/* --- 悬浮球与面板 --- */
+.cw-ball { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--panel); color: var(--accent); cursor: pointer; box-shadow: var(--glow); font-family: var(--mono); font-size: 14px; }
+.cw-ball::after { content: 'CW'; font-size: 11px; letter-spacing: 0.06em; }
+.cw-ball:hover { border-color: var(--accent-2); }
+.cw-panel { position: absolute; bottom: 64px; left: 0; width: min(360px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); font: 15px/1.7 var(--sans); overflow: hidden; }
+.cw-panel-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.cw-panel-close { border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-2); font: inherit; cursor: pointer; padding: 2px 8px; }
+.cw-panel-close:hover { color: var(--text); border-color: var(--line-strong); }
+
+/* --- 装饰：角标（四角 L 形折线） --- */
+.cw-status { position: relative; }
+.cw-status::before,
+.cw-status::after { content: ''; position: absolute; width: 8px; height: 8px; pointer-events: none; }
+.cw-status::before { top: 0; left: 0; border-top: 1px solid var(--accent-2); border-left: 1px solid var(--accent-2); }
+.cw-status::after { top: 0; right: 0; border-top: 1px solid var(--accent-2); border-right: 1px solid var(--accent-2); }
+
+/* --- 装饰：扫描线纹理 --- */
+.cw-page { position: relative; }
+.cw-page::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(transparent 0 3px, var(--line) 3px 4px); opacity: 0.15; }
+
+/* --- 装饰：状态灯呼吸 --- */
+.cw-tier.is-current { animation: cw-neo-breathe 2s ease-in-out infinite; }
+@keyframes cw-neo-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+/* --- 动效 --- */
+.cw-block { animation: cw-neo-in 160ms steps(3) both; }
+@keyframes cw-neo-in { from { opacity: 0; } }
+.cw-tab, .cw-btn, .cw-relation, .cw-fold summary { transition: border-color 150ms, box-shadow 150ms, color 150ms, background 150ms; }
+@media (prefers-reduced-motion: reduce) {
+  .cw-block { animation: none; }
+  .cw-tier.is-current { animation: none; }
+}

@@ -55,16 +55,7 @@ html[data-motion="reduced"] .theme-entrance { display: none; }
 .pet-notice summary { cursor: pointer; }
 .pet-notice pre { margin: 8px 0 0; padding: 10px 12px; max-height: 260px; overflow: auto; white-space: pre-wrap; font: 12px/1.6 var(--font-ui); color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
 
-/* ---------- 借鉴优化 (1.0.0): code blocks you can copy, and a way back to the latest message ---------- */
-.code-block { position: relative; }
-.code-block > pre { margin: 0; }
-/* The block's spacing moves from the pre to its wrapper, so the copy button sits on the code. */
-.message-body .code-block { margin: 14px 0; }
-.code-copy { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px;
-  color: var(--muted); background: var(--floating); border: 1px solid var(--line); opacity: 0; transition: opacity var(--motion-fast), color var(--motion-fast); }
-.code-block:hover .code-copy, .code-copy:focus-visible { opacity: 1; }
-.code-copy:hover { color: var(--text); }
-.code-block.is-studio .code-copy { border-radius: 0; background: var(--cs-panel-2, var(--floating)); border-color: var(--cs-hair-2, var(--line)); color: var(--cs-muted, var(--muted)); }
+/* ---------- 借鉴优化 (1.0.0): a way back to the latest message (code blocks moved to conversation/conversation.css in 1.1) ---------- */
 .jump-latest { position: sticky; bottom: 14px; z-index: 5; display: flex; justify-content: center; height: 0; overflow: visible; pointer-events: none; }
 .jump-latest button { pointer-events: auto; transform: translateY(-100%); display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 12.5px;
   color: var(--text); background: var(--floating); border: 1px solid var(--line-strong); border-radius: 999px; box-shadow: var(--shadow-popover); transition: border-color var(--motion-fast); }

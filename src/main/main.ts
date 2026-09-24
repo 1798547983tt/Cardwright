@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, safeStorage, shell, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, Notification, safeStorage, shell, Tray } from 'electron';
 import { join, resolve, sep } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir, release as osRelease, version as osVersion } from 'node:os';
@@ -9,6 +9,7 @@ import { readCoverSource } from './card-cover.ts';
 import { externalUrl } from '../core/external-url.ts';
 import { setEcosystemApplicationRoot } from '../runtime/ecosystem-skills.ts';
 import type { AppSnapshot, Approval, Bridge, Task } from '../shared/types.ts';
+import type { CardPreviewKind } from '../shared/card-studio/types.ts';
 import { applyAppUpdate, createAppUpdate } from '../shared/app-updates.ts';
 import { shouldNotify, type NotifyKind } from '../shared/notify.ts';
 import { StudioServices } from './studio-services.ts';
@@ -20,6 +21,7 @@ import { appendRendererLog, LOG_FOLDER } from './renderer-log.ts';
 import { AppearanceService } from './appearance.ts';
 import { PetWindow } from './pet-window.ts';
 import { diagnosticText, windowsLabel } from '../shared/diagnostics.ts';
+import { ReleaseCheck } from './release-check.ts';
 
 const directory = __dirname;
 /** The packaged smoke's switch for one deliberate render error per page (0.9.1). Nothing inside the app turns it on. */
@@ -36,15 +38,17 @@ let closeReady = false;
 const frontendUrl = process.env.CARDWRIGHT_DEV_URL;
 
 function showWindow(): void { if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } }
-function notify(title: string, body: string, task?: Task, kind: NotifyKind = 'other'): void {
+/** True when the notification was shown; a click brings the window back unless the caller gives it something else to do. */
+function notify(title: string, body: string, task?: Task, kind: NotifyKind = 'other', click: () => void = showWindow): boolean {
   void harness?.hooks('Notification', task, { message: `${title}: ${body}` });
   const preferences = harness?.snapshot().preferences;
-  if (!preferences || !Notification.isSupported()) return;
-  if (!shouldNotify({ kind, focused: !!window?.isFocused(), preferences })) return;
+  if (!preferences || !Notification.isSupported()) return false;
+  if (!shouldNotify({ kind, focused: !!window?.isFocused(), preferences })) return false;
   const notification = new Notification({ title, body, icon: join(directory, 'icon.png') });
-  notification.on('click', showWindow); notification.show();
+  notification.on('click', click); notification.show();
   // The taskbar keeps the mark until the user comes back to the window.
   try { window?.setOverlayIcon(nativeImage.createFromPath(join(directory, 'badge.png')), title); } catch { /* No overlay support here. */ }
+  return true;
 }
 function handle<K extends keyof Bridge>(name: K, fn: Bridge[K]): void {
   ipcMain.handle(`cardwright:${name}`, async (event, ...args: unknown[]) => {
@@ -267,6 +271,20 @@ async function initialize(): Promise<void> {
     const error = await shell.openPath(logDirectory); if (error) throw new Error(error);
   });
   handle('copyText', async text => { clipboard.writeText(String(text)); });
+  // 新版本提醒 (1.1, handoff §5.7a): about a minute after startup and then once a day, the latest release's version number
+  // and page from GitHub; a click on the reminder opens that page. Nothing is downloaded and nothing else is sent.
+  const releases = new ReleaseCheck({
+    dataDir: dataDirectory, currentVersion: app.getVersion(), fetch: (url, init) => net.fetch(url, init),
+    enabled: () => service.publicView().preferences.releaseCheck !== false,
+    // Held back like any other notification (switched off, or the window in front), the reminder comes at the next check,
+    // so the Notification hooks hear it once, when it is shown.
+    notify: (version, url) => Notification.isSupported() && shouldNotify({ kind: 'other', focused: !!window?.isFocused(), preferences: service.publicView().preferences })
+      && notify(`Cardwright ${version} 新版本 / New version`, '点这里打开发布页 / Click to open the release page', undefined, 'other', () => {
+        try { void shell.openExternal(externalUrl(url)).catch(() => undefined); } catch { showWindow(); }
+      }),
+  });
+  handle('readReleaseCheck', async () => releases.read());
+  releases.start();
   // 主题包 and 桌宠 (ADR 0018): packs are read from the data folder; the built-in pet ships in assets/pets.
   const appearance = new AppearanceService(dataDirectory, app.getAppPath());
   // 桌宠 (ADR 0018, 2026-09-23): a window of its own above every other one; a click brings this one back on what it reported.
@@ -329,6 +347,11 @@ async function initialize(): Promise<void> {
   handle('resumeCardRun', async id => cardStudio.runner.resume(id));
   handle('stopCardRun', async id => cardStudio.runner.stop(id));
   handle('dismissCardRun', async id => cardStudio.runner.dismiss(id));
+  handle('startCardChange', async (id, input) => cardStudio.startChange(id, input));
+  handle('removeCardChangeItem', async (id, changeId, itemId) => cardStudio.removeChangeItem(id, changeId, itemId));
+  handle('dropCardChange', async (id, changeId) => cardStudio.dropChange(id, changeId));
+  handle('confirmCardChange', async (id, changeId, settings) => cardStudio.confirmChange(id, changeId, settings));
+  handle('resumeCardChange', async (id, changeId, settings) => cardStudio.resumeChange(id, changeId, settings));
   handle('readCardPrompt', async (id, sectionId, mode) => cardStudio.readPrompt(id, sectionId, mode));
   handle('pickCardSources', async id => {
     const selected = await dialog.showOpenDialog(window!, { title: '导入资料 / Import material', properties: ['openFile', 'multiSelections'], filters: [{ name: '资料 / Material', extensions: ['txt', 'md', 'json', 'png', 'jpg', 'jpeg', 'webp', 'gif'] }, { name: '所有文件 / All files', extensions: ['*'] }] });
@@ -348,6 +371,9 @@ async function initialize(): Promise<void> {
   });
   handle('newCardComponent', async (id, input) => cardStudio.newComponent(id, input));
   handle('readCardComponents', async id => cardStudio.listComponents(id));
+  handle('moveCardLore', async (id, paths, section) => cardStudio.moveLore(id, paths, section));
+  handle('suggestCardLoreSections', async (id, uids) => cardStudio.suggestLoreSections(id, uids));
+  handle('readCardVariableTable', async id => cardStudio.readVariableTable(id));
   handle('readCardPieces', async id => cardStudio.listPieces(id));
   handle('runCardChecks', async id => cardStudio.runChecks(id));
   handle('exportCardProject', async (id, kind) => kind === 'lorebook' ? cardStudio.exportLorebook(id) : cardStudio.exportCard(id));
@@ -356,7 +382,7 @@ async function initialize(): Promise<void> {
   handle('exportAllCardPieces', async id => cardStudio.exportAllPieces(id));
   handle('readCardMeta', async id => cardStudio.readMeta(id));
   handle('saveCardMeta', async (id, meta) => cardStudio.saveMeta(id, meta));
-  handle('previewCard', async (id, kind) => cardStudio.preview(id, kind === 'update' ? 'update' : 'body'));
+  handle('previewCard', async (id, kind) => cardStudio.preview(id, ['update', 'status', 'start'].includes(String(kind)) ? kind as CardPreviewKind : 'body'));
   handle('importCardPiece', async id => {
     const selected = await dialog.showOpenDialog(window!, { title: '导入正则或脚本 / Import a regex or a script', properties: ['openFile'], filters: [{ name: '正则与脚本 / Regex and scripts', extensions: ['json'] }] });
     return selected.canceled || !selected.filePaths.length ? null : cardStudio.importPieceFile(id, selected.filePaths[0]);

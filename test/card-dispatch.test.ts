@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dispatchKey, formatDispatch, messageStartsDispatch, parseDispatches } from '../src/shared/card-studio/dispatch.ts';
-import { boardOf, findBoard, sectionFromTarget, sectionLabel, targetOf } from '../src/shared/card-studio/boards.ts';
+import { SECTION_IDS, SECTION_ORDER, boardOf, findBoard, sectionFromTarget, sectionLabel, sortByDependency, targetOf } from '../src/shared/card-studio/boards.ts';
 
 const fence = '```';
 const block = (target: string, title: string, requires: string, body: string) => `${fence}派单\n目标: ${target}\n标题: ${title}\n前置: ${requires}\n---\n${body}\n${fence}`;
@@ -78,4 +78,15 @@ test('recognizes a sent message that starts a known dispatch', () => {
   assert.equal(messageStartsDispatch(block('世界书/人设', '写人物总览', '人物模板已确认', '正文'), dispatch), false);
   assert.equal(messageStartsDispatch('写人物模板', dispatch), false);
   assert.equal(dispatchKey({ target: '世界书 / 人设', title: ' 写人物模板 ' }), dispatchKey(dispatch));
+});
+
+test('改动派单 go in the sections\' dependency order: ties keep their order, unknown sections come last', () => {
+  const items = [
+    { sectionId: 'greet', title: '开场白' }, { sectionId: 'regex-start', title: '创角页' }, { sectionId: null, title: '未知' },
+    { sectionId: 'script-schema', title: '变量表' }, { sectionId: 'lore-vars', title: '变量条目甲' }, { sectionId: 'nowhere', title: '别处' },
+    { sectionId: 'lore-vars', title: '变量条目乙' }, { sectionId: 'regex-body', title: '正文美化' }, { sectionId: 'lore-rules', title: '叙事规则' },
+  ];
+  assert.deepEqual(sortByDependency(items).map(item => item.title), ['叙事规则', '变量表', '变量条目甲', '变量条目乙', '正文美化', '创角页', '开场白', '未知', '别处']);
+  assert.equal(items[0].title, '开场白', 'the input is left as it was');
+  assert.deepEqual([...SECTION_ORDER].sort(), SECTION_IDS.filter(id => id !== 'source').sort(), 'every section with conversations has a place');
 });

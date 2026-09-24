@@ -1,0 +1,73 @@
+/* Cardwright skin: washi (和纸) */
+:root {
+  --bg: #f3ede1;
+  --panel: #faf6ee;
+  --panel-2: #ece3d2;
+  --line: rgba(60, 44, 32, .18);
+  --line-strong: rgba(60, 44, 32, .42);
+  --text: #2a2420;
+  --text-2: #5c5249;
+  --text-3: #857a6e;
+  --accent: #c23a2b;
+  --accent-2: #33587a;
+  --ok: #4d7a52; --warn: #b7791f; --danger: #a3261c;
+  --radius: 3px;
+  --serif: "Noto Serif SC", "Source Han Serif SC", "STSong", SimSun, serif;
+  --kai: "KaiTi", "STKaiti", "Noto Serif SC", serif;
+  --sans: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+/* --- 面板 --- */
+.cw-block { border-radius: var(--radius); }
+.cw-block-title { font-family: var(--serif); letter-spacing: 0.12em; font-weight: 600; }
+.cw-chapter { font-family: var(--serif); letter-spacing: 0.12em; }
+.cw-head { font-family: var(--serif); }
+
+/* --- 分页签 --- */
+.cw-tab { font-family: var(--serif); letter-spacing: 0.04em; }
+.cw-tab.is-on { color: var(--accent); border-bottom-color: currentColor; }
+.cw-tab:hover { color: var(--text); }
+
+/* --- 标签 --- */
+.cw-tag { border-radius: var(--radius); border-color: var(--line-strong); font-family: var(--serif); font-size: 12px; }
+
+/* --- 进度条 --- */
+.cw-bar-track { border-radius: var(--radius); height: 5px; }
+.cw-bar-fill { border-radius: var(--radius); background: var(--accent-2); }
+
+/* --- 对白 --- */
+.cw-say { border-left: 1px solid var(--line-strong); }
+.cw-say.is-player { border-left-color: var(--accent-2); }
+.cw-speaker { font-family: var(--kai); font-size: 13px; }
+
+/* --- 按钮 --- */
+.cw-btn { border-radius: var(--radius); font-family: var(--serif); transition: border-color 280ms, background 280ms; }
+.cw-btn:hover { border-color: var(--line-strong); }
+.cw-btn.is-primary { background: var(--accent); color: var(--panel); border-color: transparent; }
+.cw-btn.is-primary:hover { opacity: 0.92; }
+
+/* --- 悬浮球与面板 --- */
+.cw-ball { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--panel); color: var(--accent); cursor: pointer; font-family: var(--kai); font-size: 16px; }
+.cw-ball::after { content: '卡'; }
+.cw-ball:hover { border-color: var(--text-2); }
+.cw-panel { position: absolute; bottom: 64px; left: 0; width: min(360px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); font: 15px/1.8 var(--sans); overflow: hidden; }
+.cw-panel-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.cw-panel-close { border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-2); font: inherit; cursor: pointer; padding: 2px 8px; }
+.cw-panel-close:hover { color: var(--text); }
+
+/* --- 装饰：朱印（当前项标记，厚边墨印） --- */
+.cw-tier.is-current::after { content: ''; display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 1px; opacity: 0.7; margin-left: 4px; transform: rotate(-4deg); vertical-align: middle; }
+
+/* --- 装饰：题签（标题区域） --- */
+.cw-status-title { font-family: var(--kai); letter-spacing: 0.12em; }
+
+/* --- 装饰：分隔圆点 --- */
+.cw-tabs::after { content: ''; display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--line-strong); margin: 4px auto 0; }
+
+/* --- 动效 --- */
+.cw-block { animation: cw-wsh-in 280ms ease-out both; }
+@keyframes cw-wsh-in { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: blur(0); } }
+.cw-tab, .cw-btn, .cw-relation, .cw-fold summary { transition: border-color 200ms, color 200ms, background 200ms; }
+@media (prefers-reduced-motion: reduce) {
+  .cw-block { animation: none; }
+}

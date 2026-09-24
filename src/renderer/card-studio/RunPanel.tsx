@@ -6,10 +6,10 @@ import { ModelPicker } from '../ModelPicker';
 import { thinkingLabel } from '../effort';
 import { selectedModel } from '../model-resolution';
 import { availableEfforts } from '../../shared/effort';
-import { BOARDS, sectionLabel } from '../../shared/card-studio/boards';
-import { RUN_PAUSE_LABELS, runIsOpen, runQueue, runUsage } from '../../shared/card-studio/run';
+import { BOARDS, sectionLabel, sortByDependency } from '../../shared/card-studio/boards';
+import { RUN_PAUSE_LABELS, runIsOpen, runQueue, runUsage, runnableSection } from '../../shared/card-studio/run';
 import { runningConversation } from '../../shared/card-studio/view';
-import type { CardPermission, CardProjectView, CardRun, CardRunScope } from '../../shared/card-studio/types';
+import type { CardChange, CardPermission, CardProjectView, CardRun, CardRunScope } from '../../shared/card-studio/types';
 import type { ThinkingLevel } from '../../shared/types';
 import { useStudio } from './CardStudio';
 import { cardPermissionLabels } from './StudioComposer';
@@ -18,18 +18,20 @@ import { tokenCount } from './actions';
 const PERMISSIONS: CardPermission[] = ['ask', 'edit', 'full'];
 const errorText = (reason: unknown) => reason instanceof Error ? reason.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(reason);
 
-/** 一键制作 names its board; 全部开做 covers them all. */
+/** 一键制作 names its board; 全部开做 covers them all; a 改动单's run is named for it. */
 export function runTitle(scope: CardRunScope, t: (en: string, zh: string) => string): string {
   if (scope === 'all') return t('Run everything', '全部开做');
+  if (scope === 'change') return t('Change order', '改动单');
   const board = BOARDS.find(item => item.id === scope);
   return t(`One-click making · ${board?.en ?? scope}`, `一键制作 · ${board?.name ?? scope}`);
 }
 
 /**
  * The panel before a run: effort, model, permission and 遇到提问自动按推荐, remembered per card once the run starts.
- * The first time it offers 高, the default model, 项目内自动编辑 and no automatic answers.
+ * The first time it offers 高, the default model, 项目内自动编辑 and no automatic answers. Scope `change` with a draft
+ * `change` is 照单开做; with a paused one it is 继续跑.
  */
-export function RunDialog({ card, scope, onClose }: { card: CardProjectView; scope: CardRunScope; onClose: () => void }) {
+export function RunDialog({ card, scope, change, onClose }: { card: CardProjectView; scope: CardRunScope; change?: CardChange; onClose: () => void }) {
   const { data, api, t } = useApp();
   const saved = data.projects.find(project => project.id === card.projectId)?.cardSettings?.run;
   const [choice, setChoice] = useState(() => {
@@ -50,11 +52,15 @@ export function RunDialog({ card, scope, onClose }: { card: CardProjectView; sco
   const efforts: ThinkingLevel[] = (gateway ? availableEfforts(gateway) : ['off' as ThinkingLevel]).filter(level => level !== 'ultra');
   const thinking = efforts.includes(choice.thinking) ? choice.thinking : efforts.includes('high') ? 'high' : efforts[efforts.length - 1] ?? 'off';
   const labels = cardPermissionLabels(t);
-  const queue = runQueue(card.dispatches, scope).flatMap(id => card.dispatches.filter(item => item.id === id));
+  const confirming = scope === 'change' && change?.status === 'draft';
+  const queue: Array<{ id: string; target: string; sectionId: string | null; title: string }> = scope !== 'change' ? runQueue(card.dispatches, scope).flatMap(id => card.dispatches.filter(item => item.id === id))
+    : !change ? [] : confirming ? sortByDependency(change.items) : change.dispatchIds.flatMap(id => card.dispatches.filter(item => item.id === id && item.status !== 'done'));
+  const stray = scope === 'change' ? queue.find(item => !runnableSection(item.sectionId)) : undefined;
   const busy = runningConversation(data.tasks, card.projectId);
   const blocker = runIsOpen(card.run) ? t('This card already has a run that is not finished.', '这张卡还有一次一键制作没做完。')
-    : !card.design.exists ? t('There is no design book yet. Planning writes it together with the dispatches.', '还没有设计书。先在规划写出设计书和派单。')
-    : !queue.length ? t('No unsent dispatches here.', '这里没有未派的派单。')
+    : scope !== 'change' && !card.design.exists ? t('There is no design book yet. Planning writes it together with the dispatches.', '还没有设计书。先在规划写出设计书和派单。')
+    : !queue.length ? scope === 'change' ? t('Nothing is left to do for this change.', '这个改动没有要做的改动派单。') : t('No unsent dispatches here.', '这里没有未派的派单。')
+    : stray ? t(`「${stray.title}」 targets ${stray.target}, which one-click making cannot go to. Take it off the list first.`, `「${stray.title}」的目标「${stray.target}」不是一键制作能去的分区，先把这一条删掉。`)
     : busy ? t('A conversation of this card is running. Wait for it to finish or stop it first.', '这张卡有对话正在运行，等它结束或先停止它。')
     : !gateway ? t('Configure a model gateway in settings first.', '请先在设置里配置模型网关。') : '';
 
@@ -62,18 +68,23 @@ export function RunDialog({ card, scope, onClose }: { card: CardProjectView; sco
     if (starting || blocker || !gateway) return;
     setStarting(true); setError('');
     try {
-      await api.startCardRun(card.projectId, scope, { thinking, gatewayId: gateway.id, modelId: gateway.modelId, permission: choice.permission, autoAnswer: choice.autoAnswer });
+      const settings = { thinking, gatewayId: gateway.id, modelId: gateway.modelId, permission: choice.permission, autoAnswer: choice.autoAnswer };
+      if (scope !== 'change') await api.startCardRun(card.projectId, scope, settings);
+      else if (change) await (confirming ? api.confirmCardChange(card.projectId, change.id, settings) : api.resumeCardChange(card.projectId, change.id, settings));
       onClose();
     } catch (reason) { setError(errorText(reason)); }
     finally { setStarting(false); }
   }
 
-  return <Modal title={runTitle(scope, t)} className="studio-modal cs-run-dialog" onClose={() => { if (!starting) onClose(); }}>
-    <p className="modal-intro">{t(
+  return <Modal title={confirming ? t('Go ahead with the list', '照单开做') : runTitle(scope, t)} className="studio-modal cs-run-dialog" onClose={() => { if (!starting) onClose(); }}>
+    {scope === 'change' ? <p className="modal-intro">{t(
+      'The change dispatches below go to their sections in dependency order, one conversation per section, with the same pause rules as one-click making. When the card has a design book, the change AI first brings it in line with the list. The run ends with the assembly check.',
+      '下面的改动派单按分区依赖顺序代发给对应分区，一个分区一个对话，暂停规则和一键制作相同。卡有设计书时，改动 AI 先把设计书改到与清单一致再开跑。全部做完后跑一次拼装检查。')}</p>
+      : <p className="modal-intro">{t(
       'Sends the unsent dispatches below to their sections in order, one conversation per section. A dispatch is marked done once it is delivered and the assembly check finds no errors in what it wrote. Questions, refusals, errors and approvals pause the run and notify you.',
-      '按派单顺序，把下面这些未派的派单代发给对应分区，一个分区用一个对话接连做完。交付后拼装检查没有这条派单的错误，就自动标记完成；遇到提问、拒绝开工、出错或需要批准时暂停，并通知你。')}{scope === 'all' && t(' The run ends with the assembly check.', '全部做完后再跑一次拼装检查。')}</p>
+      '按派单顺序，把下面这些未派的派单代发给对应分区，一个分区用一个对话接连做完。交付后拼装检查没有这条派单的错误，就自动标记完成；遇到提问、拒绝开工、出错或需要批准时暂停，并通知你。')}{scope === 'all' && t(' The run ends with the assembly check.', '全部做完后再跑一次拼装检查。')}</p>}
     {queue.length > 0 && <ol className="cs-run-queue" aria-label={t('Dispatches to do', '将要做的派单')}>
-      {queue.slice(0, 8).map(dispatch => <li key={dispatch.id}><span>{sectionLabel(dispatch.sectionId!)}</span><b>{dispatch.title}</b></li>)}
+      {queue.slice(0, 8).map(dispatch => <li key={dispatch.id}><span>{dispatch.sectionId ? sectionLabel(dispatch.sectionId) : dispatch.target}</span><b>{dispatch.title}</b></li>)}
       {queue.length > 8 && <li className="is-more">{t(`and ${queue.length - 8} more`, `还有 ${queue.length - 8} 条`)}</li>}
     </ol>}
     <div className="cs-run-fields">
@@ -102,7 +113,7 @@ export function RunDialog({ card, scope, onClose }: { card: CardProjectView; sco
     {error && <p className="cs-form-error" role="alert">{error}</p>}
     <div className="modal-actions">
       <button type="button" className="cs-btn" disabled={starting} onClick={onClose}>{t('Cancel', '取消')}</button>
-      <button type="button" className="cs-btn is-primary" disabled={!!blocker || starting} onClick={() => void start()}>{starting ? <LoaderCircle size={14} className="spinning" /> : <Zap size={14} />}{t(`Start · ${queue.length}`, `开始 · ${queue.length} 条`)}</button>
+      <button type="button" className="cs-btn is-primary" disabled={!!blocker || starting} onClick={() => void start()}>{starting ? <LoaderCircle size={14} className="spinning" /> : <Zap size={14} />}{confirming ? t(`Go ahead · ${queue.length}`, `照单开做 · ${queue.length} 条`) : scope === 'change' ? t(`Carry on · ${queue.length}`, `继续跑 · ${queue.length} 条`) : t(`Start · ${queue.length}`, `开始 · ${queue.length} 条`)}</button>
     </div>
   </Modal>;
 }

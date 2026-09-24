@@ -1,0 +1,77 @@
+/* Cardwright skin: cinema (复古电影) */
+:root {
+  --bg: #15110e;
+  --panel: #1c1713;
+  --panel-2: #241d17;
+  --text: #efe4d6;
+  --text-2: #a89886;
+  --text-3: #746654;
+  --accent: #d8742f;
+  --accent-2: #b89a6e;
+  --line: rgba(168, 131, 90, .55);
+  --line-soft: rgba(168, 131, 90, .25);
+  --ok: #8fb07a; --warn: #e0a24a; --danger: #cf5a4e;
+  --radius: 2px;
+  --serif: "Noto Serif SC", "Source Han Serif SC", "STZhongsong", SimSun, serif;
+  --sans: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --display: "Sitka Banner", "Didot", Georgia, serif;
+}
+
+/* --- 面板 --- */
+.cw-block { border: 1px solid var(--line-soft); border-radius: var(--radius); }
+.cw-block-title { font-family: var(--serif); letter-spacing: 0.1em; }
+.cw-chapter { font-family: var(--serif); letter-spacing: 0.1em; }
+.cw-head { font-family: var(--serif); letter-spacing: 0.04em; }
+
+/* --- 分页签 --- */
+.cw-tab { font-family: var(--serif); }
+.cw-tab.is-on { color: var(--accent); border-bottom-color: currentColor; }
+.cw-tab:hover { color: var(--text); }
+
+/* --- 标签 --- */
+.cw-tag { border-radius: 999px; border-color: var(--line); font-family: var(--serif); font-size: 12px; }
+
+/* --- 进度条 --- */
+.cw-bar-track { border-radius: 999px; height: 5px; }
+.cw-bar-fill { border-radius: 999px; background: var(--accent-2); }
+
+/* --- 对白 --- */
+.cw-say { border-left: 1px solid var(--line); }
+.cw-say.is-player { border-left-color: var(--line-strong, var(--line)); }
+.cw-speaker { font-family: var(--serif); font-size: 13px; }
+
+/* --- 按钮 --- */
+.cw-btn { border-radius: 999px; border-color: var(--line); font-family: var(--serif); transition: background 200ms, border-color 200ms; }
+.cw-btn:hover { background: var(--panel-2); border-color: var(--line); }
+.cw-btn.is-primary { background: var(--accent); color: var(--bg); border-color: transparent; }
+.cw-btn.is-primary:hover { opacity: 0.92; }
+
+/* --- 悬浮球与面板 --- */
+.cw-ball { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--accent); cursor: pointer; font-family: var(--display); font-size: 16px; }
+.cw-ball::after { content: 'C'; font-style: italic; }
+.cw-ball:hover { border-color: var(--accent-2); }
+.cw-panel { position: absolute; bottom: 64px; left: 0; width: min(360px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); font: 15px/1.7 var(--sans); overflow: hidden; }
+.cw-panel-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); }
+.cw-panel-close { border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--text-2); font: inherit; cursor: pointer; padding: 2px 10px; }
+.cw-panel-close:hover { color: var(--text); }
+
+/* --- 装饰：四角星标记（标题前） --- */
+.cw-block-title::before { content: ''; display: inline-block; width: 8px; height: 8px; background: var(--accent-2); clip-path: polygon(50% 0%, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0% 50%, 38% 38%); margin-right: 6px; vertical-align: middle; }
+
+/* --- 装饰：章节标记（小号序号线） --- */
+.cw-chapter::before { content: ''; display: block; width: 40px; height: 1px; background: var(--line); margin-bottom: 6px; }
+
+/* --- 装饰：胶片颗粒纹理 --- */
+.cw-status { position: relative; }
+.cw-status::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.08; background-image: repeating-linear-gradient(0deg, transparent 0 2px, var(--text-3) 2px 3px); mix-blend-mode: overlay; }
+
+/* --- 动效 --- */
+.cw-block { animation: cw-cin-in 420ms cubic-bezier(.22,1,.36,1) both; }
+@keyframes cw-cin-in { from { opacity: 0; transform: translateY(3px); } }
+.cw-block-title::before { animation: cw-cin-glow 4s ease-in-out infinite; }
+@keyframes cw-cin-glow { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+.cw-tab, .cw-btn, .cw-relation, .cw-fold summary { transition: background 200ms, border-color 200ms, color 200ms; }
+@media (prefers-reduced-motion: reduce) {
+  .cw-block { animation: none; }
+  .cw-block-title::before { animation: none; }
+}

@@ -16,6 +16,8 @@ import { pngChunks, readCardFromPng, writeCardIntoPng } from '../src/core/card-s
 import { deflateSync } from 'node:zlib';
 import type { PreviewSegment } from '../src/shared/card-studio/preview.ts';
 import type { Gateway, Task } from '../src/shared/types.ts';
+import { SAMPLE_TABLE } from './variable-table-sample.ts';
+import { START_SHEET, STATUS_SHEET } from './assembly-sheet-samples.ts';
 
 const fakeWorker = fileURLToPath(new URL('./fixtures/fake-worker.mjs', import.meta.url));
 const resources = fileURLToPath(new URL('../card-studio', import.meta.url));
@@ -568,6 +570,33 @@ test('the section AI gets uids and check results through tools, other tasks do n
   assert.match(lastReply(harness, ordinary.id), /card-error:.*制卡对话/);
 });
 
+test('the variable structure section turns 变量表.yaml into the variable files through a tool', async t => {
+  const { root, harness, studio } = await setup(t);
+  const folder = join(root, 'cards', '变量卡');
+  const { card: { projectId } } = await studio.create({ name: '变量卡', kind: 'original', folder });
+  await writeFile(join(folder, '设计书.md'), ['# 设计书', '', '## 人物名单', '', '| 序号 | 人物 | 档位 | 状态 |', '| --- | --- | --- | --- |', ''].join('\n'));
+  await writeFile(join(folder, '变量表.yaml'), SAMPLE_TABLE);
+  const conversation = await studio.startConversation({ projectId, sectionId: 'script-schema', prompt: 'card-request:{"action":"sync_variables"}' });
+  await until(() => settled(harness, conversation.id), 'sync tool');
+  const reply = lastReply(harness, conversation.id);
+  assert.ok(reply.startsWith('card:'), reply);
+  const result = JSON.parse(reply.slice('card:'.length));
+  assert.equal(result.sync.rows, 13);
+  assert.ok(result.sync.created.some((path: string) => path.endsWith('ZOD.js')), JSON.stringify(result.sync.created));
+  assert.equal(typeof result.check.ok, 'boolean');
+  assert.ok((await stat(join(folder, '世界书', '变量', '1002-[initvar].md'))).isFile());
+  assert.deepEqual((await studio.reload(projectId)).variableTable, { source: 'authored', rows: 13 });
+  const table = await studio.readVariableTable(projectId);
+  assert.equal(table.source, 'authored');
+  assert.equal(table.rows.length, 13);
+  assert.equal(table.stale, undefined, 'generated from the current table');
+  assert.deepEqual(table.rows[2], { path: '/主角/生命', type: '数值 0–100', default: '100', owner: '模型', when: '受伤或恢复时', note: '' });
+  const before = (await studio.reload(projectId)).updatedAt;
+  await writeFile(join(folder, '变量表.yaml'), SAMPLE_TABLE.replace('上限: 12', '上限: 5'));
+  await studio.syncVariables(projectId);
+  assert.notEqual((await studio.reload(projectId)).updatedAt, before, 'a sync counts as an edit, so the brief re-reads');
+});
+
 test('the local preview runs the card regex over the format sample and hands each part over as its own document', async t => {
   const published: Array<{ owner: string; segments: PreviewSegment[] }> = [];
   const publishPreview = (owner: string, segments: PreviewSegment[]) => { published.push({ owner, segments }); return segments.map((_, index) => `test://${owner}/${index}`); };
@@ -596,6 +625,9 @@ test('the local preview runs the card regex over the format sample and hands eac
   assert.deepEqual(body.states[0].frames.map(frame => frame.kind), ['frontend', 'html']);
   assert.equal(body.states[0].frames[0].url, `test://${published.at(-1)!.owner}/0`, 'each part is served under the address the publisher gives it');
   const [document, receipt] = published.at(-1)!.segments;
+  assert.match(document.sim ?? '', /cardwrightSim/, 'a front-end in the body preview runs inside the 模拟酒馆');
+  assert.equal(receipt.sim, undefined, 'message text runs no card script, so it gets no sim');
+  assert.equal(typeof body.variables, 'string');
   assert.ok(document.html.includes('<div class="mist">雾从码头升起。「又是这种天气。」</div>'), 'the body regex output, with the quotes left alone inside the document');
   assert.ok(receipt.html.includes('<details class="cw-update"><summary>变量更新</summary><pre>'), receipt.html);
 
@@ -643,4 +675,113 @@ test('the preview shows a front-end written as a bare document the way the expor
   const body = await studio.preview(id, 'body');
   assert.deepEqual(body.states[0].frames.map(frame => frame.kind), ['frontend'], 'the app adds the fence, so 酒馆助手 makes it an iframe and its script runs');
   assert.ok(published.at(-1)!.segments[0].html.includes('<div class="mist">雾从码头升起。</div>'));
+});
+
+test('status and creation previews compile the sheets, carry the sample variables and the sim, and list the floating script', async t => {
+  const published: Array<{ owner: string; segments: PreviewSegment[] }> = [];
+  const publishPreview = (owner: string, segments: PreviewSegment[]) => { published.push({ owner, segments }); return segments.map((_, index) => `test://${owner}/${index}`); };
+  const { root, studio } = await setup(t, { publishPreview });
+  const { card: { projectId, path } } = await studio.create({ name: '雾港档案', kind: 'original', folder: join(root, 'cards', '骨架卡') });
+  await writeFile(join(path, '变量表.yaml'), SAMPLE_TABLE);
+  const status = await studio.newComponent(projectId, { board: 'regex', name: '状态栏', format: 'sheet' });
+  await writeFile(join(path, status.bodyPath), STATUS_SHEET);
+  const start = await studio.newComponent(projectId, { board: 'regex', name: '开局创角页', format: 'sheet' });
+  await writeFile(join(path, start.bodyPath), START_SHEET);
+  await writeFile(join(path, '开场白/00-开场.md'), '<start>入港</start>');
+
+  const preview = await studio.preview(projectId, 'status');
+  assert.equal(preview.kind, 'status'); assert.equal(preview.form, 'placeholder');
+  assert.deepEqual(preview.source, { from: 'sheet', path: '正则/01-状态栏.yaml' });
+  assert.equal(JSON.parse(preview.variables ?? '{}').主角.生命, 100, 'the table defaults stand in for [initvar]');
+  assert.equal(preview.states.length, 1); assert.equal(preview.states[0].label, '初始变量'); assert.deepEqual(preview.states[0].steps, []);
+  const segment = published.at(-1)!.segments[0];
+  assert.equal(segment.kind, 'frontend');
+  assert.match(segment.html, /CardwrightHost\.boot\(\)/);
+  assert.match(segment.sim ?? '', /cardwrightSim/);
+  assert.match(segment.sim ?? '', /"生命":100/);
+
+  const creation = await studio.preview(projectId, 'start');
+  assert.equal(creation.kind, 'start');
+  const startSegment = published.at(-1)!.segments[0];
+  assert.match(startSegment.html, /<textarea id="cw-source" hidden>入港<\/textarea>/, 'the greeting start block stands in for the capture');
+  assert.ok(startSegment.sim);
+
+  const checks = await studio.runChecks(projectId);
+  assert.ok(checks.findings.some(item => item.code === 'status-form'), 'the service hands the skeleton to the checks');
+
+  await writeFile(join(path, status.bodyPath), STATUS_SHEET.replace('形态: placeholder', '形态: header'));
+  const header = await studio.preview(projectId, 'status');
+  assert.equal(header.form, 'header');
+  assert.match(header.notice ?? '', /正文美化/);
+
+  await writeFile(join(path, status.bodyPath), STATUS_SHEET.replace('形态: placeholder', '形态: floating'));
+  const floating = await studio.preview(projectId, 'status');
+  assert.equal(floating.form, 'floating');
+  assert.match(published.at(-1)!.segments[0].html, /CardwrightFloating\.mount/);
+  const pieces = await studio.listPieces(projectId);
+  const synthesized = pieces.find(piece => piece.synthesized);
+  assert.equal(synthesized?.kind, 'script'); assert.equal(synthesized?.title, '状态栏·悬浮应用'); assert.equal(synthesized?.bodyPath, '正则/01-状态栏.yaml');
+  const exported = await studio.exportPiece(projectId, 'script', synthesized!.name);
+  assert.match(exported.file, /脚本-01-状态栏·悬浮应用/);
+
+  const missing = await studio.preview(projectId, 'body');
+  assert.ok(missing.notice, 'the body preview still explains itself when there is no format sample');
+});
+
+test('the tool makes a sheet when asked', async t => {
+  const { root, studio, harness } = await setup(t);
+  const { card: { projectId } } = await studio.create({ name: '工具卡', kind: 'original', folder: join(root, 'cards', '工具卡') });
+  const task = { projectId, card: { sectionId: 'regex-status' } } as unknown as Task;
+  const made = await studio.toolRequest(task, { action: 'new_component', board: 'regex', name: '状态栏', format: 'sheet' }) as { bodyPath: string };
+  assert.equal(made.bodyPath, '正则/01-状态栏.yaml');
+  void harness;
+});
+
+// Q11: one sentence → 影响清单 → 改动派单 → the run goes to the end without the user entering a section.
+test('a 改动单 lists its 派单 as the 影响清单, not as dispatches; 照单开做 registers them in dependency order and runs them', async t => {
+  const { root, harness, studio } = await setup(t);
+  const folder = join(root, 'change');
+  const { card: { projectId } } = await studio.create({ name: '雾港档案局', kind: 'original', folder });
+  await writeFile(join(folder, '设计书.md'), '# 设计书 · 雾港档案局\n');
+  const { change, task: started } = await studio.startChange(projectId, { kind: 'request', text: '创角页加自定义开局选项 CHANGE:impact' });
+  assert.equal(change.status, 'draft');
+  assert.deepEqual(task(harness, started.id).card, { sectionId: 'plan', mode: 'change', web: false, changeId: change.id });
+  assert.ok(task(harness, started.id).messages[0].text.startsWith('【改动单】'));
+  assert.ok(task(harness, started.id).title.startsWith('改动 · 创角页加自定义开局选项'));
+  await until(() => card(harness).changes[0]?.items.length === 4, 'the impact list');
+  assert.deepEqual(card(harness).dispatches, [], 'the change AI\'s 派单 wait for 照单开做');
+  const items = card(harness).changes[0].items;
+  assert.deepEqual(items.map(item => [item.sectionId, item.title]), [['greet', '改动 · 开场白提到自定义开局'], ['regex-start', '改动 · 加自定义选项'], ['script-schema', '改动 · 变量表加开局字段'], ['lore-vars', '改动 · 变量规则']]);
+  assert.equal(card(harness).changes[0].taskId, started.id);
+  await assert.rejects(studio.startConversation({ projectId, sectionId: 'plan', mode: 'change', prompt: '改点东西' }), /提改动/);
+
+  await studio.removeChangeItem(projectId, change.id, items[0].id);
+  await studio.confirmChange(projectId, change.id, { thinking: 'off', gatewayId: 'fixture', permission: 'edit', autoAnswer: false });
+  const confirmed = card(harness);
+  assert.deepEqual(confirmed.dispatches.map(item => [item.sectionId, item.title, item.status, item.changeId]), [
+    ['script-schema', '改动 · 变量表加开局字段', 'todo', change.id], ['lore-vars', '改动 · 变量规则', 'todo', change.id], ['regex-start', '改动 · 加自定义选项', 'todo', change.id]]);
+  assert.deepEqual(confirmed.changes[0].dispatchIds, confirmed.dispatches.map(item => item.id));
+  assert.equal(confirmed.changes[0].status, 'running');
+  await assert.rejects(studio.removeChangeItem(projectId, change.id, items[1].id), /照单开做/);
+
+  await until(() => card(harness).changes[0].status === 'done', 'the change to run to the end', 30_000);
+  assert.ok(task(harness, started.id).messages.some(message => message.role === 'user' && message.text.startsWith('照单开做。')), 'the change AI synced the design book before the run');
+  assert.deepEqual(card(harness).dispatches.map(item => item.status), ['done', 'done', 'done']);
+  const run = harness.snapshot().projects.find(project => project.id === projectId)?.cardRun;
+  assert.equal(run?.scope, 'change');
+  assert.equal(run?.changeId, change.id);
+  assert.equal(run?.status, 'completed');
+  assert.ok(run?.finalCheck, 'a change run ends with the assembly check');
+});
+
+test('a 改动单 on a card without a design book says so, and a single component is edited directly', async t => {
+  const { root, harness, studio } = await setup(t);
+  const { card: { projectId } } = await studio.create({ name: '汽灯与铜镜', kind: 'original', folder: join(root, 'direct') });
+  const { change, task: started } = await studio.startChange(projectId, { kind: 'error', text: '创角页报错 CHANGE:direct' });
+  assert.equal(change.noDesignBook, true);
+  const first = task(harness, started.id).messages[0].text;
+  assert.ok(first.startsWith('【报错】') && first.includes('（本卡没有设计书：以卡里现有的组件为准。）'), first);
+  await until(() => card(harness).changes[0]?.status === 'done', 'the direct change');
+  assert.deepEqual(card(harness).changes[0].direct, ['正则/创角页.json']);
+  assert.deepEqual(card(harness).dispatches, []);
 });

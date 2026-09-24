@@ -93,3 +93,30 @@ test('sections without a built-in prompt still say so', async () => {
   assert.ok(prompt.includes('本分区的专用提示词尚未内置'));
   assert.ok(!prompt.includes('## 世界书通用规则'), 'the board rules belong to the world book board only');
 });
+
+test('regex sections get the card preset and the token names; other boards do not', async () => {
+  const status = await buildSectionPrompt(resources, { ...card, sectionId: 'regex-status', stylePreset: { id: 'washi', name: '和纸' } });
+  assert.ok(status.includes('## 本卡的风格预设与前端骨架'));
+  assert.ok(status.includes('预设：和纸（washi）'));
+  for (const token of ['--bg', '--panel', '--text-3', '--accent-2', '--danger']) assert.ok(status.includes(token), token);
+  assert.ok(status.includes('frontend/blocks/词汇.md'));
+  assert.ok(status.includes('装配单'));
+  const custom = await buildSectionPrompt(resources, { ...card, sectionId: 'regex-body', stylePreset: { id: 'custom', name: '题材自定' } });
+  assert.ok(custom.includes('令牌:') && custom.includes('设计书'), 'a custom preset tells the section to copy the tokens from the design book');
+  const none = await buildSectionPrompt(resources, { ...card, sectionId: 'regex-start', stylePreset: null });
+  assert.ok(none.includes('还没有定风格预设'));
+  const lore = await buildSectionPrompt(resources, { ...card, sectionId: 'lore-people', stylePreset: { id: 'washi', name: '和纸' } });
+  assert.ok(!lore.includes('## 本卡的风格预设与前端骨架'));
+});
+
+test('the regex prompts ask for sheets and name the new checks', async () => {
+  const shared = await buildSectionPrompt(resources, { ...card, sectionId: 'regex-status', stylePreset: null });
+  for (const expected of ['.yaml', "format: 'sheet'", 'sheet-invalid', 'variable-binding', 'status-form', 'frontend-external', 'regex-dialect', 'regex-backtrack', '形态']) assert.ok(shared.includes(expected), expected);
+  const body = await buildSectionPrompt(resources, { ...card, sectionId: 'regex-body', stylePreset: null });
+  assert.ok(body.includes('状态头') && body.includes('模块'));
+  const start = await buildSectionPrompt(resources, { ...card, sectionId: 'regex-start', stylePreset: null });
+  assert.ok(start.includes('自定义开局') && start.includes('将写入'));
+  const plan = await buildSectionPrompt(resources, { ...card, sectionId: 'plan', mode: 'scratch' });
+  assert.ok(plan.includes('状态栏形态'));
+  assert.ok(plan.includes('正则/正文美化 → 正则/状态栏') || plan.includes('正文美化 → 状态栏'), 'the body beautifier is dispatched before the status bar, since the default form rides inside it');
+});

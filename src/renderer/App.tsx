@@ -13,7 +13,7 @@ import { Sidebar } from './Sidebar';
 import { SidePanel, type PanelState, type PanelTab } from './SidePanel';
 export type ShellMode = 'code' | 'tasks' | 'settings';
 import { BootSequence } from './BootSequence';
-import { UpgradeNotice } from './Notices';
+import { ReleasePill, UpgradeNotice } from './Notices';
 import { configureSound, installClickSounds, playCue } from './sound';
 import { watchWindowActivity } from './window-activity';
 import { preloadFonts } from './fonts';
@@ -193,6 +193,7 @@ export function App() {
     : <AppContext.Provider key="workbench" value={context}><div ref={shell} className={`app-shell desk-shell ${live ? 'is-live' : ''} ${panel && selectedTask && mode === 'code' ? 'with-panel' : ''}`}>
     <div className="desk-titlebar">
       <span className="desk-titlebar-name">{windowTitle}</span>
+      <ReleasePill />
       <div className="window-controls">
         <button type="button" aria-label={t('Minimize window', '最小化窗口')} onClick={() => void run(() => api.window('minimize'))}><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 6h10" stroke="currentColor" /></svg></button>
         <button type="button" aria-label={t('Maximize window', '最大化窗口')} onClick={() => void run(() => api.window('maximize'))}><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5h9v9h-9z" fill="none" stroke="currentColor" /></svg></button>
