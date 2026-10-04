@@ -10,7 +10,7 @@ import type { UsageLedgerDay } from './usage.ts';
 import type { VariableRow } from './card-studio/variable-table.ts';
 import type { RequestDiagnostic } from '../runtime/request-log.ts';
 import type { AssembledJailbreak, JailbreakChoice, JailbreakPack, JailbreakPackSummary, PresetImportEntry } from './jailbreak.ts';
-import type { CardChange, NewCardChange, CardRun, CardRunScope, CardRunSettings, CardSettings, CardSettingsChange, CardSquadAssignment, CardSquadSettings, PromptOverrideDetail, PromptOverrideItem, CardMeta, CardPieceImport, CardPreview, CardPreviewKind, CardPieceSummary, CardCheckReport, CardComponentResult, CardComponentSummary, CardExportResult, CardImportPreview, CardImportReport, CardLoreSuggestion, CardProjectView, CardStudioSnapshot, CardTaskInfo, CardVariableTableView, CardVariableTableEdit, CardVariableSyncResult, CoverSource, NewCardComponent, NewCardProject, PlanMode, SourceImportReport, SourceRecord, StartCardConversation } from './card-studio/types.ts';
+import type { CardChange, NewCardChange, CardRun, CardRunScope, CardRunSettings, CardSettings, CardSettingsChange, CardFrontendAssets, CardSquadAssignment, CardSquadSettings, PromptOverrideDetail, PromptOverrideItem, CardMeta, CardPieceImport, CardPreview, CardPreviewKind, CardPieceSummary, CardCheckReport, CardComponentResult, CardComponentSummary, CardExportResult, CardImportPreview, CardImportReport, CardLoreSuggestion, CardProjectView, CardStudioSnapshot, CardTaskInfo, CardVariableTableView, CardVariableTableEdit, CardVariableSyncResult, CoverSource, NewCardComponent, NewCardProject, PlanMode, SourceImportReport, SourceRecord, StartCardConversation } from './card-studio/types.ts';
 export type PermissionMode = 'ask' | 'edit' | 'full';
 export type TaskStatus = 'idle' | 'queued' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled';
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
@@ -356,6 +356,8 @@ export interface Bridge extends StudioBridge {
   exportAllCardPieces(projectId: string): Promise<{ folder: string; files: string[] }>;
   readCardMeta(projectId: string): Promise<CardMeta>;
   saveCardMeta(projectId: string, meta: CardMeta): Promise<CardMeta>;
+  /** 前端资源内联还是外链（编译选项）；外链要锁一个已发布的 https tag。 */
+  saveCardFrontendAssets(projectId: string, assets: CardFrontendAssets): Promise<CardProjectView>;
   previewCard(projectId: string, kind: CardPreviewKind): Promise<CardPreview>;
   exportCardPiece(projectId: string, kind: 'regex' | 'script', name: string): Promise<CardExportResult>;
   importCardPiece(projectId: string): Promise<CardPieceImport | null>;

@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
-import type { CardChange, CardChangeItem, CardDispatch, CardKind, CoverStyleId } from '../../shared/card-studio/types.ts';
+import type { CardChange, CardChangeItem, CardDispatch, CardFrontendAssets, CardKind, CoverStyleId } from '../../shared/card-studio/types.ts';
+import { DEFAULT_FRONTEND_ASSETS_BASE, INLINE_FRONTEND_ASSETS } from '../../shared/card-studio/types.ts';
+import type { FrontendExternal } from '../../shared/card-studio/frontend-compile.ts';
 
 /** The app-maintained registration inside every card project folder. The AI may read it but never writes it. */
 export const CARD_FILE = '卡项目.json';
@@ -9,9 +11,16 @@ export const CARD_SCHEMA = 'cardwright.card-project';
 export const CARD_FOLDERS = ['资料/原件', '资料/分章', '世界书/叙事规则', '世界书/总览', '世界书/设定', '世界书/变量', '世界书/正文格式', '世界书/人设', '世界书/剧情', '脚本', '正则', '开场白', '封面', '导出'] as const;
 export const COVER_STYLES: readonly CoverStyleId[] = ['vermilion', 'archive', 'terminal', 'theatre', 'gilded'];
 
+/**
+ * 前端资源进卡的方式（编译选项）见 shared 里的 `CardFrontendAssets`；默认值也放在那里，渲染层要用同一份。
+ */
+export { DEFAULT_FRONTEND_ASSETS_BASE, INLINE_FRONTEND_ASSETS };
+
 export interface CardProjectFile {
   schema: typeof CARD_SCHEMA; version: 1; cardId: string; name: string; kind: CardKind; source?: string;
   coverStyle: CoverStyleId; cover?: string; stylePreset: { id: string; name: string } | null;
+  /** 前端资源内联还是外链（外链必须锁 https 的已发布 tag）。 */
+  frontendAssets: CardFrontendAssets;
   origin: 'new' | 'import'; createdAt: string; updatedAt: string; dispatches: CardDispatch[]; exports: unknown[];
   /** The next world book uid to hand out. It only grows, so a deleted entry never gives its uid to another one. */
   nextUid: number;
@@ -59,6 +68,23 @@ function validChange(value: unknown): value is CardChange {
     && ['taskId', 'note'].every(key => value[key] === undefined || isString(value[key]));
 }
 
+/** 一个坏了、写歪了或干脆没有的 frontendAssets 一律当内联：卡照旧能导出，不会因为一个字段卡死。 */
+export function parseFrontendAssets(value: unknown): CardFrontendAssets {
+  if (!isRecord(value)) return { ...INLINE_FRONTEND_ASSETS };
+  if (value.mode !== 'cdn') return { ...INLINE_FRONTEND_ASSETS };
+  const base = (isString(value.base) ? value.base.trim() : '').replace(/\/+$/, '');
+  if (!base) return { mode: 'cdn', base: DEFAULT_FRONTEND_ASSETS_BASE };
+  // 外链必须是 https：http 会被酒馆页面拦掉，带凭据的 URL 也不许写进卡里。
+  if (!/^https:\/\/[^\s]+$/.test(base)) return { ...INLINE_FRONTEND_ASSETS };
+  return { mode: 'cdn', base };
+}
+
+/** 登记文件 → 编译器要的外链根；内联时给 null。导出、检查、预览都走这一个判断。 */
+export function frontendExternalOf(file: Pick<CardProjectFile, 'frontendAssets'> | null | undefined): FrontendExternal | null {
+  const assets = file?.frontendAssets;
+  return assets && assets.mode === 'cdn' && assets.base ? { root: assets.base } : null;
+}
+
 export function parseCardFile(value: unknown): CardProjectFile {
   if (!isRecord(value) || value.schema !== CARD_SCHEMA) throw new Error('这不是卡项目登记文件（卡项目.json）。');
   if (!Number.isInteger(value.version) || Number(value.version) < 1) throw new Error('卡项目.json 的版本号无效。');
@@ -72,6 +98,7 @@ export function parseCardFile(value: unknown): CardProjectFile {
   const file: Record<string, unknown> = {
     ...value, schema: CARD_SCHEMA, version: 1, cardId: value.cardId, name: value.name.trim(), kind: value.kind,
     coverStyle: COVER_STYLES.includes(value.coverStyle as CoverStyleId) ? value.coverStyle : COVER_STYLES[0], stylePreset: preset,
+    frontendAssets: parseFrontendAssets(value.frontendAssets),
     origin: value.origin === 'import' ? 'import' : 'new', createdAt: value.createdAt, updatedAt: value.updatedAt,
     dispatches: (value.dispatches as CardDispatch[] | undefined) ?? [], exports: Array.isArray(value.exports) ? value.exports : [],
     nextUid: Number.isInteger(value.nextUid) && Number(value.nextUid) >= 0 ? Number(value.nextUid) : 0,
@@ -112,7 +139,7 @@ export async function createCardFolder(input: { folder: string; name: string; ki
   const pick = Math.floor((input.random ?? Math.random)() * COVER_STYLES.length);
   const file: CardProjectFile = {
     schema: CARD_SCHEMA, version: 1, cardId: input.id ?? randomUUID(), name, kind: input.kind, ...(source ? { source } : {}),
-    coverStyle: COVER_STYLES[Math.max(0, Math.min(COVER_STYLES.length - 1, pick))], stylePreset: null, origin: 'new',
+    coverStyle: COVER_STYLES[Math.max(0, Math.min(COVER_STYLES.length - 1, pick))], stylePreset: null, frontendAssets: { ...INLINE_FRONTEND_ASSETS }, origin: 'new',
     createdAt: at, updatedAt: at, dispatches: [], exports: [], nextUid: 0, changes: [],
   };
   await writeCardFile(input.folder, file);

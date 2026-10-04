@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs
 import { dirname, join, resolve } from 'node:path';
 import type { Harness } from './harness.ts';
 import type { Project, Task } from '../shared/types.ts';
-import { createCardFolder, readCardFile, writeCardFile, type CardProjectFile } from '../core/card-studio/card-project.ts';
+import { createCardFolder, frontendExternalOf, parseFrontendAssets, readCardFile, writeCardFile, type CardProjectFile } from '../core/card-studio/card-project.ts';
 import { importSources, readSourceManifest, resplitSource, type SourceImportReport, type SourceRecord } from '../core/card-studio/sources.ts';
 import { buildMemberPrompt, buildSectionPrompt } from '../core/card-studio/prompts.ts';
 import { SQUAD_PROMPT_FILES } from '../shared/card-studio/prompt-files.ts';
@@ -19,6 +19,7 @@ import { sampleVariables } from '../core/card-studio/variable-sample.ts';
 import { tavernSimScript } from '../shared/card-studio/tavern-sim.ts';
 import { frontendDocument } from '../shared/card-studio/frontend.ts';
 import type { FrontendResources } from '../shared/card-studio/frontend-compile.ts';
+import type { CardFrontendAssets } from '../shared/card-studio/types.ts';
 import { runChecks } from '../core/card-studio/checks.ts';
 import { searchSources } from '../core/card-studio/source-search.ts';
 import { DERIVED_TABLE_FILE, VARIABLE_TABLE_FILE, hashText, readArtifactManifest, readVariableTableState, syncVariableArtifacts, writeDerivedTable, writeVariableTable } from '../core/card-studio/variable-artifacts.ts';
@@ -55,9 +56,15 @@ function changeTitle(title: string): string {
   return `改动 · ${rest || title.trim()}`;
 }
 
+/**
+ * 头像表：项目根目录的一份 JSON，`{ 角色名: { 表情: 图片地址 } }`。
+ * 编译正文美化时写进页面的一小段脚本，运行时按 `{名字:表情}「…」` 选头像。
+ * 属于卡片内容，不是应用状态：文件缺失或写坏只是没有头像，不报错、不影响导出。
+ */
+const AVATARS_FILE = '.cardwright-avatars.json';
+
 /** The version and date every export file carries. */
-function exportStamp(components: ProjectComponents): { version: string; date: string } {
-  const envelope = components.envelope as Record<string, unknown>;
+function exportStamp(components: ProjectComponents): { version: string; date: string } {  const envelope = components.envelope as Record<string, unknown>;
   const data = (envelope.data && typeof envelope.data === 'object' ? envelope.data : {}) as Record<string, unknown>;
   const now = new Date();
   return {
@@ -822,6 +829,23 @@ export class CardStudioService {
     return this.reload(projectId);
   }
 
+  /**
+   * 前端资源的编译选项：内联（默认）或外链到一个已发布的 https tag。
+   * 写到卡项目登记文件里，导出与检查都从这里取，和卡一起走。
+   */
+  async saveFrontendAssets(projectId: string, assets: CardFrontendAssets): Promise<CardProjectView> {
+    const project = this.cardProject(projectId);
+    const next = parseFrontendAssets(assets);
+    if (next.mode === 'cdn' && !next.base) throw new Error('外链模式要给一个 https 的资产地址（锁到已发布的 tag）。');
+    await this.exclusive(projectId, async () => {
+      const file = await readCardFile(project.path);
+      file.frontendAssets = next;
+      file.updatedAt = stamp();
+      await writeCardFile(project.path, file);
+    });
+    return this.reload(projectId);
+  }
+
   async clearCover(projectId: string): Promise<CardProjectView> {
     const project = this.cardProject(projectId);
     await this.exclusive(projectId, async () => {
@@ -1179,13 +1203,31 @@ export class CardStudioService {
     return this.frontendResources;
   }
 
+  /** 头像表：项目根目录的 `.cardwright-avatars.json`（`{ 角色名: { 表情: 图片地址 } }`）。文件坏了不影响导出，只是没有头像。 */
+  private async avatars(projectPath: string): Promise<Record<string, Record<string, string>> | null> {
+    try {
+      const text = await readFile(join(projectPath, AVATARS_FILE), 'utf8');
+      const parsed = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      const rows: Record<string, Record<string, string>> = {};
+      for (const [name, value] of Object.entries(parsed as Record<string, unknown>)) {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+        const row: Record<string, string> = {};
+        for (const [emotion, url] of Object.entries(value as Record<string, unknown>)) if (typeof url === 'string' && url) row[emotion] = url;
+        if (Object.keys(row).length) rows[name] = row;
+      }
+      return Object.keys(rows).length ? rows : null;
+    } catch { return null; }
+  }
+
   /** What the checks, the exports and the previews assemble with: the skeleton, the 变量表 (authored or derived), the card's name and preset. */
   private async assemblyContext(projectId: string, components: ProjectComponents): Promise<AssemblyContext> {
     const project = this.cardProject(projectId);
     const view = this.views.get(projectId);
     let table: AssemblyContext['table'] = null;
     try { const state = await readVariableTableState(project.path); table = state.source ? state.table : null; } catch { table = null; }
-    return { frontend: await this.frontend(), table, cardName: assemblyCardName(components, view?.name ?? project.name), preset: view?.stylePreset?.id ?? null };
+    const registration = await readCardFile(project.path).catch(() => null);
+    return { frontend: await this.frontend(), table, cardName: assemblyCardName(components, view?.name ?? project.name), preset: view?.stylePreset?.id ?? null, avatars: await this.avatars(project.path), external: frontendExternalOf(registration) };
   }
 
   private cardConversation(taskId: string): Task {
@@ -1201,7 +1243,7 @@ export class CardStudioService {
   }
 
   private placeholder(project: Project, error?: string): CardProjectView {
-    return { projectId: project.id, path: project.path, cardId: '', name: project.name, kind: 'original', coverStyle: 'vermilion', stylePreset: null, origin: 'new', createdAt: project.createdAt, updatedAt: project.createdAt, lastEditedAt: project.createdAt, dispatches: [], design: { exists: false, people: null }, changes: [], sources: 0, unclassified: 0, ...(error ? { error } : {}) };
+    return { projectId: project.id, path: project.path, cardId: '', name: project.name, kind: 'original', coverStyle: 'vermilion', stylePreset: null, frontendAssets: { mode: 'inline', base: '' }, origin: 'new', createdAt: project.createdAt, updatedAt: project.createdAt, lastEditedAt: project.createdAt, dispatches: [], design: { exists: false, people: null }, changes: [], sources: 0, unclassified: 0, ...(error ? { error } : {}) };
   }
 
   private async load(project: Project): Promise<CardProjectView> {
@@ -1219,7 +1261,7 @@ export class CardStudioService {
     return {
       projectId: project.id, path: project.path, cardId: file.cardId, name: file.name, kind: file.kind, ...(file.source ? { source: file.source } : {}),
       // Planning names the preset in the design book's 风格预设 section; that is what the card shows once it exists.
-      coverStyle: file.coverStyle, ...(file.cover ? { cover: file.cover } : {}), stylePreset: (design === undefined ? null : parseStylePreset(design)) ?? file.stylePreset, origin: file.origin,
+      coverStyle: file.coverStyle, ...(file.cover ? { cover: file.cover } : {}), stylePreset: (design === undefined ? null : parseStylePreset(design)) ?? file.stylePreset, frontendAssets: file.frontendAssets, origin: file.origin,
       createdAt: file.createdAt, updatedAt: file.updatedAt, lastEditedAt: file.updatedAt, dispatches: file.dispatches,
       design: { exists: design !== undefined, people: design === undefined ? null : parsePeople(design) }, changes: file.changes, sources, unclassified,
       ...(variableTable ? { variableTable } : {}),

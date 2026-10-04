@@ -407,6 +407,7 @@ async function initialize(): Promise<void> {
   handle('exportAllCardPieces', async id => cardStudio.exportAllPieces(id));
   handle('readCardMeta', async id => cardStudio.readMeta(id));
   handle('saveCardMeta', async (id, meta) => cardStudio.saveMeta(id, meta));
+  handle('saveCardFrontendAssets', async (id, assets) => cardStudio.saveFrontendAssets(id, assets));
   handle('previewCard', async (id, kind) => cardStudio.preview(id, ['update', 'status', 'start'].includes(String(kind)) ? kind as CardPreviewKind : 'body'));
   handle('importCardPiece', async id => {
     const selected = await dialog.showOpenDialog(window!, { title: '导入正则或脚本 / Import a regex or a script', properties: ['openFile'], filters: [{ name: '正则与脚本 / Regex and scripts', extensions: ['json'] }] });

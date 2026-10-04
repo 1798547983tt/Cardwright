@@ -157,8 +157,50 @@ test('enrichSheet and compress are plain helpers', () => {
   assert.equal(JSON.stringify(original), snapshot, 'enrichSheet copies the sheet rather than mutating it');
 });
 
-test('user content carrying $-sequences and a missing skin are reported, not shipped corrupted', () => {
-  const status = parseAssemblySheet(STATUS_SHEET) as StatusSheet;
+const EXTERNAL = { root: 'https://testingcf.jsdelivr.net/gh/owner/repo@v1.2.0/card-studio/frontend' };
+
+test('外链模式：runtime 与 base 走链接，装配单自己的东西仍旧内联，卡明显变小', () => {
+  const sheet = parseAssemblySheet(STATUS_SHEET) as StatusSheet;
+  const inline = compileSheet(sheet, context()).html;
+  const external = compileSheet(sheet, context({ external: EXTERNAL })).html;
+
+  assert.ok(isHtmlDocument(external), '仍然是一份完整文档');
+  assert.match(external, new RegExp(`<!-- Cardwright assets ${EXTERNAL.root.replaceAll('.', '\\.')} -->`));
+  assert.match(external, new RegExp(`<link rel="stylesheet" href="${EXTERNAL.root}/base\\.css">`));
+  assert.match(external, new RegExp(`<link rel="stylesheet" href="${EXTERNAL.root}/skins/${sheet.preset ?? 'sakura'}\\.css">`));
+  assert.match(external, new RegExp(`<script src="${EXTERNAL.root}/runtime/core\\.js"></script>`));
+  assert.match(external, new RegExp(`<script src="${EXTERNAL.root}/runtime/host\\.js"></script>`));
+  assert.ok(!external.includes('CardwrightCore') && !external.includes('CardwrightHost ='), 'runtime 不再内联');
+  assert.ok(external.length < inline.length / 4, `${external.length} 应远小于 ${inline.length}`);
+  assert.ok(external.includes('<textarea id="cw-source" hidden>$1</textarea>') || !external.includes('cw-source'), '正文美化的 $1 捕获点照旧');
+  assert.match(external, /<script>CardwrightHost\.boot\(\);<\/script>/, '调用仍旧留在文档里');
+
+  // 质量检查按链接到的资源判定：不报「用了外部资源」，也没有因为看不到样式而误报的错误。
+  const withAssets = frontendQuality(external, { assets: resources });
+  assert.deepEqual(withAssets.filter(item => item.level === 'error').map(item => item.code), []);
+  assert.ok(!withAssets.some(item => item.code === 'frontend-external'));
+  assert.deepEqual(withAssets.filter(item => item.level === 'warning').map(item => item.code), [], '外链文档不该因为看不到皮肤而多出令牌/media 之类警告');
+});
+
+test('外链模式：custom 皮肤把装配单令牌内联，皮肤文件本身外链', () => {
+  const sheet = { ...(parseAssemblySheet(STATUS_SHEET) as StatusSheet), preset: 'custom', tokens: TOKENS };
+  const html = compileSheet(sheet, context({ external: EXTERNAL })).html;
+  assert.match(html, new RegExp(`<link rel="stylesheet" href="${EXTERNAL.root}/skins/custom\\.css">`));
+  assert.match(html, /<style>[\s\S]*--bg: #101214;[\s\S]*<\/style>/, '装配单令牌必须留在文档里');
+  assert.deepEqual(frontendQuality(html, { assets: resources }).filter(item => item.level === 'error').map(item => item.code), []);
+});
+
+test('外链模式的两种形态（创角页 / 正文美化）同样只写链接', () => {
+  for (const body of [START_SHEET, BODY_SHEET]) {
+    const result = compileSheet(parseAssemblySheet(body), context({ external: EXTERNAL }));
+    assert.deepEqual(result.issues, [], body.slice(0, 20));
+    assert.ok(result.html.length < 8 * 1024, `${result.kind}: ${result.html.length} 字节`);
+    assert.match(result.html, /runtime\/core\.js/);
+    assert.ok(!result.html.includes('.cw-app { max-width'), 'base.css 不再内联');
+  }
+});
+
+test('user content carrying $-sequences and a missing skin are reported, not shipped corrupted', () => {  const status = parseAssemblySheet(STATUS_SHEET) as StatusSheet;
   const dollar = compileSheet({ ...status, title: '赏金$1章' }, context());
   assert.deepEqual(dollar.issues.map(issue => issue.code), ['sheet-invalid']);
   assert.match(dollar.issues[0].message, /\$/);

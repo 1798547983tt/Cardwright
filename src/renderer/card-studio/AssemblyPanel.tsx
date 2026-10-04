@@ -4,13 +4,49 @@ import remarkGfm from 'remark-gfm';
 import { AlertTriangle, CircleCheck, FileDown, FolderOpen, Image, Info, LoaderCircle, Package, Save, ShieldAlert } from 'lucide-react';
 import { useApp } from '../context';
 import { UNCLASSIFIED_SECTION, sectionLabel } from '../../shared/card-studio/boards';
+import { DEFAULT_FRONTEND_ASSETS_BASE } from '../../shared/card-studio/types';
 import { renderCoverPng } from './cover-canvas';
 import { PreviewPanel } from './PreviewPanel';
 import { UnclassifiedDialog } from './UnclassifiedDialog';
 import type { CardCheckReport, CardExportResult, CardMeta, CardProjectView } from '../../shared/card-studio/types';
 
 const LEVEL_ICON = { error: ShieldAlert, warning: AlertTriangle, info: Info } as const;
-type Busy = 'check' | 'card' | 'lorebook' | 'png' | 'pieces' | 'meta' | null;
+type Busy = 'check' | 'card' | 'lorebook' | 'png' | 'pieces' | 'meta' | 'assets' | null;
+
+/**
+ * 前端资源的编译选项：内联（骨架写进卡里）还是外链（锁一个已发布的 tag）。
+ * 外链时 runtime 与皮肤从 CDN 取，卡体积约减半，也不会再穿过酒馆的文本管线。
+ */
+function FrontendAssetsForm({ card, busy, setBusy }: { card: CardProjectView; busy: Busy; setBusy: (value: Busy) => void }) {
+  const { api, t, run } = useApp();
+  const saved = card.frontendAssets;
+  const [mode, setMode] = useState(saved.mode);
+  const [base, setBase] = useState(saved.base || DEFAULT_FRONTEND_ASSETS_BASE);
+  useEffect(() => { setMode(saved.mode); setBase(saved.base || DEFAULT_FRONTEND_ASSETS_BASE); }, [saved.mode, saved.base]);
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy('assets');
+    await run(() => api.saveCardFrontendAssets(card.projectId, { mode, base: mode === 'cdn' ? base.trim() : '' }), t('Front-end assets saved', '前端资源设置已保存'));
+    setBusy(null);
+  }
+  return <details className="cs-meta">
+    <summary>{t('Front-end assets', '前端资源')}<small>{saved.mode === 'cdn' ? t('external · a pinned tag', '外链 · 锁 tag') : t('inline · written into the card', '内联 · 写进卡里')}</small></summary>
+    <form onSubmit={event => void submit(event)}>
+      <label className="cs-field"><span>{t('Mode', '方式')}<small>{t('what the export writes', '导出时怎么装前端')}</small></span>
+        <select value={mode} onChange={event => setMode(event.target.value === 'cdn' ? 'cdn' : 'inline')}>
+          <option value="inline">{t('Inline (default)', '内联（默认）')}</option>
+          <option value="cdn">{t('External · CDN', '外链 · CDN')}</option>
+        </select>
+      </label>
+      {mode === 'cdn' && <label className="cs-field cs-meta-wide"><span>{t('Asset base', '资产地址')}<small>{t('a published https tag of this repository', '本仓库已发布的 https tag')}</small></span>
+        <input value={base} onChange={event => setBase(event.target.value)} placeholder={DEFAULT_FRONTEND_ASSETS_BASE} /></label>}
+      <div className="cs-meta-actions">
+        {mode === 'cdn' && <p className="cs-note">{t('The card then needs the network; if the CDN is unreachable the front-end stays blank.', '外链版依赖网络：CDN 拉不到时前端会是空白。')}</p>}
+        <button type="submit" className="cs-btn" disabled={busy !== null}><Save size={14} />{t('Save front-end assets', '保存前端资源设置')}</button>
+      </div>
+    </form>
+  </details>;
+}
 
 /** The name, author, version, notes and tags SillyTavern shows (§3.6 step 3), confirmed before the export. */
 function MetaForm({ card, busy, setBusy }: { card: CardProjectView; busy: Busy; setBusy: (value: Busy) => void }) {
@@ -105,6 +141,7 @@ export function AssemblyPanel({ card }: { card: CardProjectView }) {
     </header>
 
     <MetaForm card={card} busy={busy} setBusy={setBusy} />
+    <FrontendAssetsForm card={card} busy={busy} setBusy={setBusy} />
 
     {report && <dl className="cs-assembly-stats">
       <div><dt>{t('Entries', '条目')}</dt><dd>{report.stats.entries}</dd></div>
