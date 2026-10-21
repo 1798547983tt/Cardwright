@@ -6,11 +6,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { WorkerRuntime } from '../src/runtime/worker.ts';
-import { createResources } from '../src/runtime/resources.ts';
-import type { FromWorker, Gateway, PermissionMode, WorkerInit } from '../src/shared/types.ts';
-import { CARD_ROLES } from '../src/shared/card-studio/squad.ts';
-import type { CardSquadAssignment } from '../src/shared/card-studio/types.ts';
+import { WorkerRuntime } from '../../src/runtime/worker.ts';
+import { createResources } from '../../src/runtime/resources.ts';
+import type { FromWorker, Gateway, PermissionMode, WorkerInit } from '../../src/shared/types.ts';
+import { CARD_ROLES } from '../../src/shared/card-studio/squad.ts';
+import type { CardSquadAssignment } from '../../src/shared/card-studio/types.ts';
 
 async function createFixture(mode: PermissionMode, handler: (request: Record<string, unknown>, response: ServerResponse) => void, protocol: Gateway['protocol'] = 'openai-completions') {
   const root = await mkdtemp(join(tmpdir(), 'cardwright-worker-'));
@@ -542,7 +542,7 @@ test('messages arriving during prompt preflight are queued and settle once', { t
 
 test('the actual child worker accepts IPC init/prompt and reports streamed completion', { timeout: 30000 }, async () => {
   const fixture = await createFixture('ask', (_request, response) => stream(response, undefined, 'IPC verified.'));
-  const child = fork(fileURLToPath(new URL('../src/runtime/worker.ts', import.meta.url)), [], {
+  const child = fork(fileURLToPath(new URL('../../src/runtime/worker.ts', import.meta.url)), [], {
     execArgv: ['--import', 'tsx'], stdio: 'pipe', serialization: 'json',
   });
   const messages: FromWorker[] = [];

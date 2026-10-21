@@ -4,11 +4,11 @@ import { createServer, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { WorkerRuntime } from '../src/runtime/worker.ts';
-import { runSandboxCommand } from '../src/runtime/sandbox-runner.ts';
-import { defaultEcosystem } from '../src/core/ecosystem.ts';
-import { buildSectionPrompt } from '../src/core/card-studio/prompts.ts';
-import type { FromWorker, PermissionMode, WorkerInit } from '../src/shared/types.ts';
+import { WorkerRuntime } from '../../src/runtime/worker.ts';
+import { runSandboxCommand } from '../../src/runtime/sandbox-runner.ts';
+import { defaultEcosystem } from '../../src/core/ecosystem.ts';
+import { buildSectionPrompt } from '../../src/core/card-studio/prompts.ts';
+import type { FromWorker, PermissionMode, WorkerInit } from '../../src/shared/types.ts';
 
 const windowsOnly = { skip: process.platform !== 'win32' };
 /** Lists the names of PI_* variables the command can see; prints PI_COUNT=0 when there are none. */

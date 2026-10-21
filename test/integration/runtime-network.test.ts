@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { createServer, type RequestListener } from 'node:http';
 import v8 from 'node:v8';
 import { runInNewContext } from 'node:vm';
-import { brokeredFetch, withNetworkPolicy } from '../src/runtime/network-broker.ts';
+import { brokeredFetch, withNetworkPolicy } from '../../src/runtime/network-broker.ts';
 
 async function endpoint(handler: RequestListener) {
   const server = createServer(handler);

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
-import { runChecks, relevantChecks, type CheckExecutor } from '../src/main/check-runner.ts';
-import { buildDelivery, verificationStatus } from '../src/core/delivery.ts';
+import { runChecks, relevantChecks, type CheckExecutor } from '../../src/main/check-runner.ts';
+import { buildDelivery, verificationStatus } from '../../src/core/delivery.ts';
 const executor: CheckExecutor = async (command, cwd, onData, signal) => new Promise((resolve, reject) => { const child = spawn(process.execPath, ['-e', command], { cwd, windowsHide: true, signal }); child.stdout.on('data', chunk => onData(String(chunk))); child.stderr.on('data', chunk => onData(String(chunk))); child.on('error', reject); child.on('exit', (exitCode, signal) => resolve({ exitCode, signal: signal || undefined })); });
 test('configured relevant checks execute actual processes and separate exit evidence from model completion', async () => {
   const checks = [{ id: 'unit', name: 'Unit tests', command: 'console.log("actual pass");', paths: ['src/**/*.ts'] }, { id: 'docs', name: 'Docs', command: 'process.exit(7)', paths: ['docs/**'] }];

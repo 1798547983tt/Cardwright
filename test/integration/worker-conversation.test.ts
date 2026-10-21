@@ -4,9 +4,9 @@ import { createServer, type ServerResponse } from 'node:http';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { WorkerRuntime } from '../src/runtime/worker.ts';
-import type { FromWorker, WorkerInit } from '../src/shared/types.ts';
-import { BUILTIN_ROLES, defaultEcosystem } from '../src/core/ecosystem.ts';
+import { WorkerRuntime } from '../../src/runtime/worker.ts';
+import type { FromWorker, WorkerInit } from '../../src/shared/types.ts';
+import { BUILTIN_ROLES, defaultEcosystem } from '../../src/core/ecosystem.ts';
 
 function respond(response: ServerResponse, text = 'Finished.', tool?: { name: string; args: Record<string, unknown> }, usage = { prompt_tokens: 120, completion_tokens: 24, total_tokens: 144 }) {
   response.writeHead(200, { 'content-type': 'text/event-stream' });

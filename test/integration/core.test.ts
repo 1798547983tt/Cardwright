@@ -5,10 +5,10 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import test, { type TestContext } from 'node:test';
-import { AppStore } from '../src/core/store.ts';
-import { addProjectInfo, createWorktree, getDiff, mergeWorktree } from '../src/core/git.ts';
-import { evaluateSchedule, nextRunAfter, SCHEDULE_GRACE_MS } from '../src/core/scheduler.ts';
-import type { Gateway, Project, Schedule, Task } from '../src/shared/types.ts';
+import { AppStore } from '../../src/core/store.ts';
+import { addProjectInfo, createWorktree, getDiff, mergeWorktree } from '../../src/core/git.ts';
+import { evaluateSchedule, nextRunAfter, SCHEDULE_GRACE_MS } from '../../src/core/scheduler.ts';
+import type { Gateway, Project, Schedule, Task } from '../../src/shared/types.ts';
 
 const exec = promisify(execFile);
 const at = '2026-09-16T10:00:00.000Z';

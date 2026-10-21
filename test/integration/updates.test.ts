@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { UpdateService } from '../src/main/updates.ts';
+import { UpdateService } from '../../src/main/updates.ts';
 
 const exec=promisify(execFile),digest=(data:Buffer|string)=>createHash('sha256').update(data).digest('hex');
 async function fixture(){const root=await mkdtemp(join(tmpdir(),'cardwright-updates-'));const data=join(root,'data'),source=join(root,'source');await mkdir(data);await mkdir(source);await writeFile(join(data,'state.json'),JSON.stringify({version:'old',tasks:[]}));await writeFile(join(data,'studio.json'),JSON.stringify({rules:['old']}));return{root,data,source,async cleanup(){assert.equal(dirname(root),resolve(tmpdir()));assert.match(root,/cardwright-updates-/);await rm(root,{recursive:true,force:true});}};}

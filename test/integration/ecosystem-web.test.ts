@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { build } from 'esbuild';
 import { test } from 'node:test';
-import { ecosystemSearch, fetchWebContent, nativeSearchEndpoint, type SearchGateway } from '../src/runtime/ecosystem-web.ts';
+import { ecosystemSearch, fetchWebContent, nativeSearchEndpoint, type SearchGateway } from '../../src/runtime/ecosystem-web.ts';
 
 const gateway: SearchGateway = { id: 'fixture', name: 'Fixture', baseUrl: 'https://gateway.example/v1', modelId: 'test-model', protocol: 'openai-responses', reasoning: false, contextWindow: 16000, maxTokens: 2000, hasKey: true };
 const auto = { enabled: true, provider: 'auto' as const, baseUrl: '', hasKey: false };
@@ -117,7 +117,7 @@ test('bundled CJS search loads pinned upstream TypeScript under plain Node witho
   const testDirectory = dirname(fileURLToPath(import.meta.url));
   const directory = await mkdtemp(join(testDirectory, '.compiled-web-'));
   try {
-    await build({ entryPoints: [join(testDirectory, '../src/runtime/ecosystem-web.ts')], outfile: join(directory, 'web.cjs'), bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent' });
+    await build({ entryPoints: [join(testDirectory, '../../src/runtime/ecosystem-web.ts')], outfile: join(directory, 'web.cjs'), bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent' });
     const runner = join(directory, 'run.cjs');
     await writeFile(runner, `
       const { ecosystemSearch } = require('./web.cjs');

@@ -4,8 +4,8 @@ import { createServer, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { WorkerRuntime } from '../src/runtime/worker.ts';
-import type { FromWorker, WorkerInit } from '../src/shared/types.ts';
+import { WorkerRuntime } from '../../src/runtime/worker.ts';
+import type { FromWorker, WorkerInit } from '../../src/shared/types.ts';
 
 /** Mirrors the captured DeepSeek failure: reasoning only, finish_reason "length", output equal to max_tokens. */
 function reasoningOnly(response: ServerResponse, outputTokens: number) {

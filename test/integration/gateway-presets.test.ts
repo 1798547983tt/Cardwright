@@ -5,11 +5,11 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as presets from '../src/shared/gateway-presets.ts';
-import { Harness } from '../src/main/harness.ts';
-import { Vault, type SecretCodec } from '../src/main/vault.ts';
+import * as presets from '../../src/shared/gateway-presets.ts';
+import { Harness } from '../../src/main/harness.ts';
+import { Vault, type SecretCodec } from '../../src/main/vault.ts';
 
-const fakeWorker = fileURLToPath(new URL('./fixtures/fake-worker.mjs', import.meta.url));
+const fakeWorker = fileURLToPath(new URL('../fixtures/fake-worker.mjs', import.meta.url));
 const codec: SecretCodec = { encrypt: value => Buffer.from(`fixture-codec:${value}`), decrypt: value => value.toString().slice('fixture-codec:'.length) };
 
 test('two gateway presets, both the user’s own services on this computer: local models and a local proxy', () => {

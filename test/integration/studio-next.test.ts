@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { modelCatalogUrl, fetchModelCatalog } from '../src/core/model-catalog.ts';
-import { startRevision, selectRevision } from '../src/core/conversation-revisions.ts';
-import { buildUsageReport } from '../src/shared/usage.ts';
-import type { Task } from '../src/shared/types.ts';
+import { modelCatalogUrl, fetchModelCatalog } from '../../src/core/model-catalog.ts';
+import { startRevision, selectRevision } from '../../src/core/conversation-revisions.ts';
+import { buildUsageReport } from '../../src/shared/usage.ts';
+import type { Task } from '../../src/shared/types.ts';
 
 test('model catalogue handles both protocols, names, duplicate IDs, and never follows credential redirects', async () => {
   let seenKey = ''; let redirects = 0;

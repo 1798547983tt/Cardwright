@@ -5,8 +5,8 @@ import { dirname, join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { test } from 'node:test';
-import { runSandboxCommand, startSandboxCommand } from '../src/runtime/sandbox-runner.ts';
-import { TerminalService } from '../src/main/terminal-service.ts';
+import { runSandboxCommand, startSandboxCommand } from '../../src/runtime/sandbox-runner.ts';
+import { TerminalService } from '../../src/main/terminal-service.ts';
 import { createServer } from 'node:net';
 
 const exec = promisify(execFile);

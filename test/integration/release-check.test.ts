@@ -5,8 +5,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { AppStore } from '../src/core/store.ts';
-import { isNewerVersion, ReleaseCheck, RELEASES_PAGE, type ReleaseCheckOptions } from '../src/main/release-check.ts';
+import { AppStore } from '../../src/core/store.ts';
+import { isNewerVersion, ReleaseCheck, RELEASES_PAGE, type ReleaseCheckOptions } from '../../src/main/release-check.ts';
 
 const PAGE = 'https://github.com/1798547983tt/Cardwright/releases/tag/v1.1.0';
 const NOW = new Date('2026-09-24T08:00:00.000Z');

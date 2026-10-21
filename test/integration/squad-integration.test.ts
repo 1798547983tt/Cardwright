@@ -5,8 +5,8 @@ import { promisify } from 'node:util';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
-import { SquadIntegrationService } from '../src/core/squad-integration.ts';
-import { ReviewDriftError } from '../src/core/checkpoints.ts';
+import { SquadIntegrationService } from '../../src/core/squad-integration.ts';
+import { ReviewDriftError } from '../../src/core/checkpoints.ts';
 const exec = promisify(execFile);
 async function git(cwd: string, ...args: string[]) { return (await exec('git', args, { cwd, windowsHide: true })).stdout.trim(); }
 async function fixture(t: TestContext) {
