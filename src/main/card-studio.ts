@@ -28,7 +28,8 @@ import { isCardJson, isLorebookJson, joinComponent } from '../shared/card-studio
 import { sampleOutputFrom } from '../core/card-studio/regex.ts';
 import { renderReply, updateBlocks, type PreviewRegex, type PreviewSegment } from '../shared/card-studio/preview.ts';
 import { readCardFromPng, stripCardFromPng, writeCheckedCardPng } from '../core/card-studio/png.ts';
-import { coverDataUrl, decodeCardImage, decodeCover } from '../core/card-studio/cover.ts';
+import { coverDataUrl, decodeCardImage, validateStoredCover } from '../core/card-studio/cover.ts';
+import { cropCover, releaseCoverSource } from './card-cover.ts';
 import { SECTION_IDS, UNCLASSIFIED_SECTION, sortByDependency } from '../shared/card-studio/boards.ts';
 import { DISPATCH_BATCH_LIMIT, dispatchKey, mayAddDispatches, messageStartsDispatch, parseDispatches, planDispatchBatch, sectionDispatchKey, type DispatchBatchResult } from '../shared/card-studio/dispatch.ts';
 import { projectRelativePath, squadOf, squadTools } from '../shared/card-studio/view.ts';
@@ -38,7 +39,7 @@ import { parseStylePreset } from '../shared/card-studio/style-presets.ts';
 import { KICKOFF, handoffRequestText, isHandoffRequest } from '../shared/card-studio/markers.ts';
 import { formatHandoff, handoffFromReply } from '../shared/card-studio/handoff.ts';
 import { changeQueue, runIsOpen, runOwns, runnableSection } from '../shared/card-studio/run.ts';
-import type { CardChange, CardChangeItem, CardCheckReport, CardComponentResult, CardComponentSummary, CardDispatch, CardExportResult, CardImportPreview, CardImportReport, CardLoreSuggestion, CardMeta, CardPieceSummary, CardPreview, CardPreviewKind, CardPreviewState, CardProjectView, CardRunSettings, CardSquadAssignment, CardStudioSnapshot, CardVariableSyncResult, CardVariableTableView, CardVariableTableEdit, CoverSource, NewCardChange, NewCardComponent, NewCardProject, PlanMode, StartCardConversation } from '../shared/card-studio/types.ts';
+import type { CardChange, CardChangeItem, CardCheckReport, CardComponentResult, CardComponentSummary, CardDispatch, CardExportResult, CardImportPreview, CardImportReport, CardLoreSuggestion, CardMeta, CardPieceSummary, CardPreview, CardPreviewKind, CardPreviewState, CardProjectView, CardRunSettings, CardSquadAssignment, CardStudioSnapshot, CardVariableSyncResult, CardVariableTableView, CardVariableTableEdit, CoverSaveRequest, CoverSource, NewCardChange, NewCardComponent, NewCardProject, PlanMode, StartCardConversation } from '../shared/card-studio/types.ts';
 
 export type StartConversationInput = StartCardConversation;
 const ACTIVE = new Set(['queued', 'running', 'waiting']);
@@ -808,18 +809,28 @@ export class CardStudioService {
     return (await this.options.pickCover?.()) ?? null;
   }
 
-  async saveCover(projectId: string, dataUrl: string): Promise<CardProjectView> {
+  /** Crops the retained source through the sharp pipeline in card-cover.ts and stores the encoded bytes. */
+  async saveCover(projectId: string, request: CoverSaveRequest): Promise<CardProjectView> {
     const project = this.cardProject(projectId);
-    const png = decodeCover(dataUrl);
+    const cropped = await cropCover(request);
+    const bytes = validateStoredCover(cropped.bytes);
     await this.exclusive(projectId, async () => {
       await mkdir(join(project.path, '封面'), { recursive: true });
-      await writeFile(join(project.path, '封面', '封面.png'), png);
       const file = await readCardFile(project.path);
-      file.cover = '封面/封面.png';
+      const previous = file.cover;
+      const cover = `封面/封面${cropped.extension}`;
+      await writeFile(join(project.path, ...cover.split('/')), bytes);
+      if (previous && previous !== cover) await rm(join(project.path, ...previous.split('/')), { force: true });
+      file.cover = cover;
       file.updatedAt = stamp();
       await writeCardFile(project.path, file);
     });
     return this.reload(projectId);
+  }
+
+  /** Lets go of a source the crop dialog is done with. */
+  async releaseCoverSource(sourceId: string): Promise<void> {
+    releaseCoverSource(sourceId);
   }
 
   async clearCover(projectId: string): Promise<CardProjectView> {

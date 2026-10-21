@@ -348,6 +348,8 @@ button.cs-path:hover { color: var(--cs-gold-2); }
 .cs-cover-zoom { display: flex; align-items: center; gap: 12px; width: min(280px, 100%); margin: 14px auto 0; font-size: 12.5px; letter-spacing: .08em; color: var(--cs-muted); }
 .cs-cover-zoom input { flex: 1; accent-color: var(--cs-gold-2); }
 .cs-cover-zoom b { min-width: 46px; font: 12.5px var(--cs-mono); color: var(--cs-text-2); text-align: right; }
+.cs-cover-zoom select.cs-cover-size { flex: 1; height: 26px; padding: 0 6px; color: var(--cs-text-2); background: var(--cs-panel, #14171c); border: 1px solid rgba(156, 127, 79, .4); border-radius: 6px; font: 12px var(--cs-mono); letter-spacing: .04em; }
+.cs-cover-zoom select.cs-cover-size:focus-visible { outline: 1px solid var(--cs-gold-2); }
 .cs-cover-modal .modal-actions { flex-wrap: wrap; }
 
 /* The toast shown while the studio is open sits outside .card-studio, so it carries its own colors. */
