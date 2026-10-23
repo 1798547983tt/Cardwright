@@ -4,8 +4,8 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { ConfigBackup, validateBackupData, type BackupData } from '../src/main/ecosystem-backup.ts';
-import type { AppSnapshot } from '../src/shared/types.ts';
+import { ConfigBackup, validateBackupData, type BackupData } from '../../src/main/ecosystem-backup.ts';
+import type { AppSnapshot } from '../../src/shared/types.ts';
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'cardwright-backup-')); const skillPath = join(root, 'selected-skill', 'SKILL.md');

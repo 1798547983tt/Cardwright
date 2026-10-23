@@ -4,8 +4,8 @@ import { createServer, type ServerResponse } from 'node:http';
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { WorkerRuntime } from '../src/runtime/worker.ts';
-import type { FromWorker, Gateway, WorkerInit } from '../src/shared/types.ts';
+import { WorkerRuntime } from '../../src/runtime/worker.ts';
+import type { FromWorker, Gateway, WorkerInit } from '../../src/shared/types.ts';
 
 /** One streamed reply, the way an OpenAI-compatible relay sends it. */
 function reply(response: ServerResponse, text = 'Finished.') {

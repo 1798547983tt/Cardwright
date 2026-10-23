@@ -9,7 +9,7 @@ import { build } from 'esbuild';
 
 test('bundled CJS memory resolves app packages outside cwd and runs in Electron Node mode', async () => {
   const testDir = dirname(fileURLToPath(import.meta.url));
-  const project = dirname(testDir);
+  const project = dirname(dirname(testDir));
   const moduleDir = mkdtempSync(join(testDir, '.memory-bundle-'));
   const dataDir = mkdtempSync(join(tmpdir(), 'cardwright-memory-cjs-'));
   try {

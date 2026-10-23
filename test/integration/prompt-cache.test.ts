@@ -5,11 +5,11 @@ import { join } from 'node:path';
 import { createServer, type ServerResponse } from 'node:http';
 import { test } from 'node:test';
 import { createSyntheticSourceInfo, type Skill } from '@earendil-works/pi-coding-agent';
-import { PrefixMeter, contextSnapshot } from '../src/runtime/prompt-cache.ts';
-import { cardwrightSystemPrompt, createResources, instructionContext, type ResourceOptions } from '../src/runtime/resources.ts';
-import { searchSkillCatalog } from '../src/runtime/skill-tools.ts';
-import { WorkerRuntime } from '../src/runtime/worker.ts';
-import type { FromWorker, WorkerInit } from '../src/shared/types.ts';
+import { PrefixMeter, contextSnapshot } from '../../src/runtime/prompt-cache.ts';
+import { cardwrightSystemPrompt, createResources, instructionContext, type ResourceOptions } from '../../src/runtime/resources.ts';
+import { searchSkillCatalog } from '../../src/runtime/skill-tools.ts';
+import { WorkerRuntime } from '../../src/runtime/worker.ts';
+import type { FromWorker, WorkerInit } from '../../src/shared/types.ts';
 
 const lead = { modelId: 'model-a', gatewayName: 'Relay', language: 'zh' as const, persona: true, member: false };
 const systemFor = (options: ResourceOptions) => createResources(tmpdir(), tmpdir(), [], '', undefined, options).getSystemPrompt()!;

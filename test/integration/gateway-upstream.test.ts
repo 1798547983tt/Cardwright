@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import { AddressInfo } from 'node:net';
 import type { Model } from '@earendil-works/pi-ai/compat';
-import { detectUpstream, resolveUpstream, upstreamCompat, isGatewayUpstream, GATEWAY_UPSTREAMS } from '../src/shared/gateway-upstream.ts';
+import { detectUpstream, resolveUpstream, upstreamCompat, isGatewayUpstream, GATEWAY_UPSTREAMS } from '../../src/shared/gateway-upstream.ts';
 
 /**
  * A stand-in for a strict service such as NVIDIA NIM: it validates the request

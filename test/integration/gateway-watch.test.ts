@@ -4,8 +4,8 @@ import { createServer, type RequestListener } from 'node:http';
 import v8 from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import { isRetryableAssistantError, type AssistantMessage } from '@earendil-works/pi-ai';
-import { watchedFetch } from '../src/runtime/gateway-watch.ts';
-import { withNetworkPolicy } from '../src/runtime/network-broker.ts';
+import { watchedFetch } from '../../src/runtime/gateway-watch.ts';
+import { withNetworkPolicy } from '../../src/runtime/network-broker.ts';
 
 async function endpoint(handler: RequestListener) {
   const server = createServer(handler);

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { createServer, type ServerResponse } from 'node:http';
 import { test } from 'node:test';
-import { decidePermission } from '../src/runtime/permissions.ts';
-import { searchConfigurationError, searchWeb } from '../src/runtime/web-search.ts';
-import type { SearchConfig } from '../src/shared/types.ts';
+import { decidePermission } from '../../src/runtime/permissions.ts';
+import { searchConfigurationError, searchWeb } from '../../src/runtime/web-search.ts';
+import type { SearchConfig } from '../../src/shared/types.ts';
 
 const brave: SearchConfig = { enabled: true, provider: 'brave', baseUrl: 'https://ignored.invalid/', hasKey: true };
 const fixtureKey = 'search-fixture-secret';

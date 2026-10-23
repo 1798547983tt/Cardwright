@@ -9,10 +9,10 @@ import { build } from 'esbuild';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
 import { createAgentSession, createEventBus, createExtensionRuntime, ModelRuntime, SessionManager, SettingsManager } from '@earendil-works/pi-coding-agent';
-import { loadExtensionFromFactory } from '../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js';
+import { loadExtensionFromFactory } from '../../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js';
 import { InMemoryCredentialStore } from '@earendil-works/pi-ai';
-import { createResources } from '../src/runtime/resources.ts';
-import { createEcosystemMcpExtension, ecosystemMcpConfig } from '../src/runtime/ecosystem-mcp.ts';
+import { createResources } from '../../src/runtime/resources.ts';
+import { createEcosystemMcpExtension, ecosystemMcpConfig } from '../../src/runtime/ecosystem-mcp.ts';
 
 test('MCP config is an isolated lazy snapshot with no environment/credential autodiscovery', () => {
   const input = [{ id: 'local', name: 'Local', enabled: true, transport: 'stdio' as const, command: 'node', args: ['server.mjs'], env: { EXPLICIT: 'literal' } }];
@@ -77,7 +77,7 @@ test('bundled ESM MCP adapter loads under plain Node without node_modules type s
   const testDirectory = dirname(fileURLToPath(import.meta.url));
   const directory = await mkdtemp(join(testDirectory, '.compiled-mcp-'));
   try {
-    await build({ entryPoints: [join(testDirectory, '../src/runtime/ecosystem-mcp.ts')], outfile: join(directory, 'mcp.mjs'), bundle: true, packages: 'external', platform: 'node', format: 'esm', logLevel: 'silent' });
+    await build({ entryPoints: [join(testDirectory, '../../src/runtime/ecosystem-mcp.ts')], outfile: join(directory, 'mcp.mjs'), bundle: true, packages: 'external', platform: 'node', format: 'esm', logLevel: 'silent' });
     const runner = join(directory, 'run.mjs');
     await writeFile(runner, `
       import { createEcosystemMcpExtension } from './mcp.mjs';

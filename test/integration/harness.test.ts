@@ -6,14 +6,14 @@ import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import test, { type TestContext } from 'node:test';
-import { AppStore } from '../src/core/store.ts';
-import { DREAMER_ROLE } from '../src/core/ecosystem.ts';
-import { Harness } from '../src/main/harness.ts';
-import { StudioServices } from '../src/main/studio-services.ts';
-import { Vault, type SecretCodec } from '../src/main/vault.ts';
-import type { Gateway, NewSchedule, NewTask, Preferences, Task } from '../src/shared/types.ts';
+import { AppStore } from '../../src/core/store.ts';
+import { DREAMER_ROLE } from '../../src/core/ecosystem.ts';
+import { Harness } from '../../src/main/harness.ts';
+import { StudioServices } from '../../src/main/studio-services.ts';
+import { Vault, type SecretCodec } from '../../src/main/vault.ts';
+import type { Gateway, NewSchedule, NewTask, Preferences, Task } from '../../src/shared/types.ts';
 
-const fakeWorker = fileURLToPath(new URL('./fixtures/fake-worker.mjs', import.meta.url));
+const fakeWorker = fileURLToPath(new URL('../fixtures/fake-worker.mjs', import.meta.url));
 const exec = promisify(execFile);
 const harnesses = new Map<string, Harness>();
 const codec: SecretCodec = {
