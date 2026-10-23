@@ -6,6 +6,7 @@
  * The variable update receipt is inline (a section and its style, no script) and stays unfenced.
  */
 import { normalizeNewlines } from './fences.ts';
+import type { FrontendResources } from './frontend-compile.ts';
 
 const FENCE = '`'.repeat(3);
 const DOCUMENT_START = /^<!doctype\s+html\b[^>]*>|^<html(?=[\s>])/i;
@@ -290,37 +291,72 @@ function partsOf(html: string): { css: string; inline: string; scripts: string; 
 
 const summary = (items: string[]) => `${items.slice(0, 3).join('；')}${items.length > 3 ? `；另有 ${items.length - 3} 处` : ''}`;
 
+/** 外链模式下 HTML 里只有 `<link>`/`<script src>`：检查时把指向的资源内容补回来，判定口径与内联模式一致。 */
+export interface FrontendQualityOptions { assets?: FrontendResources | null }
+
+/** 文档里指向本仓库发布资产的链接，以及它们对应的内容（只有骨架自己的路径才算，别人的外链仍旧按外链报）。 */
+function linkedAssets(html: string, resources: FrontendResources | null | undefined): { urls: string[]; css: string; scripts: string } {
+  const urls: string[] = [];
+  let css = ''; let scripts = '';
+  if (!resources) return { urls, css, scripts };
+  const stylesheet = (url: string): string | null => {
+    if (url.endsWith('/base.css')) return resources.base;
+    const skin = /\/skins\/([\w-]+)\.css$/.exec(url);
+    return skin ? resources.skins[skin[1]] ?? null : null;
+  };
+  const runtime = (url: string): string | null => {
+    if (url.endsWith('/runtime/core.js')) return resources.core;
+    if (url.endsWith('/runtime/host.js')) return resources.host;
+    if (url.endsWith('/runtime/floating.js')) return resources.floating;
+    return null;
+  };
+  for (const match of html.matchAll(/<link\b[^>]*\bhref\s*=\s*"([^"]+)"/gi)) {
+    const text = stylesheet(match[1]);
+    if (text !== null) { urls.push(match[1]); css += `\n${text}`; }
+  }
+  for (const match of html.matchAll(/<script\b[^>]*\bsrc\s*=\s*"([^"]+)"/gi)) {
+    const text = runtime(match[1]);
+    if (text !== null) { urls.push(match[1]); scripts += `\n${text}`; }
+  }
+  return { urls, css, scripts };
+}
+
 /** The quality findings for one iframe front-end document (Q17). One finding per kind, naming up to three places. */
-export function frontendQuality(html: string): FrontendFinding[] {
+export function frontendQuality(html: string, options: FrontendQualityOptions = {}): FrontendFinding[] {
   const { css, inline, scripts, markup } = partsOf(html);
-  const declarations = [...cssDeclarations(css), ...cssDeclarations(inline)];
+  const linked = linkedAssets(html, options.assets);
+  const cssAll = `${css}\n${linked.css}`;
+  const scriptsAll = `${scripts}\n${linked.scripts}`;
+  const declarations = [...cssDeclarations(cssAll), ...cssDeclarations(inline)];
   const tokens = rootTokens(declarations);
   const findings: FrontendFinding[] = [];
   const add = (level: FrontendFinding['level'], code: string, message: string) => findings.push({ level, code, message });
 
   const mobile = mobileProblems(declarations, markup);
   if (mobile.length) add('error', 'frontend-mobile', `375px 手机上会横向滚动：${summary(mobile)}。宽度改用 max-width 或百分比，定宽只写进 @media (min-width: …)，宽表格外面包一层 overflow-x: auto 的容器。`);
-  const pseudo = /:(hover|active|focus|focus-visible|focus-within)\b/i.test(css);
-  const listens = /addEventListener\s*\(|\.on[a-z]+\s*=|\beventOn\w*\s*\(|\.on\s*\(|\.click\s*\(/i.test(scripts) || /\son[a-z]+\s*=/i.test(markup);
+  const pseudo = /:(hover|active|focus|focus-visible|focus-within)\b/i.test(cssAll);
+  const listens = /addEventListener\s*\(|\.on[a-z]+\s*=|\beventOn\w*\s*\(|\.on\s*\(|\.click\s*\(/i.test(scriptsAll) || /\son[a-z]+\s*=/i.test(markup);
   if (!pseudo && !listens) add('error', 'frontend-interaction', '整个前端没有任何交互反馈：没有 :hover、:active、:focus，也没有事件监听。可以点的东西要让人看出来能点、点了有反应。');
   const contrast = contrastProblems(tokens);
   if (contrast.length) add('error', 'frontend-contrast', `正文对比度低于 4.5:1：${summary(contrast)}。加深文字或调整底色。`);
   const live = html.replace(COMMENTS, '');
   // A warning since 1.1.0 (the user's call, 2026-09-24): hand-written cards that work in SillyTavern still export.
   if (/fonts\.(googleapis|gstatic)\.com/i.test(live)) add('warning', 'frontend-fonts', '用了 Google Fonts：国内经常加载不出来，还会拖慢整个页面。能换就换成系统字体栈。');
-  const external = [MIRROR_HOSTS, CDN_FONT, RAW_GITHUB].flatMap(pattern => { const match = pattern.exec(live); return match ? [match[0].replace(/^(?:https?:)?\/\//, '').slice(0, 80)] : []; });
+  // 骨架自己的外链（外链模式）不算「用了外部资源」：它们是本仓库发的 tag，检查时已按内容补回。
+  const scanned = linked.urls.reduce((text, url) => text.split(url).join(''), live);
+  const external = [MIRROR_HOSTS, CDN_FONT, RAW_GITHUB].flatMap(pattern => { const match = pattern.exec(scanned); return match ? [match[0].replace(/^(?:https?:)?\/\//, '').slice(0, 80)] : []; });
   if (external.length) add('warning', 'frontend-external', `用了外部资源：${summary(external)}。字体镜像、CDN 上的样式表或字体、GitHub raw 上的文件都可能加载慢或失效，卡在别人的机器上会掉样子；骨架前端一律系统字体栈，素材只用设计书里给的链接。`);
   const images = [...html.matchAll(/data:(?:image|audio|video|font)\/[\w.+-]+(?:;[\w=.-]+)*;base64,([A-Za-z0-9+/=\s]+)/gi)].filter(match => match[1].length >= BASE64_LIMIT);
   if (images.length) add('warning', 'frontend-base64',`把 ${images.length} 个大文件（最大约 ${Math.round(Math.max(...images.map(match => match[1].length)) * 0.75 / 1024)} KB）以 base64 塞进了替换内容：每一楼都要重新解析它，卡会变慢、变大。图片用设计书里给的链接。`);
 
   // Tokens count wherever the sheet declares them: Re0 keeps its set on the app's mount element rather than :root.
-  const declared = new Set(cssDeclarations(css).filter(item => item.property.startsWith('--')).map(item => item.property));
+  const declared = new Set(cssDeclarations(cssAll).filter(item => item.property.startsWith('--')).map(item => item.property));
   if (declared.size < TOKEN_MINIMUM) add('warning', 'frontend-tokens', `只定义了 ${declared.size} 个设计令牌（CSS 自定义属性），少于 12 个。底色、面板、线、三级文字、强调色、状态色要在 :root 里成套定义，别处都用 var() 取。`);
-  if (!/@media\b/i.test(css)) add('warning', 'frontend-media', '没有任何 @media：窄屏、宽屏和减少动画都没有照顾到。');
+  if (!/@media\b/i.test(cssAll)) add('warning', 'frontend-media', '没有任何 @media：窄屏、宽屏和减少动画都没有照顾到。');
   const loops = declarations.some(item => (item.property === 'animation' || item.property === 'animation-iteration-count') && /\binfinite\b/i.test(item.value));
-  if (loops && !/prefers-reduced-motion/i.test(`${css}\n${scripts}`)) add('warning', 'frontend-motion', '有循环动画，却没有写 @media (prefers-reduced-motion: reduce)：系统设了减少动画的玩家也会一直看到它在动。');
+  if (loops && !/prefers-reduced-motion/i.test(`${cssAll}\n${scriptsAll}`)) add('warning', 'frontend-motion', '有循环动画，却没有写 @media (prefers-reduced-motion: reduce)：系统设了减少动画的玩家也会一直看到它在动。');
   const accent = mainToken(tokens, ['accent', 'primary', 'brand'], new Set(['on', 'text', 'fg', 'bg', 'soft', 'dim', 'muted', 'line', 'border', 'glow', 'shadow', '2', '3']));
-  const uses = accent ? (`${css}\n${inline}`.match(new RegExp(`var\\(\\s*${accent}\\s*[,)]`, 'g')) ?? []).length : 0;
+  const uses = accent ? (`${cssAll}\n${inline}`.match(new RegExp(`var\\(\\s*${accent}\\s*[,)]`, 'g')) ?? []).length : 0;
   if (uses > ACCENT_LIMIT) add('warning', 'frontend-accent', `强调色 ${accent} 用了 ${uses} 处，超过 8 处：到处都强调就等于没有强调。只留给当前状态、主要操作和关键数字。`);
   return findings;
 }

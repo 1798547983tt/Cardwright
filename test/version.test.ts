@@ -50,7 +50,7 @@ test('the version the app reports is the version it is packaged as', async () =>
   assert.equal(APP_VERSION, metadata.version);
   assert.equal(lock.version, metadata.version);
   assert.equal(lock.packages[''].version, metadata.version);
-  assert.equal(metadata.version, '1.3.2');
+  assert.equal(metadata.version, '1.3.3');
 });
 
 test('the window is told that same version', async t => {

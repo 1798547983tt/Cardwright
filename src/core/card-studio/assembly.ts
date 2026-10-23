@@ -6,11 +6,11 @@
 import { buildCard, joinComponent, type CardParts } from '../../shared/card-studio/card-file.ts';
 import { withFrontendFence } from '../../shared/card-studio/frontend.ts';
 import { AssemblySheetError, isAssemblySheet, parseAssemblySheet, type AssemblySheet, type BodySheet, type StatusForm, type StatusSheet } from '../../shared/card-studio/assembly-sheet.ts';
-import { compileSheet, type CompileIssue, type FrontendResources } from '../../shared/card-studio/frontend-compile.ts';
+import { compileSheet, type CompileIssue, type FrontendExternal, type FrontendResources } from '../../shared/card-studio/frontend-compile.ts';
 import type { VariableTable } from '../../shared/card-studio/variable-table.ts';
 import type { FileComponent, PieceKind, ProjectComponents } from './components.ts';
 
-export interface AssemblyContext { frontend: FrontendResources | null; table: VariableTable | null; cardName: string; preset?: string | null }
+export interface AssemblyContext { frontend: FrontendResources | null; table: VariableTable | null; cardName: string; preset?: string | null; avatars?: Record<string, Record<string, string>> | null; external?: FrontendExternal | null }
 export interface AssemblyIssue { code: CompileIssue['code']; message: string; path?: string; component: string; bodyPath: string }
 export interface CompiledRegex { component: FileComponent; sheet: AssemblySheet | null; replacement: string; form?: StatusForm }
 export interface SynthesizedScript { name: string; params: Record<string, unknown>; body: string; from: FileComponent }
@@ -62,7 +62,7 @@ export function compileProject(project: ProjectComponents, context: AssemblyCont
     counts.set(parsed.kind, nth);
     if (nth > 1) issues.push({ code: 'sheet-invalid', message: `「${label(component)}」是本卡第 ${nth} 个「${parsed.kind}」装配单，只认第一个；删掉多余的。`, component: component.name, bodyPath: component.bodyPath });
     if (!context.frontend) { skeletonless = true; return { component, sheet: parsed, replacement: '', ...(parsed.kind === '状态栏' ? { form: parsed.form } : {}) }; }
-    const result = compileSheet(parsed, { resources: context.frontend, table: context.table, cardName: context.cardName, preset: context.preset ?? null, bodySheet, statusSheet, regexId: String(component.params.id ?? component.name) });
+    const result = compileSheet(parsed, { resources: context.frontend, table: context.table, cardName: context.cardName, preset: context.preset ?? null, bodySheet, statusSheet, regexId: String(component.params.id ?? component.name), avatars: context.avatars ?? null, external: context.external ?? null });
     issues.push(...result.issues.map(issue => ({ ...issue, message: `「${label(component)}」${issue.message}`, component: component.name, bodyPath: component.bodyPath })));
     if (result.script) {
       const id = `${String(component.params.id ?? component.name)}-floating`;

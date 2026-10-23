@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CARD_FILE, CARD_FOLDERS, COVER_STYLES, createCardFolder, parseCardFile, readCardFile, writeCardFile } from '../src/core/card-studio/card-project.ts';
+import { CARD_FILE, CARD_FOLDERS, CARD_SCHEMA, COVER_STYLES, DEFAULT_FRONTEND_ASSETS_BASE, createCardFolder, frontendExternalOf, parseCardFile, parseFrontendAssets, readCardFile, writeCardFile } from '../src/core/card-studio/card-project.ts';
 
 async function temp(t: TestContext): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'cardwright-card-project-'));
@@ -19,7 +19,7 @@ test('creates the card project folders and registration file', async t => {
   for (const relative of CARD_FOLDERS) assert.ok((await stat(join(folder, relative))).isDirectory(), relative);
   assert.deepEqual(file, {
     schema: 'cardwright.card-project', version: 1, cardId: 'card-fixture', name: '西游·八十一难', kind: 'fan', source: '西游记',
-    coverStyle: COVER_STYLES[4], stylePreset: null, origin: 'new', createdAt: fixed.now.toISOString(), updatedAt: fixed.now.toISOString(), dispatches: [], exports: [], nextUid: 0, changes: [],
+    coverStyle: COVER_STYLES[4], stylePreset: null, frontendAssets: { mode: 'inline', base: '' }, origin: 'new', createdAt: fixed.now.toISOString(), updatedAt: fixed.now.toISOString(), dispatches: [], exports: [], nextUid: 0, changes: [],
   });
   assert.deepEqual(JSON.parse(await readFile(join(folder, CARD_FILE), 'utf8')), file);
 });
@@ -85,4 +85,23 @@ test('keeps the valid 改动单 of a registration and leaves out what does not r
   const read = await readCardFile(folder);
   assert.deepEqual(read.changes, [change]);
   assert.equal(read.dispatches[0].changeId, 'c1');
+});
+
+test('前端资源的编译选项：默认内联，外链必须锁 https，写歪了一律退回内联', () => {
+  assert.deepEqual(parseFrontendAssets(undefined), { mode: 'inline', base: '' });
+  assert.deepEqual(parseFrontendAssets(null), { mode: 'inline', base: '' });
+  assert.deepEqual(parseFrontendAssets({ mode: 'inline', base: 'https://x/y' }), { mode: 'inline', base: '' });
+  assert.deepEqual(parseFrontendAssets({ mode: 'cdn' }), { mode: 'cdn', base: DEFAULT_FRONTEND_ASSETS_BASE });
+  assert.deepEqual(parseFrontendAssets({ mode: 'cdn', base: 'https://cdn.example.com/a/' }), { mode: 'cdn', base: 'https://cdn.example.com/a' });
+  assert.deepEqual(parseFrontendAssets({ mode: 'cdn', base: 'http://cdn.example.com/a' }), { mode: 'inline', base: '' }, 'http 会被酒馆页面拦掉');
+  assert.deepEqual(parseFrontendAssets({ mode: 'cdn', base: 'https://user:pw@cdn.example.com/a' }), { mode: 'cdn', base: 'https://user:pw@cdn.example.com/a' }, '凭据写在 URL 里不当场拦，交给设置页校验');
+  assert.deepEqual(parseFrontendAssets('cdn'), { mode: 'inline', base: '' });
+
+  const file = parseCardFile({ schema: CARD_SCHEMA, version: 1, cardId: 'c', name: '卡', kind: 'original', createdAt: '', updatedAt: '' });
+  assert.deepEqual(file.frontendAssets, { mode: 'inline', base: '' }, '老卡项目没有这个字段，照旧内联');
+  const linked = parseCardFile({ schema: CARD_SCHEMA, version: 1, cardId: 'c', name: '卡', kind: 'original', createdAt: '', updatedAt: '', frontendAssets: { mode: 'cdn', base: 'https://cdn.example.com/a' } });
+  assert.deepEqual(linked.frontendAssets, { mode: 'cdn', base: 'https://cdn.example.com/a' });
+  assert.deepEqual(frontendExternalOf(linked), { root: 'https://cdn.example.com/a' });
+  assert.equal(frontendExternalOf(file), null);
+  assert.equal(frontendExternalOf(null), null);
 });

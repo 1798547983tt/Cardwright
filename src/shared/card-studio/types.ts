@@ -1,4 +1,13 @@
 import type { VariableRow } from './variable-table.ts';
+/**
+ * 前端资源进卡的方式（编译选项）。
+ * - `inline`：骨架、皮肤与 runtime 全部内联进替换内容（默认，向后兼容）。
+ * - `cdn`：只写 `<link>`/`<script src>` 外链，指向一个**已发布的 https tag**；卡体积约减半，runtime 不再穿过酒馆的文本管线。
+ */
+export interface CardFrontendAssets { mode: 'inline' | 'cdn'; base: string }
+/** 外链模式默认指向的已发布资产根：改 runtime 就发新 tag，并把这里（或卡项目里的 base）一起改掉。 */
+export const DEFAULT_FRONTEND_ASSETS_BASE = 'https://testingcf.jsdelivr.net/gh/1798547983tt/Cardwright@v1.3.3/card-studio/frontend';
+export const INLINE_FRONTEND_ASSETS: CardFrontendAssets = { mode: 'inline', base: '' };
 /** Card studio data shared by the main process, the renderer and tests. */
 import type { PreviewSegment, RegexStep } from './preview.ts';
 
@@ -121,6 +130,8 @@ export interface CardRun {
 export interface CardProjectView {
   projectId: string; path: string; cardId: string; name: string; kind: CardKind; source?: string;
   coverStyle: CoverStyleId; cover?: string; stylePreset: { id: string; name: string } | null;
+  /** 前端资源进卡的方式（编译选项）：内联，或者外链到一个已发布的 tag。 */
+  frontendAssets: CardFrontendAssets;
   origin: 'new' | 'import'; createdAt: string; updatedAt: string; lastEditedAt: string;
   dispatches: CardDispatch[]; design: { exists: boolean; people: { written: number; total: number } | null };
   /** The card's 改动单, oldest first. */
