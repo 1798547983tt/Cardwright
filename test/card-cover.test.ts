@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
 import sharp from 'sharp';
 import { COVER_HEIGHT, COVER_MAX_EDGE, COVER_MIN_EDGE, COVER_WIDTH, coverDataUrl, decodeCardImage, pngSize, sniffImageMime, storedCoverSize, validateCropRequest, validateStoredCover } from '../src/core/card-studio/cover.ts';
+import { cropCover, readCoverSource } from '../src/main/card-cover.ts';
 import { ARG_LIMITS, assertArgSize, argLimit } from '../src/main/ipc-size.ts';
 
 const SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -105,4 +109,32 @@ test('the IPC guard keeps the default and lifts the PNG export', () => {
   assert.doesNotThrow(() => assertArgSize('snapshot', ['A'.repeat(1_999_996)]));
   assert.doesNotThrow(() => assertArgSize('exportCardPng', ['A'.repeat(31_999_995)]), 'a rendered photo card face passes');
   assert.throws(() => assertArgSize('exportCardPng', ['A'.repeat(31_999_999)]), /Request exceeds/);
+});
+
+test('EXIF orientation is applied before the preview and the crop', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cardwright-cover-'));
+  try {
+    // 600×400 with a red left half and a blue right half. Orientation=6 says the stored image must be
+    // rotated 90° clockwise to display, so the red half is the top half of the picture the user sees.
+    const red = await sharp({ create: { width: 300, height: 400, channels: 3, background: { r: 255, g: 0, b: 0 } } }).png().toBuffer();
+    const blue = await sharp({ create: { width: 300, height: 400, channels: 3, background: { r: 0, g: 0, b: 255 } } }).png().toBuffer();
+    const photo = await sharp({ create: { width: 600, height: 400, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+      .composite([{ input: red, left: 0, top: 0 }, { input: blue, left: 300, top: 0 }])
+      .jpeg().withMetadata({ orientation: 6 }).toBuffer();
+    const path = join(directory, 'phone.jpg');
+    await writeFile(path, photo);
+
+    const source = await readCoverSource(path);
+    assert.deepEqual({ width: source.width, height: source.height }, { width: 400, height: 600 }, 'the source is measured as displayed');
+    const result = await cropCover({ sourceId: source.sourceId, crop: { x: 0, y: 0, width: 400, height: 600 }, output: { width: 300, height: 450 }, quality: 100 });
+    assert.equal(result.extension, '.png');
+    const { data, info } = await sharp(result.bytes).raw().toBuffer({ resolveWithObject: true });
+    const pixel = (x: number, y: number) => { const at = (y * info.width + x) * info.channels; return [data[at], data[at + 1], data[at + 2]]; };
+    const top = pixel(150, 30);
+    const bottom = pixel(150, 420);
+    assert.ok(top[0] > 180 && top[2] < 90, `the red half ends up on top, got ${top}`);
+    assert.ok(bottom[2] > 180 && bottom[0] < 90, `the blue half ends up at the bottom, got ${bottom}`);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

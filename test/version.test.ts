@@ -9,6 +9,7 @@ import { Harness } from '../src/main/harness.ts';
 import { StudioServices } from '../src/main/studio-services.ts';
 import { Vault, type SecretCodec } from '../src/main/vault.ts';
 import { APP_VERSION } from '../src/shared/version.ts';
+import { DEFAULT_FRONTEND_ASSETS_BASE } from '../src/shared/card-studio/types.ts';
 
 const fakeWorker = fileURLToPath(new URL('./fixtures/fake-worker.mjs', import.meta.url));
 const codec: SecretCodec = { encrypt: value => Buffer.from(`fixture-codec:${value}`), decrypt: value => value.toString().slice('fixture-codec:'.length) };
@@ -51,6 +52,11 @@ test('the version the app reports is the version it is packaged as', async () =>
   assert.equal(lock.version, metadata.version);
   assert.equal(lock.packages[''].version, metadata.version);
   assert.equal(metadata.version, '1.3.3');
+});
+
+test('the default external assets base pins the tag of this version', () => {
+  // R6 版本握手：默认外链地址里的 tag 必须跟 APP_VERSION 一起走；升版本忘了改这里，这个测试就失败。
+  assert.ok(DEFAULT_FRONTEND_ASSETS_BASE.includes(`@v${APP_VERSION}/`), `${DEFAULT_FRONTEND_ASSETS_BASE} 里 pin 的 tag 必须与 APP_VERSION ${APP_VERSION} 一致`);
 });
 
 test('the window is told that same version', async t => {

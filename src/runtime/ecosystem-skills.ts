@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, isAbsolute, join } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 
 export const SUPI_GUIDANCE_VERSION = '6.4.0';
 let applicationRoot: string | undefined;
@@ -17,7 +17,10 @@ export function setEcosystemApplicationRoot(path: string): void {
 export function resolveEcosystemPackage(name: string): string {
   if (!/^(@[a-z0-9-]+\/)?[a-z0-9-]+$/.test(name)) throw new Error('Invalid built-in package name.');
   const main = (process as NodeJS.Process & { mainModule?: { filename?: string } }).mainModule?.filename;
-  const anchor = applicationRoot ? join(applicationRoot, 'package.json') : main ?? process.argv[1];
+  // Under `--experimental-test-isolation=none` Node keeps the test runner's relative argv[1]; resolve it against cwd so the
+  // anchor below is always absolute (the default isolated runner hands workers absolute paths already).
+  const argvEntry = process.argv[1] ? resolve(process.argv[1]) : undefined;
+  const anchor = applicationRoot ? join(applicationRoot, 'package.json') : main ?? argvEntry;
   if (!anchor || !isAbsolute(anchor)) throw new Error('Cannot resolve the Cardwright application module.');
   let directory = dirname(anchor);
   while (true) {

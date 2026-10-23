@@ -6,7 +6,7 @@
  * The variable update receipt is inline (a section and its style, no script) and stays unfenced.
  */
 import { normalizeNewlines } from './fences.ts';
-import type { FrontendResources } from './frontend-compile.ts';
+import type { FrontendExternal, FrontendResources } from './frontend-compile.ts';
 
 const FENCE = '`'.repeat(3);
 const DOCUMENT_START = /^<!doctype\s+html\b[^>]*>|^<html(?=[\s>])/i;
@@ -292,22 +292,35 @@ function partsOf(html: string): { css: string; inline: string; scripts: string; 
 const summary = (items: string[]) => `${items.slice(0, 3).join('；')}${items.length > 3 ? `；另有 ${items.length - 3} 处` : ''}`;
 
 /** 外链模式下 HTML 里只有 `<link>`/`<script src>`：检查时把指向的资源内容补回来，判定口径与内联模式一致。 */
-export interface FrontendQualityOptions { assets?: FrontendResources | null }
+export interface FrontendQualityOptions {
+  assets?: FrontendResources | null;
+  /** 外链模式下的资产根；只有回链到它的链接才算骨架。内联或不传时，文档里的外链一律按外部资源算。 */
+  external?: FrontendExternal | null;
+}
 
-/** 文档里指向本仓库发布资产的链接，以及它们对应的内容（只有骨架自己的路径才算，别人的外链仍旧按外链报）。 */
-function linkedAssets(html: string, resources: FrontendResources | null | undefined): { urls: string[]; css: string; scripts: string } {
+/** 文档里回链到本仓库发布资产的链接，以及它们对应的内容；只认 `${external.root}/` 下的骨架路径，别人的同后缀外链不算。 */
+function linkedAssets(
+  html: string,
+  resources: FrontendResources | null | undefined,
+  external: FrontendExternal | null | undefined,
+): { urls: string[]; css: string; scripts: string } {
   const urls: string[] = [];
   let css = ''; let scripts = '';
-  if (!resources) return { urls, css, scripts };
+  if (!resources || !external) return { urls, css, scripts };
+  const root = external.root.replace(/\/+$/, '');
+  // 与资产根精确比对：必须是 `${root}/…`（或正好等于 root），`…/frontend-evil/base.css` 这种不算骨架。
+  const own = (url: string): string | null => url === root ? '/' : url.startsWith(`${root}/`) ? url.slice(root.length) : null;
   const stylesheet = (url: string): string | null => {
-    if (url.endsWith('/base.css')) return resources.base;
-    const skin = /\/skins\/([\w-]+)\.css$/.exec(url);
+    const path = own(url);
+    if (path === '/base.css') return resources.base;
+    const skin = path === null ? null : /^\/skins\/([\w-]+)\.css$/.exec(path);
     return skin ? resources.skins[skin[1]] ?? null : null;
   };
   const runtime = (url: string): string | null => {
-    if (url.endsWith('/runtime/core.js')) return resources.core;
-    if (url.endsWith('/runtime/host.js')) return resources.host;
-    if (url.endsWith('/runtime/floating.js')) return resources.floating;
+    const path = own(url);
+    if (path === '/runtime/core.js') return resources.core;
+    if (path === '/runtime/host.js') return resources.host;
+    if (path === '/runtime/floating.js') return resources.floating;
     return null;
   };
   for (const match of html.matchAll(/<link\b[^>]*\bhref\s*=\s*"([^"]+)"/gi)) {
@@ -324,7 +337,7 @@ function linkedAssets(html: string, resources: FrontendResources | null | undefi
 /** The quality findings for one iframe front-end document (Q17). One finding per kind, naming up to three places. */
 export function frontendQuality(html: string, options: FrontendQualityOptions = {}): FrontendFinding[] {
   const { css, inline, scripts, markup } = partsOf(html);
-  const linked = linkedAssets(html, options.assets);
+  const linked = linkedAssets(html, options.assets, options.external);
   const cssAll = `${css}\n${linked.css}`;
   const scriptsAll = `${scripts}\n${linked.scripts}`;
   const declarations = [...cssDeclarations(cssAll), ...cssDeclarations(inline)];

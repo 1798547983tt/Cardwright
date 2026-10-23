@@ -8,7 +8,7 @@ import { DEFAULT_FRONTEND_ASSETS_BASE } from '../../shared/card-studio/types';
 import { renderCoverPng } from './cover-canvas';
 import { PreviewPanel } from './PreviewPanel';
 import { UnclassifiedDialog } from './UnclassifiedDialog';
-import type { CardCheckReport, CardExportResult, CardMeta, CardProjectView } from '../../shared/card-studio/types';
+import type { CardCheckReport, CardExportResult, CardFrontendAssets, CardMeta, CardProjectView } from '../../shared/card-studio/types';
 
 const LEVEL_ICON = { error: ShieldAlert, warning: AlertTriangle, info: Info } as const;
 type Busy = 'check' | 'card' | 'lorebook' | 'png' | 'pieces' | 'meta' | 'assets' | null;
@@ -19,18 +19,28 @@ type Busy = 'check' | 'card' | 'lorebook' | 'png' | 'pieces' | 'meta' | 'assets'
  */
 function FrontendAssetsForm({ card, busy, setBusy }: { card: CardProjectView; busy: Busy; setBusy: (value: Busy) => void }) {
   const { api, t, run } = useApp();
-  const saved = card.frontendAssets;
-  const [mode, setMode] = useState(saved.mode);
-  const [base, setBase] = useState(saved.base || DEFAULT_FRONTEND_ASSETS_BASE);
-  useEffect(() => { setMode(saved.mode); setBase(saved.base || DEFAULT_FRONTEND_ASSETS_BASE); }, [saved.mode, saved.base]);
+  const [effective, setEffective] = useState<CardFrontendAssets>(card.frontendAssets);
+  const [mode, setMode] = useState(effective.mode);
+  const [base, setBase] = useState(effective.base || DEFAULT_FRONTEND_ASSETS_BASE);
+  useEffect(() => {
+    setEffective(card.frontendAssets);
+    setMode(card.frontendAssets.mode);
+    setBase(card.frontendAssets.base || DEFAULT_FRONTEND_ASSETS_BASE);
+  }, [card.frontendAssets]);
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy('assets');
-    await run(() => api.saveCardFrontendAssets(card.projectId, { mode, base: mode === 'cdn' ? base.trim() : '' }), t('Front-end assets saved', '前端资源设置已保存'));
+    // 保存路径会严格校验地址：非法时 run 报错并返回空；成功时把重读后的卡项目回写进来，别显示没生效的地址。
+    const view = await run(() => api.saveCardFrontendAssets(card.projectId, { mode, base: mode === 'cdn' ? base.trim() : '' }), t('Front-end assets saved', '前端资源设置已保存'));
+    if (view) {
+      setEffective(view.frontendAssets);
+      setMode(view.frontendAssets.mode);
+      setBase(view.frontendAssets.base || DEFAULT_FRONTEND_ASSETS_BASE);
+    }
     setBusy(null);
   }
   return <details className="cs-meta">
-    <summary>{t('Front-end assets', '前端资源')}<small>{saved.mode === 'cdn' ? t('external · a pinned tag', '外链 · 锁 tag') : t('inline · written into the card', '内联 · 写进卡里')}</small></summary>
+    <summary>{t('Front-end assets', '前端资源')}<small>{effective.mode === 'cdn' ? t(`external · ${effective.base}`, `外链 · ${effective.base}`) : t('inline · written into the card', '内联 · 写进卡里')}</small></summary>
     <form onSubmit={event => void submit(event)}>
       <label className="cs-field"><span>{t('Mode', '方式')}<small>{t('what the export writes', '导出时怎么装前端')}</small></span>
         <select value={mode} onChange={event => setMode(event.target.value === 'cdn' ? 'cdn' : 'inline')}>
@@ -41,7 +51,7 @@ function FrontendAssetsForm({ card, busy, setBusy }: { card: CardProjectView; bu
       {mode === 'cdn' && <label className="cs-field cs-meta-wide"><span>{t('Asset base', '资产地址')}<small>{t('a published https tag of this repository', '本仓库已发布的 https tag')}</small></span>
         <input value={base} onChange={event => setBase(event.target.value)} placeholder={DEFAULT_FRONTEND_ASSETS_BASE} /></label>}
       <div className="cs-meta-actions">
-        {mode === 'cdn' && <p className="cs-note">{t('The card then needs the network; if the CDN is unreachable the front-end stays blank.', '外链版依赖网络：CDN 拉不到时前端会是空白。')}</p>}
+        {mode === 'cdn' && <p className="cs-note">{t('The in-app preview does not load external assets (they load once the card is exported, in SillyTavern); if the CDN is unreachable the front-end stays blank.', '外链模式在应用内预览不会加载外链资源（导出后在酒馆里才加载）；CDN 不可达时前端为空。')}</p>}
         <button type="submit" className="cs-btn" disabled={busy !== null}><Save size={14} />{t('Save front-end assets', '保存前端资源设置')}</button>
       </div>
     </form>

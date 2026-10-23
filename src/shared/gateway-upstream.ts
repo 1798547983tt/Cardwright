@@ -43,7 +43,7 @@ export const UPSTREAM_LABELS: Record<GatewayUpstream, { en: string; zh: string }
 
 /**
  * The host patterns pi-ai itself matches. Kept beside the compat table so both
- * move together; `test/gateway-upstream.test.ts` pins the behaviour.
+ * move together; `test/integration/gateway-upstream.test.ts` pins the behaviour.
  */
 const UPSTREAM_HOSTS: Array<{ upstream: ResolvedUpstream; hosts: string[] }> = [
   { upstream: 'openai', hosts: ['api.openai.com'] },

@@ -22,7 +22,7 @@ import { SAMPLE_TABLE } from '../variable-table-sample.ts';
 import { START_SHEET, STATUS_SHEET } from '../assembly-sheet-samples.ts';
 
 const fakeWorker = fileURLToPath(new URL('../fixtures/fake-worker.mjs', import.meta.url));
-const resources = fileURLToPath(new URL('../card-studio', import.meta.url));
+const resources = fileURLToPath(new URL('../../card-studio', import.meta.url));
 const codec: SecretCodec = { encrypt: value => Buffer.from(`fixture-codec:${value}`), decrypt: value => value.toString().slice('fixture-codec:'.length) };
 const gateway: Omit<Gateway, 'hasKey'> = { id: 'fixture', name: 'Fixture', baseUrl: 'https://example.invalid/v1', modelId: 'fixture', protocol: 'openai-completions', reasoning: false, contextWindow: 8192, maxTokens: 1024 };
 

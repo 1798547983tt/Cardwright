@@ -21,6 +21,10 @@ const style = (extra = '') => [
 const doc = (css = style(), body = '<main class="card"><button class="tab">状态</button><span class="badge">新</span></main>', script = 'document.querySelector(".tab").addEventListener("click", () => {});') =>
   ['<!DOCTYPE html>', '<html lang="zh-CN">', '<head><meta charset="utf-8"><style>', css, '</style></head>', `<body>${body}<script>${script}</script></body>`, '</html>'].join(NL);
 const codes = (html: string) => frontendQuality(html).map(item => `${item.level}:${item.code}`).sort();
+const EXTERNAL = { root: 'https://testingcf.jsdelivr.net/gh/owner/repo@v1.2.0/card-studio/frontend' };
+/** The published skeleton as the checks load it: the same stylesheets the external document links to. */
+const SKELETON = { version: '1.2.0', core: '', host: '', floating: '', base: style(), skins: { sakura: style() } };
+const externalCodes = (html: string, options: { assets?: typeof SKELETON | null; external?: typeof EXTERNAL | null }) => frontendQuality(html, options).filter(item => item.code === 'frontend-external').map(item => item.level);
 
 test('a front-end that meets the minimum passes without findings', () => {
   assert.deepEqual(frontendQuality(doc()), []);
@@ -100,4 +104,15 @@ test('a commented-out link loads nothing; protocol-relative CDN fonts and every 
   assert.equal(built?.level, 'warning', 'a raw address a script puts together');
   assert.match(built!.message, /raw\.githubusercontent\.com\/someone\/cards\/\$\{commit\}\/avatars/);
   assert.match(built!.message, /CDN 上的样式表或字体/);
+});
+
+test('外链模式只把回链到资产根的链接当骨架；同后缀的第三方外链与内联模式的用户外链照旧报', () => {
+  const skeleton = doc('', `<link rel="stylesheet" href="${EXTERNAL.root}/base.css"><link rel="stylesheet" href="${EXTERNAL.root}/skins/sakura.css"><button class="tab">状态</button>`);
+  assert.deepEqual(frontendQuality(skeleton, { assets: SKELETON, external: EXTERNAL }), [], '骨架自己的链接不报外链、也不缺样式');
+  const thirdParty = doc('', '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cards@1/skins/sakura.css"><button class="tab">状态</button>');
+  assert.deepEqual(externalCodes(thirdParty, { assets: SKELETON, external: EXTERNAL }), ['warning'], '同后缀的第三方外链还是外链');
+  const lookalike = doc('', `<link rel="stylesheet" href="${EXTERNAL.root}-evil/base.css"><button class="tab">状态</button>`);
+  assert.deepEqual(externalCodes(lookalike, { assets: SKELETON, external: EXTERNAL }), ['warning'], '只是前缀相同的地址不算骨架');
+  const inline = doc('', '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cards@1/base.css"><button class="tab">状态</button>');
+  assert.deepEqual(externalCodes(inline, { assets: SKELETON }), ['warning'], '内联模式下用户自己写的外链必须照报');
 });

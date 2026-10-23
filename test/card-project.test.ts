@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CARD_FILE, CARD_FOLDERS, CARD_SCHEMA, COVER_STYLES, DEFAULT_FRONTEND_ASSETS_BASE, createCardFolder, frontendExternalOf, parseCardFile, parseFrontendAssets, readCardFile, writeCardFile } from '../src/core/card-studio/card-project.ts';
+import { CARD_FILE, CARD_FOLDERS, CARD_SCHEMA, COVER_STYLES, DEFAULT_FRONTEND_ASSETS_BASE, createCardFolder, frontendExternalOf, parseCardFile, parseFrontendAssets, readCardFile, validateFrontendAssetsBase, writeCardFile } from '../src/core/card-studio/card-project.ts';
 
 async function temp(t: TestContext): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'cardwright-card-project-'));
@@ -94,7 +94,8 @@ test('前端资源的编译选项：默认内联，外链必须锁 https，写�
   assert.deepEqual(parseFrontendAssets({ mode: 'cdn' }), { mode: 'cdn', base: DEFAULT_FRONTEND_ASSETS_BASE });
   assert.deepEqual(parseFrontendAssets({ mode: 'cdn', base: 'https://cdn.example.com/a/' }), { mode: 'cdn', base: 'https://cdn.example.com/a' });
   assert.deepEqual(parseFrontendAssets({ mode: 'cdn', base: 'http://cdn.example.com/a' }), { mode: 'inline', base: '' }, 'http 会被酒馆页面拦掉');
-  assert.deepEqual(parseFrontendAssets({ mode: 'cdn', base: 'https://user:pw@cdn.example.com/a' }), { mode: 'cdn', base: 'https://user:pw@cdn.example.com/a' }, '凭据写在 URL 里不当场拦，交给设置页校验');
+  assert.deepEqual(parseFrontendAssets({ mode: 'cdn', base: 'https://user:pw@cdn.example.com/a' }), { mode: 'inline', base: '' }, '带账号密码的地址旧卡里读到也回退内联');
+  assert.deepEqual(parseFrontendAssets({ mode: 'cdn', base: 'https://cdn.example.com/a"><script>' }), { mode: 'inline', base: '' }, '引号尖括号的坏地址回退内联');
   assert.deepEqual(parseFrontendAssets('cdn'), { mode: 'inline', base: '' });
 
   const file = parseCardFile({ schema: CARD_SCHEMA, version: 1, cardId: 'c', name: '卡', kind: 'original', createdAt: '', updatedAt: '' });
@@ -104,4 +105,21 @@ test('前端资源的编译选项：默认内联，外链必须锁 https，写�
   assert.deepEqual(frontendExternalOf(linked), { root: 'https://cdn.example.com/a' });
   assert.equal(frontendExternalOf(file), null);
   assert.equal(frontendExternalOf(null), null);
+});
+
+test('保存路径的资产地址严格校验：非 https、账号密码、引号尖括号、空白一律拒绝', async t => {
+  assert.equal(validateFrontendAssetsBase('https://cdn.example.com/a/'), 'https://cdn.example.com/a', '末尾斜杠归一');
+  const bad: Array<[string, RegExp]> = [
+    ['', /要给一个资产地址/], ['   ', /要给一个资产地址/],
+    ['http://cdn.example.com/a', /必须是 https/], ['javascript:alert(1)', /必须是 https/], ['data:text/plain,hi', /必须是 https/],
+    ['https://user:pw@cdn.example.com/a', /账号密码/], ['https://user@cdn.example.com/a', /账号密码/],
+    ['https://cdn.example.com/a"b', /引号、尖括号/], ["https://cdn.example.com/a'b", /引号、尖括号/],
+    ['https://cdn.example.com/a<b>', /引号、尖括号/], ['https://cdn.example.com/a\\b', /引号、尖括号/], ['https://cdn.example.com/a b', /引号、尖括号/],
+    ['not-a-url', /合法的网址/], ['https://', /合法的网址/],
+  ];
+  for (const [value, message] of bad) assert.throws(() => validateFrontendAssetsBase(value), message, value);
+  const folder = join(await temp(t), 'card');
+  const { file } = await createCardFolder({ folder, name: '汽灯与铜镜', kind: 'original', ...fixed });
+  await writeCardFile(folder, { ...file, frontendAssets: { mode: 'cdn', base: 'http://cdn.example.com/a' } });
+  assert.deepEqual((await readCardFile(folder)).frontendAssets, { mode: 'inline', base: '' }, '坏地址落盘后读回来是内联，卡不会因此打不开');
 });

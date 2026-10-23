@@ -65,7 +65,6 @@ export function CoverDialog({ card, onClose }: { card: CardProjectView; onClose:
     if (!element || !source) return;
     setBusy(true);
     // The displayed rectangle, scaled back into the source image's own pixels.
-    const k = COVER_WIDTH / VIEW_WIDTH;
     const x = Math.round(-offset.x / scale);
     const y = Math.round(-offset.y / scale);
     const width = Math.round(VIEW_WIDTH / scale);

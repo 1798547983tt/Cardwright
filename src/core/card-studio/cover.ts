@@ -53,8 +53,9 @@ const ratio = (width: number, height: number): number => width / height;
 
 /** The crop rectangle must sit inside the source, the output between 300 and 3840 on each side, and both 2:3. */
 export function validateCropRequest(request: CoverSaveRequest, source: { width: number; height: number }): { crop: { left: number; top: number; width: number; height: number }; output: CoverOutput; quality: number } {
-  const crop = request?.crop ?? (undefined as never);
-  const output = request?.output ?? (undefined as never);
+  const crop = request?.crop;
+  const output = request?.output;
+  if (!crop || !output) throw new Error('裁剪请求缺少裁剪区域或输出尺寸。');
   const quality = request?.quality;
   if (!Number.isInteger(crop.x) || !Number.isInteger(crop.y) || !Number.isInteger(crop.width) || !Number.isInteger(crop.height)) throw new Error('裁剪区域无效。');
   if (crop.width < 1 || crop.height < 1 || crop.x < 0 || crop.y < 0 || crop.x + crop.width > source.width || crop.y + crop.height > source.height) throw new Error('裁剪区域超出了原图的范围。');

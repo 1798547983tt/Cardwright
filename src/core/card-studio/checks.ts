@@ -11,7 +11,7 @@ import { assemblyCardName, buildCardFromCompiled, compileProject, isSheetCompone
 import { backtrackSamples, createRegexProber, dialectProblems } from './regex-probe.ts';
 import { splitCard } from '../../shared/card-studio/card-file.ts';
 import { frontendDocument, frontendEscapeProblems, frontendFenceProblem, frontendQuality } from '../../shared/card-studio/frontend.ts';
-import type { CompileIssue, FrontendResources } from '../../shared/card-studio/frontend-compile.ts';
+import type { CompileIssue, FrontendExternal, FrontendResources } from '../../shared/card-studio/frontend-compile.ts';
 import { findSource, regexFromString, type PreviewRegex } from '../../shared/card-studio/preview.ts';
 import { UNCLASSIFIED_SECTION } from '../../shared/card-studio/boards.ts';
 import { checkRegexParams, compileRegex, parseFindRegex, regexHits, sampleOutputFrom } from './regex.ts';
@@ -262,7 +262,7 @@ const PROBE_BUDGET_MS = 300;
 /** A check knows the card's name but not the player's: {{user}} in a find expression stands for this one. */
 const PROBE_USER = '玩家';
 
-async function checkRegexComponents(project: ProjectComponents, sample: string | null, findings: CheckFinding[], compiled: CompiledProject, tableState: VariableTableState, cardName: string, assets: FrontendResources | null): Promise<void> {
+async function checkRegexComponents(project: ProjectComponents, sample: string | null, findings: CheckFinding[], compiled: CompiledProject, tableState: VariableTableState, cardName: string, assets: FrontendResources | null, external: FrontendExternal | null): Promise<void> {
   const ids = new Map<string, string>();
   // Only a regex aimed at a tag the body sample defines has to hit it; the update block and the start page have their own formats.
   const sampleTags = sample ? tagNames(sample) : new Set<string>();
@@ -314,7 +314,7 @@ async function checkRegexComponents(project: ProjectComponents, sample: string |
       if (fence) findings.push({ level: 'error', code: 'frontend-fence', path: item.bodyPath, message: `「${label}」${fence}` });
       for (const problem of frontendEscapeProblems(entry.replacement)) findings.push({ ...problem, path: item.bodyPath, message: `「${label}」${problem.message}` });
       const document = frontendDocument(entry.replacement);
-      if (document) for (const finding of frontendQuality(document, { assets })) findings.push({ ...finding, path: item.bodyPath, message: `「${label}」${finding.message}` });
+      if (document) for (const finding of frontendQuality(document, { assets, external })) findings.push({ ...finding, path: item.bodyPath, message: `「${label}」${finding.message}` });
     }
   }
   // One worker for the run, one probe after another (a reused worker makes each probe cost milliseconds). A probe that
@@ -601,7 +601,7 @@ export async function runChecks(root: string, options: CheckOptions = {}): Promi
   const sample = format ? sampleOutputFrom(format.content) : null;
   if (format && !sample) findings.push({ level: 'warning', code: 'format-sample', uid: format.uid, path: format.bodyPath, message: '正文格式条目里没有 ```示例输出 块，正则和拼装检查无法验证渲染。' });
   if (format && sample) checkFormatSample(project, format, sample, findings);
-  await checkRegexComponents(project, sample, findings, compiled, tableState, context.cardName, context.frontend);
+  await checkRegexComponents(project, sample, findings, compiled, tableState, context.cardName, context.frontend, context.external ?? null);
   checkControllerUids(project, findings);
   checkScriptComponents(project, compiled, findings);
   checkGreetings(project, formatRootTag(sample), findings);

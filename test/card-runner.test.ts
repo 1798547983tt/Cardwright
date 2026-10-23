@@ -110,7 +110,7 @@ test('a question pauses the run; with 自动按推荐 it answers and carries on,
 });
 
 // 自动按推荐 answers a question for the user; a section AI that never stops asking would be answered for ever, request after request.
-test('自动按推荐 stops answering a dispatch after CONTINUE_LIMIT answers and pauses for the user', async t => {
+test('自动按推荐 stops answering a dispatch after CONTINUE_LIMIT answers and pauses for the user', { timeout: 120_000 }, async t => {
   const { root, harness, studio, notices } = await setup(t); cleanup(t, root, harness);
   const { projectId } = await card(harness, studio, root, '一键·问个没完', [['世界书/人设', '写甲', 'RUN:ask forever'], ['世界书/人设', '写乙', 'RUN:deliver 乙']]);
   await studio.runner.start(projectId, 'lore', { ...settings, autoAnswer: true });

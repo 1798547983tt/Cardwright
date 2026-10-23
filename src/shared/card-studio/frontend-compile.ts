@@ -22,11 +22,6 @@ export interface CompileContext {
   /** The project's other sheets: a header status bar needs the body sheet, and a body sheet with 状态头 needs the status sheet. */
   bodySheet?: BodySheet | null; statusSheet?: StatusSheet | null;
   /** The regex component's id: the floating app mounts once per id. */ regexId?: string;
-  /**
-   * 头像表 `{ 角色名: { 表情: 图片地址 } }`。只对正文美化生效：它写进页面里的一小段脚本，
-   * 由运行时 core.js 的 sayLine 读取，给 `{名字:表情}「…」` 选头像。没有就整段不写。
-   */
-  avatars?: Record<string, Record<string, string>> | null;
 }
 export interface CompileResult { kind: SheetKind; form?: StatusForm; html: string; script?: string; issues: CompileIssue[] }
 const DEFAULT_PRESET = 'sakura';
@@ -78,6 +73,8 @@ export function enrichSheet<T extends AssemblySheet>(sheet: T, table: VariableTa
 const JSON_AMP = String.fromCharCode(92) + 'u0026';
 /** Data embedded in a script: `</` cannot close the tag, and no `&` is left for SillyTavern to decode once more as an entity. */
 const escapeJson = (value: unknown): string => JSON.stringify(value).replace(/<\//g, '<\\/').replace(/&/g, JSON_AMP);
+/** 外链根要拼进 HTML 的注释与属性（`<link href>`/`<script src>`）：先转义 & " ' < >，坏地址就注入不了标签或属性。 */
+const escapeHtml = (text: string): string => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 /** 装配单给的令牌（只有 custom 皮肤走这条路）。外链模式下这一块必须内联——皮肤文件里没有它。 */
 function tokensCss(tokens: Record<string, string> | undefined): string {
   return `:root {\n${Object.entries(tokens ?? {}).map(([name, value]) => `  ${name}: ${value};`).join('\n')}\n}\n`;
@@ -97,19 +94,21 @@ function customCss(sheet: AssemblySheet): string {
   if (sheet.kind === '正文美化') sheet.custom.forEach(item => { if (item.css) blocks.push(item.css); });
   return blocks.join('\n');
 }
-function htmlDocument(options: { resources: FrontendResources; preset: string; form: string; css: string; sheetJson: string; app: string; source: boolean; avatars?: Record<string, Record<string, string>> | null; external?: FrontendExternal | null }): string {
+function htmlDocument(options: { resources: FrontendResources; preset: string; form: string; css: string; sheetJson: string; app: string; source: boolean; external?: FrontendExternal | null }): string {
   const { resources } = options;
   const external = options.external ?? null;
+  // 外链根会进注释与属性：末尾斜杠归一后转义，坏地址拼不出新的标签。
+  const root = external ? escapeHtml(external.root.replace(/\/+$/, '')) : '';
   return [
     '<!DOCTYPE html>',
     `<!-- Cardwright skeleton ${resources.version} · ${options.preset} · ${options.form}${external ? ' · 外链资产' : ''} -->`,
-    ...(external ? [`<!-- Cardwright assets ${external.root} -->`] : []),
+    ...(external ? [`<!-- Cardwright assets ${root} -->`] : []),
     '<html lang="zh-CN">',
     '<head>', '<meta charset="utf-8">', '<meta name="viewport" content="width=device-width, initial-scale=1">',
     ...(external
       ? [
-          `<link rel="stylesheet" href="${external.root}/base.css">`,
-          `<link rel="stylesheet" href="${external.root}/skins/${options.preset}.css">`,
+          `<link rel="stylesheet" href="${root}/base.css">`,
+          `<link rel="stylesheet" href="${root}/skins/${escapeHtml(options.preset)}.css">`,
           ...(options.css.trim() ? [`<style>\n${options.css}\n</style>`] : []),
         ]
       : [`<style>\n${resources.base}\n${options.css}\n</style>`]),
@@ -118,13 +117,8 @@ function htmlDocument(options: { resources: FrontendResources; preset: string; f
     options.app,
     ...(options.source ? ['<textarea id="cw-source" hidden>$1</textarea>'] : []),
     `<script id="cw-sheet" type="application/json">${options.sheetJson}</script>`,
-    // 头像表单独一个小脚本：只说数据，不含逻辑；没有配就整段省掉。
-    ...(options.avatars && Object.keys(options.avatars).length
-      ? [`<script id="cw-avatars" type="application/json">${escapeJson(options.avatars)}</script>`,
-         `<script>window.__CW_AVATARS=${escapeJson(options.avatars)};</script>`]
-      : []),
     ...(external
-      ? [`<script src="${external.root}/runtime/core.js"></script>`, `<script src="${external.root}/runtime/host.js"></script>`]
+      ? [`<script src="${root}/runtime/core.js"></script>`, `<script src="${root}/runtime/host.js"></script>`]
       : [`<script>\n${compress(resources.core)}\n${compress(resources.host)}\n</script>`]),
     '<script>CardwrightHost.boot();</script>',
     '</body>', '</html>',
@@ -157,7 +151,7 @@ export function compileSheet(sheet: AssemblySheet, context: CompileContext): Com
   if (sheetJson.includes('{{')) return fail('装配单里有 {{，酒馆会把它当宏替换掉。');
   if (/\$(?:\d|<)/.test(css)) return fail('样式里有 $ 后面跟数字或 <，酒馆正则会把它替换掉。');
   if (css.includes('{{')) return fail('样式里有 {{，酒馆会把它当宏替换掉。');
-  // 外链模式下 runtime 不在文档里，guard 也就无从谈起；它仍然在仓库里由 build 检查。
+  // 外链模式下 runtime 不在文档里，guard 无从谈起；内联模式下它随文档一起走，所以在这里挡下 $1 与 {{。
   if (!external) { guard(context.resources.core, '运行时 core.js'); guard(context.resources.host, '运行时 host.js'); }
 
   if (sheet.kind === '状态栏') {
@@ -200,7 +194,7 @@ export function compileSheet(sheet: AssemblySheet, context: CompileContext): Com
         app = `<div id="cw-status-head" class="cw-status-head"></div>\n${app}`;
       }
     }
-    return { kind, issues, html: htmlDocument({ resources: context.resources, preset, form: 'body', css, sheetJson: json, app, source: true, avatars: context.avatars ?? null, external }) };
+    return { kind, issues, html: htmlDocument({ resources: context.resources, preset, form: 'body', css, sheetJson: json, app, source: true, external }) };
   }
   return { kind, issues, html: htmlDocument({ resources: context.resources, preset, form: 'start', css, sheetJson, app: '<main id="cw-app" class="cw-app is-start"></main>', source: true, external }) };
 }

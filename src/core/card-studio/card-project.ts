@@ -68,15 +68,35 @@ function validChange(value: unknown): value is CardChange {
     && ['taskId', 'note'].every(key => value[key] === undefined || isString(value[key]));
 }
 
-/** 一个坏了、写歪了或干脆没有的 frontendAssets 一律当内联：卡照旧能导出，不会因为一个字段卡死。 */
+/** 资产地址里不能出现的字符：引号、尖括号会弄坏 HTML 属性，反斜杠和空白在 URL 里没有意义。 */
+const UNSAFE_FRONTEND_BASE = /["'<>\\\s\u0000-\u001f]/;
+
+/**
+ * 保存外链资产地址前的严格校验：只收 https、能被 URL 解析、带主机名，且不带账号密码/引号/尖括号/反斜杠/空白。
+ * 返回去掉末尾斜杠的地址；不合规就抛中文错误，地址不会写进卡项目登记文件。
+ */
+export function validateFrontendAssetsBase(value: unknown): string {
+  const text = isString(value) ? value.trim() : '';
+  if (!text) throw new Error('外链模式要给一个资产地址：形如 https://…/card-studio/frontend。');
+  if (UNSAFE_FRONTEND_BASE.test(text)) throw new Error('资产地址不能带引号、尖括号、反斜杠或空白。');
+  let url: URL;
+  try { url = new URL(text); }
+  catch { throw new Error('资产地址不是合法的网址。'); }
+  if (url.protocol !== 'https:') throw new Error('资产地址必须是 https（http、javascript:、data: 都不行）。');
+  if (!url.hostname) throw new Error('资产地址缺少主机名。');
+  if (url.username || url.password) throw new Error('资产地址不能带账号密码。');
+  return text.replace(/\/+$/, '');
+}
+
+/** 一个坏了、写歪了或干脆没有的 frontendAssets 一律当内联：卡照旧能导出，不会因为一个字段卡死（保存路径另走严格校验）。 */
 export function parseFrontendAssets(value: unknown): CardFrontendAssets {
   if (!isRecord(value)) return { ...INLINE_FRONTEND_ASSETS };
   if (value.mode !== 'cdn') return { ...INLINE_FRONTEND_ASSETS };
-  const base = (isString(value.base) ? value.base.trim() : '').replace(/\/+$/, '');
+  const base = isString(value.base) ? value.base.trim() : '';
   if (!base) return { mode: 'cdn', base: DEFAULT_FRONTEND_ASSETS_BASE };
-  // 外链必须是 https：http 会被酒馆页面拦掉，带凭据的 URL 也不许写进卡里。
-  if (!/^https:\/\/[^\s]+$/.test(base)) return { ...INLINE_FRONTEND_ASSETS };
-  return { mode: 'cdn', base };
+  // 旧卡里的坏地址回退内联：读到一张别人的卡，不能因为它写过 http 或带账号密码的地址就整张打不开。
+  try { return { mode: 'cdn', base: validateFrontendAssetsBase(base) }; }
+  catch { return { ...INLINE_FRONTEND_ASSETS }; }
 }
 
 /** 登记文件 → 编译器要的外链根；内联时给 null。导出、检查、预览都走这一个判断。 */

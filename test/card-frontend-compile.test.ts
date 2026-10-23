@@ -176,7 +176,7 @@ test('外链模式：runtime 与 base 走链接，装配单自己的东西仍旧
   assert.match(external, /<script>CardwrightHost\.boot\(\);<\/script>/, '调用仍旧留在文档里');
 
   // 质量检查按链接到的资源判定：不报「用了外部资源」，也没有因为看不到样式而误报的错误。
-  const withAssets = frontendQuality(external, { assets: resources });
+  const withAssets = frontendQuality(external, { assets: resources, external: EXTERNAL });
   assert.deepEqual(withAssets.filter(item => item.level === 'error').map(item => item.code), []);
   assert.ok(!withAssets.some(item => item.code === 'frontend-external'));
   assert.deepEqual(withAssets.filter(item => item.level === 'warning').map(item => item.code), [], '外链文档不该因为看不到皮肤而多出令牌/media 之类警告');
@@ -187,7 +187,7 @@ test('外链模式：custom 皮肤把装配单令牌内联，皮肤文件本身�
   const html = compileSheet(sheet, context({ external: EXTERNAL })).html;
   assert.match(html, new RegExp(`<link rel="stylesheet" href="${EXTERNAL.root}/skins/custom\\.css">`));
   assert.match(html, /<style>[\s\S]*--bg: #101214;[\s\S]*<\/style>/, '装配单令牌必须留在文档里');
-  assert.deepEqual(frontendQuality(html, { assets: resources }).filter(item => item.level === 'error').map(item => item.code), []);
+  assert.deepEqual(frontendQuality(html, { assets: resources, external: EXTERNAL }).filter(item => item.level === 'error').map(item => item.code), []);
 });
 
 test('外链模式的两种形态（创角页 / 正文美化）同样只写链接', () => {
@@ -200,7 +200,22 @@ test('外链模式的两种形态（创角页 / 正文美化）同样只写链�
   }
 });
 
-test('user content carrying $-sequences and a missing skin are reported, not shipped corrupted', () => {  const status = parseAssemblySheet(STATUS_SHEET) as StatusSheet;
+test('外链根拼进注释与属性前先转义，坏地址拼不出标签', () => {
+  const evil = { root: 'https://cdn.example/"><script>alert(1)</script>' };
+  const sheet = parseAssemblySheet(STATUS_SHEET) as StatusSheet;
+  const html = compileSheet(sheet, context({ external: evil })).html;
+  const escaped = 'https://cdn.example/&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;';
+  const preset = sheet.preset ?? 'sakura';
+  assert.ok(isHtmlDocument(html));
+  assert.ok(!html.includes('<script>alert(1)</script>'), '坏地址没有变成真标签');
+  assert.ok(html.includes(`<!-- Cardwright assets ${escaped} -->`));
+  assert.ok(html.includes(`<link rel="stylesheet" href="${escaped}/base.css">`));
+  assert.ok(html.includes(`<link rel="stylesheet" href="${escaped}/skins/${preset}.css">`));
+  assert.ok(html.includes(`<script src="${escaped}/runtime/core.js"></script>`));
+});
+
+test('user content carrying $-sequences and a missing skin are reported, not shipped corrupted', () => {
+  const status = parseAssemblySheet(STATUS_SHEET) as StatusSheet;
   const dollar = compileSheet({ ...status, title: '赏金$1章' }, context());
   assert.deepEqual(dollar.issues.map(issue => issue.code), ['sheet-invalid']);
   assert.match(dollar.issues[0].message, /\$/);

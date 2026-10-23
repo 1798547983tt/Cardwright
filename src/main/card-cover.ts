@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { extname } from 'node:path';
-import sharp from 'sharp';
+import sharp, { type Metadata, type Sharp } from 'sharp';
 import { validateCropRequest, type CoverCropResult } from '../core/card-studio/cover.ts';
 import type { CoverSaveRequest } from '../shared/card-studio/types.ts';
 
@@ -26,6 +26,19 @@ function retain(bytes: Buffer): string {
   return sourceId;
 }
 
+/** A sharp pipeline that first applies EXIF orientation, so preview, crop and output all talk about the
+    image as the user sees it (a phone photo tagged Orientation=6 displays rotated, not sideways). */
+function oriented(bytes: Buffer): Sharp {
+  return sharp(bytes, { limitInputPixels: MAX_PIXELS }).rotate();
+}
+
+/** The displayed pixel size: EXIF orientation 5–8 swaps width and height. */
+function orientedSize(metadata: Metadata): { width: number; height: number } {
+  if (!metadata.width || !metadata.height) throw new Error('这张图片打不开，请换一张 PNG、JPEG 或 WebP。');
+  const swapped = (metadata.orientation ?? 1) >= 5;
+  return swapped ? { width: metadata.height, height: metadata.width } : { width: metadata.width, height: metadata.height };
+}
+
 /** Retains the picked image for the crop dialog and returns a bounded preview of it. */
 export async function readCoverSource(path: string): Promise<{ sourceId: string; dataUrl: string; width: number; height: number }> {
   const information = await stat(path);
@@ -33,23 +46,24 @@ export async function readCoverSource(path: string): Promise<{ sourceId: string;
     throw new Error('请选择小于 64 MB 的图片文件（PNG、JPEG、WebP 等）。');
   }
   const bytes = await readFile(path);
-  const metadata = await sharp(bytes, { limitInputPixels: MAX_PIXELS }).metadata().catch(() => null);
-  if (!metadata?.width || !metadata?.height) throw new Error('这张图片打不开，请换一张 PNG、JPEG 或 WebP。');
-  const { width, height } = metadata;
+  const image = oriented(bytes);
+  const metadata = await image.metadata().catch(() => null);
+  if (!metadata) throw new Error('这张图片打不开，请换一张 PNG、JPEG 或 WebP。');
+  const { width, height } = orientedSize(metadata);
   const scale = Math.min(1, PREVIEW_EDGE / Math.max(width, height));
-  const preview = scale < 1
-    ? await sharp(bytes, { limitInputPixels: MAX_PIXELS }).resize(Math.round(width * scale), Math.round(height * scale), { kernel: 'lanczos3' }).jpeg({ quality: 92 }).toBuffer()
-    : await sharp(bytes, { limitInputPixels: MAX_PIXELS }).jpeg({ quality: 92 }).toBuffer();
-  return { sourceId: retain(bytes), dataUrl: `data:image/jpeg;base64,${preview.toString('base64')}`, width, height };
+  const preview = (scale < 1
+    ? image.resize(Math.round(width * scale), Math.round(height * scale), { kernel: 'lanczos3' })
+    : image).jpeg({ quality: 92 }).toBuffer();
+  return { sourceId: retain(bytes), dataUrl: `data:image/jpeg;base64,${(await preview).toString('base64')}`, width, height };
 }
 
 /** Runs the crop on the retained source and hands back encoded bytes, plus the mime to store it under. */
 export async function cropCover(request: CoverSaveRequest): Promise<CoverCropResult> {
   const bytes = SOURCES.get(request?.sourceId ?? '');
   if (!bytes) throw new Error('找不到所选的封面原图，请重新选择图片。');
-  const metadata = await sharp(bytes, { limitInputPixels: MAX_PIXELS }).metadata();
-  const checked = validateCropRequest(request, { width: metadata.width ?? 0, height: metadata.height ?? 0 });
-  const pipeline = sharp(bytes, { limitInputPixels: MAX_PIXELS }).extract(checked.crop);
+  const image = oriented(bytes);
+  const checked = validateCropRequest(request, orientedSize(await image.metadata()));
+  const pipeline = image.extract(checked.crop);
   const output = checked.output.width === checked.crop.width && checked.output.height === checked.crop.height ? pipeline : pipeline.resize(checked.output.width, checked.output.height, { kernel: 'lanczos3' });
   const encoded = checked.quality === 100
     ? await output.png().toBuffer()

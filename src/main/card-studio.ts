@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs
 import { dirname, join, resolve } from 'node:path';
 import type { Harness } from './harness.ts';
 import type { Project, Task } from '../shared/types.ts';
-import { createCardFolder, frontendExternalOf, parseFrontendAssets, readCardFile, writeCardFile, type CardProjectFile } from '../core/card-studio/card-project.ts';
+import { createCardFolder, frontendExternalOf, readCardFile, validateFrontendAssetsBase, writeCardFile, type CardProjectFile } from '../core/card-studio/card-project.ts';
 import { importSources, readSourceManifest, resplitSource, type SourceImportReport, type SourceRecord } from '../core/card-studio/sources.ts';
 import { buildMemberPrompt, buildSectionPrompt } from '../core/card-studio/prompts.ts';
 import { SQUAD_PROMPT_FILES } from '../shared/card-studio/prompt-files.ts';
@@ -57,15 +57,9 @@ function changeTitle(title: string): string {
   return `改动 · ${rest || title.trim()}`;
 }
 
-/**
- * 头像表：项目根目录的一份 JSON，`{ 角色名: { 表情: 图片地址 } }`。
- * 编译正文美化时写进页面的一小段脚本，运行时按 `{名字:表情}「…」` 选头像。
- * 属于卡片内容，不是应用状态：文件缺失或写坏只是没有头像，不报错、不影响导出。
- */
-const AVATARS_FILE = '.cardwright-avatars.json';
-
 /** The version and date every export file carries. */
-function exportStamp(components: ProjectComponents): { version: string; date: string } {  const envelope = components.envelope as Record<string, unknown>;
+function exportStamp(components: ProjectComponents): { version: string; date: string } {
+  const envelope = components.envelope as Record<string, unknown>;
   const data = (envelope.data && typeof envelope.data === 'object' ? envelope.data : {}) as Record<string, unknown>;
   const now = new Date();
   return {
@@ -842,12 +836,13 @@ export class CardStudioService {
 
   /**
    * 前端资源的编译选项：内联（默认）或外链到一个已发布的 https tag。
-   * 写到卡项目登记文件里，导出与检查都从这里取，和卡一起走。
+   * 写到卡项目登记文件里，导出与检查都从这里取，和卡一起走；非法地址在写入前就报错，不会进卡。
    */
   async saveFrontendAssets(projectId: string, assets: CardFrontendAssets): Promise<CardProjectView> {
     const project = this.cardProject(projectId);
-    const next = parseFrontendAssets(assets);
-    if (next.mode === 'cdn' && !next.base) throw new Error('外链模式要给一个 https 的资产地址（锁到已发布的 tag）。');
+    const next: CardFrontendAssets = assets.mode === 'cdn'
+      ? { mode: 'cdn', base: validateFrontendAssetsBase(assets.base) }
+      : { mode: 'inline', base: '' };
     await this.exclusive(projectId, async () => {
       const file = await readCardFile(project.path);
       file.frontendAssets = next;
@@ -1214,31 +1209,14 @@ export class CardStudioService {
     return this.frontendResources;
   }
 
-  /** 头像表：项目根目录的 `.cardwright-avatars.json`（`{ 角色名: { 表情: 图片地址 } }`）。文件坏了不影响导出，只是没有头像。 */
-  private async avatars(projectPath: string): Promise<Record<string, Record<string, string>> | null> {
-    try {
-      const text = await readFile(join(projectPath, AVATARS_FILE), 'utf8');
-      const parsed = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown;
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-      const rows: Record<string, Record<string, string>> = {};
-      for (const [name, value] of Object.entries(parsed as Record<string, unknown>)) {
-        if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
-        const row: Record<string, string> = {};
-        for (const [emotion, url] of Object.entries(value as Record<string, unknown>)) if (typeof url === 'string' && url) row[emotion] = url;
-        if (Object.keys(row).length) rows[name] = row;
-      }
-      return Object.keys(rows).length ? rows : null;
-    } catch { return null; }
-  }
-
-  /** What the checks, the exports and the previews assemble with: the skeleton, the 变量表 (authored or derived), the card's name and preset. */
+  /** What the checks, the exports and the previews assemble with: the skeleton, the 变量表 (authored or derived), the card's name, preset and external root. */
   private async assemblyContext(projectId: string, components: ProjectComponents): Promise<AssemblyContext> {
     const project = this.cardProject(projectId);
     const view = this.views.get(projectId);
     let table: AssemblyContext['table'] = null;
     try { const state = await readVariableTableState(project.path); table = state.source ? state.table : null; } catch { table = null; }
     const registration = await readCardFile(project.path).catch(() => null);
-    return { frontend: await this.frontend(), table, cardName: assemblyCardName(components, view?.name ?? project.name), preset: view?.stylePreset?.id ?? null, avatars: await this.avatars(project.path), external: frontendExternalOf(registration) };
+    return { frontend: await this.frontend(), table, cardName: assemblyCardName(components, view?.name ?? project.name), preset: view?.stylePreset?.id ?? null, external: frontendExternalOf(registration) };
   }
 
   private cardConversation(taskId: string): Task {
