@@ -10,7 +10,7 @@ import type { UsageLedgerDay } from './usage.ts';
 import type { VariableRow } from './card-studio/variable-table.ts';
 import type { RequestDiagnostic } from '../runtime/request-log.ts';
 import type { AssembledJailbreak, JailbreakChoice, JailbreakPack, JailbreakPackSummary, PresetImportEntry } from './jailbreak.ts';
-import type { CardChange, NewCardChange, CardRun, CardRunScope, CardRunSettings, CardSettings, CardSettingsChange, CardSquadAssignment, CardSquadSettings, PromptOverrideDetail, PromptOverrideItem, CardMeta, CardPieceImport, CardPreview, CardPreviewKind, CardPieceSummary, CardCheckReport, CardComponentResult, CardComponentSummary, CardExportResult, CardImportPreview, CardImportReport, CardLoreSuggestion, CardProjectView, CardStudioSnapshot, CardTaskInfo, CardVariableTableView, CardVariableTableEdit, CardVariableSyncResult, CoverSource, NewCardComponent, NewCardProject, PlanMode, SourceImportReport, SourceRecord, StartCardConversation } from './card-studio/types.ts';
+import type { CardChange, NewCardChange, CardRun, CardRunScope, CardRunSettings, CardSettings, CardSettingsChange, CardSquadAssignment, CardSquadSettings, PromptOverrideDetail, PromptOverrideItem, CardMeta, CardPieceImport, CardPreview, CardPreviewKind, CardPieceSummary, CardCheckReport, CardComponentResult, CardComponentSummary, CardExportResult, CardImportPreview, CardImportReport, CardLoreSuggestion, CardProjectView, CardStudioSnapshot, CardTaskInfo, CardVariableTableView, CardVariableTableEdit, CardVariableSyncResult, CoverSaveRequest, CoverSource, NewCardComponent, NewCardProject, PlanMode, SourceImportReport, SourceRecord, StartCardConversation } from './card-studio/types.ts';
 export type PermissionMode = 'ask' | 'edit' | 'full';
 export type TaskStatus = 'idle' | 'queued' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled';
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
@@ -360,7 +360,8 @@ export interface Bridge extends StudioBridge {
   exportCardPiece(projectId: string, kind: 'regex' | 'script', name: string): Promise<CardExportResult>;
   importCardPiece(projectId: string): Promise<CardPieceImport | null>;
   pickCardCover(): Promise<CoverSource | null>;
-  saveCardCover(projectId: string, dataUrl: string): Promise<CardProjectView>;
+  saveCardCover(projectId: string, request: CoverSaveRequest): Promise<CardProjectView>;
+  releaseCardCoverSource(sourceId: string): Promise<void>;
   clearCardCover(projectId: string): Promise<CardProjectView>;
   readCardCover(projectId: string): Promise<string | null>;
   /** The built-in browser (§6.4); the pages live in the window, beside the renderer. */

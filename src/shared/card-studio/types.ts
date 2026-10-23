@@ -177,8 +177,12 @@ export interface CardPreview {
   /** The stat_data the 模拟酒馆 starts from, as JSON. */ variables?: string;
   source: { from: 'sample' | 'variables' | 'sheet'; path: string } | null; notice: string | null; states: CardPreviewState[];
 }
-/** A picked image, already downsized for the crop dialog. */
-export interface CoverSource { dataUrl: string; width: number; height: number }
+/** A picked image: a small preview for the crop dialog, plus the handle of the retained original the main process crops from. */
+export interface CoverSource { sourceId: string; dataUrl: string; width: number; height: number }
+/** An output size the cover dialog may ask the main process to encode. */
+export interface CoverOutput { width: number; height: number }
+/** A cover crop: the rectangle in the source image's own pixels, the output size, and the JPEG quality (100 = lossless PNG). */
+export interface CoverSaveRequest { sourceId: string; crop: { x: number; y: number; width: number; height: number }; output: CoverOutput; quality: number }
 /** 提改动: what to change, or the error log; the change AI starts with the effort and model the card's planning uses. */
 export interface NewCardChange { kind: CardChangeKind; text: string; thinking?: CardThinking; gatewayId?: string; modelId?: string }
 export interface StartCardConversation { projectId: string; sectionId: string; title?: string; dispatchId?: string; mode?: PlanMode; kickoff?: boolean; prompt?: string; web?: boolean; thinking?: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'; gatewayId?: string; modelId?: string; /** One-click making runs with its own permission mode. */ permission?: CardPermission }

@@ -7,7 +7,7 @@ import { buildNative } from './build-native.mjs';
 
 await mkdir('dist', { recursive: true });
 if (process.platform === 'win32') await buildNative();
-await bundle({ entryPoints: ['src/main/main.ts'], outfile: 'dist/main.cjs', platform: 'node', format: 'cjs', bundle: true, external: ['electron', '@earendil-works/pi-ai/compat'], sourcemap: true, logLevel: 'info' });
+await bundle({ entryPoints: ['src/main/main.ts'], outfile: 'dist/main.cjs', platform: 'node', format: 'cjs', bundle: true, external: ['electron', '@earendil-works/pi-ai/compat', 'sharp'], sourcemap: true, logLevel: 'info' });
 await bundle({ entryPoints: ['src/main/preload.ts'], outfile: 'dist/preload.cjs', platform: 'node', format: 'cjs', bundle: true, external: ['electron'], sourcemap: true, logLevel: 'info' });
 // The floating desk pet's window has a bridge of its own (ADR 0018).
 await bundle({ entryPoints: ['src/main/pet-preload.ts'], outfile: 'dist/pet-preload.cjs', platform: 'node', format: 'cjs', bundle: true, external: ['electron'], sourcemap: true, logLevel: 'info' });

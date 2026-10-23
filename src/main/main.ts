@@ -6,6 +6,7 @@ import { Harness } from './harness.ts';
 import { Vault } from './vault.ts';
 import { normalizeAvatar, prepareAvatar, previewAvatarSource } from './avatars.ts';
 import { readCoverSource } from './card-cover.ts';
+import { assertArgSize } from './ipc-size.ts';
 import { externalUrl } from '../core/external-url.ts';
 import { readPreset } from '../shared/jailbreak.ts';
 import { setEcosystemApplicationRoot } from '../runtime/ecosystem-skills.ts';
@@ -55,7 +56,7 @@ function notify(title: string, body: string, task?: Task, kind: NotifyKind = 'ot
 function handle<K extends keyof Bridge>(name: K, fn: Bridge[K]): void {
   ipcMain.handle(`cardwright:${name}`, async (event, ...args: unknown[]) => {
     if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) throw new Error('Untrusted IPC sender.');
-    if (JSON.stringify(args).length > 2_000_000) throw new Error('Request exceeds the allowed size.');
+    assertArgSize(name, args);
     return (fn as (...args: unknown[]) => unknown)(...args);
   });
 }
@@ -413,7 +414,8 @@ async function initialize(): Promise<void> {
     return selected.canceled || !selected.filePaths.length ? null : cardStudio.importPieceFile(id, selected.filePaths[0]);
   });
   handle('pickCardCover', async () => cardStudio.pickCover());
-  handle('saveCardCover', async (id, dataUrl) => cardStudio.saveCover(id, dataUrl));
+  handle('saveCardCover', async (id, request) => cardStudio.saveCover(id, request));
+  handle('releaseCardCoverSource', async sourceId => cardStudio.releaseCoverSource(sourceId));
   handle('clearCardCover', async id => cardStudio.clearCover(id));
   handle('readCardCover', async id => cardStudio.readCover(id));
   tray = new Tray(nativeImage.createFromPath(join(directory, 'icon-tray.png')));
