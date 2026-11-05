@@ -53,6 +53,8 @@
   --permission-plan: #9a82d6; --permission-plan-soft: rgba(154, 130, 214, .12);
   --permission-full: #e25252; --permission-full-soft: rgba(226, 82, 82, .12);
   --backdrop: rgba(8, 9, 11, .66);
+  /* Model parameters filled in from models.dev: a deep brown wash, kept faint so the values stay readable. */
+  --auto-match-veil: rgba(120, 90, 48, .24); --auto-match-line: rgba(160, 124, 70, .34);
   --shadow-popover: 0 14px 32px rgba(0, 0, 0, .5), 0 0 0 1px #2a2f37;
   --shadow-modal: 0 26px 70px rgba(0, 0, 0, .6), 0 0 0 1px #3a4149;
   --motion-fast: 140ms; --motion-medium: 200ms; --motion-slow: 240ms;
@@ -89,6 +91,7 @@ html[data-theme="light"] {
   --permission-plan: #6a58b0; --permission-plan-soft: rgba(106, 88, 176, .1);
   --permission-full: #c62828; --permission-full-soft: rgba(198, 40, 40, .1);
   --backdrop: rgba(26, 28, 31, .5);
+  --auto-match-veil: rgba(74, 49, 24, .24); --auto-match-line: rgba(74, 49, 24, .36);
   --shadow-popover: 0 14px 30px rgba(26, 28, 31, .16), 0 0 0 1px #d8d5cc;
   --shadow-modal: 0 24px 64px rgba(26, 28, 31, .24), 0 0 0 1px #b8b4a9;
 }
@@ -127,6 +130,7 @@ html[data-theme="sakura"] {
   --permission-plan: #7a52b3; --permission-plan-soft: rgba(122, 82, 179, .1);
   --permission-full: #b3261e; --permission-full-soft: rgba(179, 38, 30, .1);
   --backdrop: rgba(45, 26, 30, .45);
+  --auto-match-veil: rgba(98, 60, 62, .12); --auto-match-line: rgba(98, 60, 62, .24);
   --shadow-popover: 0 14px 30px rgba(138, 28, 43, .14), 0 0 0 1px #efdadd;
   --shadow-modal: 0 24px 64px rgba(138, 28, 43, .2), 0 0 0 1px #dab5bb;
 }

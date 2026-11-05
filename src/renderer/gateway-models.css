@@ -121,3 +121,11 @@
 .model-match-note.is-miss { color: var(--warning, var(--muted)); }
 .model-match-hint { margin: 6px 0 0; font-size: 11.5px; color: var(--muted); }
 .model-match-hint strong { font: 11.5px var(--font-code); color: var(--text); }
+/* A low-opacity deep-brown wash over parameters models.dev filled in. Square, with room around the
+   fields so it reads as a sealed panel rather than a second disabled control. */
+.model-auto-locked { position: relative; }
+.model-auto-locked > * { opacity: .9; user-select: none; }
+.model-auto-locked::after {
+  content: ''; position: absolute; inset: -6px -8px; border: 1px solid var(--auto-match-line, rgba(88, 62, 30, .28));
+  background: var(--auto-match-veil, rgba(88, 62, 30, .14)); pointer-events: auto; cursor: not-allowed;
+}

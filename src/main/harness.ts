@@ -1318,6 +1318,7 @@ export class Harness extends EventEmitter {
     if (!Array.isArray(next.skillPaths) || next.skillPaths.some(p => typeof p !== 'string')) throw new Error('Skill folders must be paths.');
     if (next.developerMode !== undefined && typeof next.developerMode !== 'boolean') throw new Error('开发者模式只能打开或关闭。');
     for (const key of ['notifyFinished', 'notifyApproval', 'bootSequence', 'quietUpgrade', 'releaseCheck', 'persona'] as const) if (next[key] !== undefined && typeof next[key] !== 'boolean') throw new Error('These switches are on or off.');
+    if (next.modelAutoMatch !== undefined && !['online', 'local', 'off'].includes(next.modelAutoMatch)) throw new Error('Unknown model auto-match mode.');
     if (next.cardHandoff !== undefined) {
       const { tokens, windowPercent } = (next.cardHandoff ?? {}) as { tokens?: unknown; windowPercent?: unknown };
       if (!Number.isInteger(tokens) || (tokens as number) < 10_000 || (tokens as number) > 10_000_000 || !Number.isInteger(windowPercent) || (windowPercent as number) < 10 || (windowPercent as number) > 90) throw new Error('换对话阈值要在 1 万到 1000 万 Token、窗口的 10% 到 90% 之间。');

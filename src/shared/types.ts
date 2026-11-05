@@ -49,6 +49,8 @@ export interface Gateway {
   models?: GatewayModel[];
   pricing?: ModelPricing;
 }
+/** How a newly added model gets its parameters: from models.dev online, from local data only, or not at all. */
+export type ModelAutoMatchMode = 'online' | 'local' | 'off';
 export interface Preferences {
   /** 主题: 'system', a built-in id (dark, light, sakura) or a theme pack's id; a pack that has gone shows as dark. */
   name: string; theme: string; language: 'en' | 'zh';
@@ -86,6 +88,8 @@ export interface Preferences {
   releaseCheck?: boolean;
   /** 小绘的性格 (1.3.0 §4.5): on unless false. Her name and the honest answer about the model stay either way. */
   persona?: boolean;
+  /** Automatically fill a new model's parameters from models.dev; online unless the user chooses local-only or off. */
+  modelAutoMatch?: ModelAutoMatchMode;
 }
 /** 一键自检 of a gateway: the model list, then one completion of a single token; each step on its own. */
 export interface GatewaySelfTest { ok: boolean; steps: Array<{ step: 'models' | 'completion'; ok: boolean; detail: string; ms: number }> }

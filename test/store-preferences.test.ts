@@ -57,6 +57,20 @@ test('小绘的性格 is on by default, survives a save and a load when switched
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+// models.dev auto-match: parseState keeps an explicit list, so the mode has to round-trip and an unknown value falls back to online.
+test('the model auto-match mode survives a save and a restart; an unknown value falls back to online', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cardwright-preferences-'));
+  try {
+    const fresh = new AppStore(dir);
+    assert.equal(fresh.state.preferences.modelAutoMatch, 'online', 'on by default');
+    fresh.state.preferences.modelAutoMatch = 'local';
+    fresh.save();
+    assert.equal(new AppStore(dir).state.preferences.modelAutoMatch, 'local');
+    await writeFile(join(dir, 'state.json'), JSON.stringify({ schemaVersion: 8, preferences: { modelAutoMatch: 'sometimes' } }));
+    assert.equal(new AppStore(dir).state.preferences.modelAutoMatch, 'online');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 // 工坊小队 (spec §5.4): parseState keeps an explicit list, so the setting has to round-trip through a save and a load.
 test('the squad settings survive a save and a restart; a missing 自行组队 takes its default and an unknown mode is dropped', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cardwright-preferences-'));
