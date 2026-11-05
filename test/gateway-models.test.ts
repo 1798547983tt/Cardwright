@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import test, { type TestContext } from 'node:test';
 import { AppStore } from '../src/core/store.ts';
-import { gatewayModels, normalizeGatewayModels, resolveGatewayModel } from '../src/shared/gateway-models.ts';
+import { gatewayModels, modelRuntimeParameters, normalizeGatewayModels, resolveGatewayModel } from '../src/shared/gateway-models.ts';
 import type { Gateway, GatewayModel } from '../src/shared/types.ts';
 
 const gateway = (changes: Partial<Gateway> = {}): Gateway => ({
@@ -133,4 +133,41 @@ test('new catalog models preserve independent Anthropic reasoning capabilities',
   assert.equal(normalized[0].effortMap, undefined);
   assert.equal(normalized[1].effortMap?.xhigh, 'xhigh');
   assert.throws(() => normalizeGatewayModels({ ...source, models: [model('legacy', { effortMap: { max: 'max' } })] }), /adaptive-thinking/);
+});
+
+
+test('auto-match and Codex metadata survive normalization, cloning and resolution', () => {
+  const source = gateway({ models: [model('m', { autoMatch: true, codexProxy: true, inputModalities: ['text', 'image'] })] });
+  const normalized = normalizeGatewayModels(source);
+  assert.equal(normalized[0].autoMatch, true);
+  assert.equal(normalized[0].codexProxy, true);
+  assert.deepEqual(normalized[0].inputModalities, ['text', 'image']);
+
+  const listed = gatewayModels(source);
+  assert.deepEqual(listed[0].inputModalities, ['text', 'image']);
+  listed[0].inputModalities!.push('text');
+  assert.deepEqual(source.models![0].inputModalities, ['text', 'image']);
+  assert.deepEqual(resolveGatewayModel(source, 'm').inputModalities, ['text', 'image']);
+
+  assert.throws(() => normalizeGatewayModels({ ...source, models: [model('m', { autoMatch: 'yes' as never })] }), /automatic model matching/);
+  assert.throws(() => normalizeGatewayModels({ ...source, models: [model('m', { codexProxy: 1 as never })] }), /Codex reverse-proxy/);
+  assert.throws(() => normalizeGatewayModels({ ...source, models: [model('m', { inputModalities: ['text', 'audio'] as never })] }), /only be text or image/);
+});
+
+test('matched effort maps keep nulls, so unsupported levels stay unsupported', () => {
+  const effortMap = { off: null, minimal: null, low: 'low', medium: null, high: 'high', xhigh: null, max: null, ultra: null };
+  const normalized = normalizeGatewayModels({ ...gateway(), models: [model('m', { effortMap })] });
+  assert.deepEqual(normalized[0].effortMap, effortMap);
+  assert.equal(normalized[0].effortMap?.ultra, null);
+});
+
+test('editor-only switches are not runtime parameter changes', () => {
+  const base = model('m', { autoMatch: true, inputModalities: ['text'] });
+  assert.equal(modelRuntimeParameters(base), modelRuntimeParameters({ ...base, autoMatch: false, codexProxy: true }));
+  assert.equal(modelRuntimeParameters(base), modelRuntimeParameters({ ...base, nativeSearch: undefined }));
+  // A model saved before 1.3.4 has no modality list; the runtime registered text and image for it.
+  assert.equal(modelRuntimeParameters(model('legacy')), modelRuntimeParameters(model('legacy', { inputModalities: ['text', 'image'] })));
+  assert.notEqual(modelRuntimeParameters(base), modelRuntimeParameters({ ...base, contextWindow: 400000 }));
+  assert.notEqual(modelRuntimeParameters(base), modelRuntimeParameters({ ...base, reasoning: false }));
+  assert.notEqual(modelRuntimeParameters(base), modelRuntimeParameters({ ...base, inputModalities: ['text', 'image'] }));
 });

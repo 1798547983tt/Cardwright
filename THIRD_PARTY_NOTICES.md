@@ -16,6 +16,8 @@ Version 1.1 bundles highlight.js 11.12.0 (github.com/highlightjs/highlight.js, t
 
 Version 1.3.3 bundles sharp 0.35.5 (github.com/lovell/sharp, the `sharp` npm package) to crop and re-encode cover images in the main process: its JavaScript wrapper and the prebuilt libvips 8.x binaries it loads (`libvips-42.dll`, `libvips-cpp-*.dll` in `@img/sharp-win32-x64`), unmodified. sharp is distributed under the Apache License 2.0; the bundled libvips is distributed under the GNU Lesser General Public License 3.0 or later. libvips is linked dynamically as separate DLLs and can be replaced by the user; the sources are at github.com/libvips/libvips and github.com/lovell/sharp-libvips. Full license texts are below, and the packages keep their own license files in `node_modules`.
 
+Version 1.3.4 derives `src/shared/model-snapshot.json` from models.dev (https://models.dev, github.com/anomalyco/models.dev), distributed under the MIT License, Copyright (c) 2025 models.dev. Only model names, context and output limits, reasoning levels and input modalities are kept. The catalog is downloaded again at runtime only when a model is missing from the snapshot; `scripts/build-model-snapshot.mjs` documents how the snapshot is regenerated. The MIT license text below covers this data.
+
 ## Pi
 
 Source reviewed: the pi 0.85.1 source release.

@@ -7,7 +7,7 @@ import { EffortSlider } from './EffortSlider';
 import type { JailbreakChoice } from '../shared/jailbreak';
 import { IconButton, MenuItem, Popover } from './primitives';
 import { ContextUsage } from './ContextUsage';
-import { availableEfforts } from '../shared/effort';
+import { availableEfforts, preferredEffort } from '../shared/effort';
 import { selectedModel } from './model-resolution';
 import { ModelPicker } from './ModelPicker';
 import { AttachmentComposer } from './AttachmentComposer';
@@ -75,9 +75,8 @@ export function Composer({ task, projectId, setProjectId }: { task?: Task; proje
   useEffect(() => { if (!task && !permissionChosen.current) setPermission(data.preferences.defaultPermission); }, [data.preferences.defaultPermission, task?.id]);
   useEffect(() => {
     if (task || !selectedGateway) return;
-    const available = availableEfforts(selectedGateway);
     const preferred = thinkingChosen.current ? thinking : data.preferences.defaultThinking;
-    const next = available.includes(preferred) ? preferred : available.includes('medium') ? 'medium' : available[0] || 'off';
+    const next = preferredEffort(selectedGateway, preferred);
     if (next !== thinking) setThinking(next);
   }, [selectedGateway, thinking, data.preferences.defaultThinking, task?.id]);
   useEffect(() => { if (task) { setPermission(task.permission); setGatewayId(task.gatewayId); setModelId(task.modelId || ''); setContextWindow(task.contextWindow || 300000); setThinking(task.thinking); } }, [task?.permission, task?.gatewayId, task?.modelId, task?.contextWindow, task?.thinking]);
@@ -129,7 +128,7 @@ export function Composer({ task, projectId, setProjectId }: { task?: Task; proje
   async function changeModel(nextGatewayId: string, nextModelId: string) {
     const base = data.gateways.find(item => item.id === nextGatewayId); const next = selectedModel(base, nextModelId);
     if (!next) return;
-    const available = availableEfforts(next); const nextThinking = (available.includes(thinking) ? thinking : available.includes('medium') ? 'medium' : available[0] || 'off') as ThinkingLevel;
+    const nextThinking = preferredEffort(next, thinking);
     const nextContext = contextChosen.current ? contextWindow : next.contextWindow;
     if (task) await run(() => api.updateTask(task.id, { gatewayId: nextGatewayId, modelId: nextModelId, contextWindow: nextContext, thinking: nextThinking }));
     else { modelChosen.current = true; setGatewayId(nextGatewayId); setModelId(nextModelId); setContextWindow(nextContext); setThinking(nextThinking); }

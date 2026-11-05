@@ -53,6 +53,7 @@ const bridge: Bridge = {
   resumeAgent: (id, message) => invoke('resumeAgent', id, message),
   setSkillEnabled: (id, enabled) => invoke('setSkillEnabled', id, enabled), setAgentEnabled: (id, enabled) => invoke('setAgentEnabled', id, enabled),
   saveHooks: hooks => invoke('saveHooks', hooks), claudeCodeHooks: projectId => invoke('claudeCodeHooks', projectId), testHook: (event, command, timeout, projectId) => invoke('testHook', event, command, timeout, projectId), fetchModels: (input, key) => invoke('fetchModels', input, key),
+  matchModel: input => invoke('matchModel', input), refreshModelMetadata: () => invoke('refreshModelMetadata'),
   listJailbreakPacks: () => invoke('listJailbreakPacks'), readJailbreakPreset: () => invoke('readJailbreakPreset'),
   saveJailbreakPack: pack => invoke('saveJailbreakPack', pack), removeJailbreakPack: id => invoke('removeJailbreakPack', id),
   createTask: input => invoke('createTask', input), deleteTasks: ids => invoke('deleteTasks', ids), exportTranscript: id => invoke('exportTranscript', id), prompt: (id, text, behavior, attachments) => invoke('prompt', id, text, behavior, attachments),

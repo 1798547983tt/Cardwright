@@ -20,7 +20,7 @@ export async function oneShotCompletion(connection: OneShotConnection, request: 
   const { streamSimple } = await import('@earendil-works/pi-ai/compat');
   const model: Model<any> = {
     id: gateway.modelId, name: gateway.modelId, provider: `cardwright-one-shot-${gateway.id}`, api: gateway.protocol, baseUrl: gateway.baseUrl,
-    reasoning: gateway.reasoning, input: ['text'], contextWindow: gateway.contextWindow, maxTokens,
+    reasoning: gateway.reasoning, input: gateway.inputModalities ?? ['text'], contextWindow: gateway.contextWindow, maxTokens,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, thinkingLevelMap: { [effort.level]: effort.providerValue },
     compat: gateway.protocol === 'anthropic-messages' ? { forceAdaptiveThinking: !!gateway.adaptiveThinking } : upstreamCompat(gateway),
   };
