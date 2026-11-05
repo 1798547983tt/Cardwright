@@ -11,5 +11,5 @@ await build({ entryPoints: ['src/runtime/worker.ts'], outfile: 'dist/worker.mjs'
 const server = await createServer({ server: { host: '127.0.0.1', port: 5173, strictPort: true } });
 await server.listen();
 const environment = { ...process.env, CARDWRIGHT_DEV_URL: 'http://127.0.0.1:5173' }; delete environment.ELECTRON_RUN_AS_NODE;
-const child = spawn(electron, ['.'], { env: environment, stdio: 'inherit', windowsHide: true });
+const child = spawn(electron, ['.'], { env: environment, stdio: 'inherit' });
 child.on('exit', () => { void server.close().then(() => process.exit()); });
