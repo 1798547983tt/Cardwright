@@ -2,7 +2,7 @@ import { useEffect, useState, type KeyboardEvent, type RefObject } from 'react';
 import { BookOpen, SquareSlash, X } from 'lucide-react';
 import { useApp } from '../context';
 import { changeCommandText, commandsFor, matchCommand, slashSuggestions, type SlashCommand, type SlashItem } from '../../shared/slash-commands';
-import { DEFAULT_HANDOFF, handoffThreshold } from '../../shared/card-studio/handoff';
+import { DEFAULT_HANDOFF, handoffThresholdFor } from '../../shared/card-studio/handoff';
 import { markableDispatch } from '../../shared/card-studio/view';
 import type { CardCheckReport, CardProjectView } from '../../shared/card-studio/types';
 import type { Task } from '../../shared/types';
@@ -133,10 +133,10 @@ export function CommandPanelView({ panel, task, onClose, onOpenBuild }: { panel:
     title = t('Context', '上下文');
     const window = task?.contextWindow || task?.contextUsage?.window || gateway?.contextWindow || 0;
     const used = task?.contextUsage?.tokens;
-    const threshold = handoffThreshold(window, data.preferences.cardHandoff ?? DEFAULT_HANDOFF);
+    const threshold = handoffThresholdFor(window, data.preferences.cardHandoff ?? DEFAULT_HANDOFF, data.studio?.preferences.cardOptimization);
     body = <dl>
       <dt>{t('Used', '已用')}</dt><dd>{typeof used === 'number' ? `${tokenCount(used)} / ${window ? tokenCount(window) : '—'}${window ? `（${Math.round(used / window * 100)}%）` : ''}` : t('Known after the next reply', '下一轮回复后可知')}</dd>
-      <dt>{t('New conversation offered at', '提议换对话')}</dt><dd>{window ? tokenCount(threshold) : '—'}</dd>
+      <dt>{t('New conversation offered at', '提议换对话')}</dt><dd>{window && threshold !== null ? tokenCount(threshold) : '—'}</dd>
       <dt>{t('Automatic compaction at', '自动压缩')}</dt><dd>{window ? `${tokenCount(Math.floor(window * 0.9))}（90%）` : '—'}</dd>
     </dl>;
   } else if (panel.kind === 'cost') {

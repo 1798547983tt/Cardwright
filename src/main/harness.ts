@@ -32,6 +32,7 @@ import type { JailbreakChoice } from '../shared/jailbreak.ts';
 import { fetchModelCatalog, modelCatalogUrl, tinyCompletion } from '../core/model-catalog.ts';
 import { assertWithdrawable, selectRevision, startRevision, withdrawTurn, type Withdrawal } from '../core/conversation-revisions.ts';
 import { mapLegacyUserMessages, type ConversationEntry } from '../runtime/conversation-history.ts';
+import type { StudioPreferences } from '../shared/studio-types.ts';
 import type { StudioServices } from './studio-services.ts';
 import type { CardStudioService } from './card-studio.ts';
 import { sectionLabel } from '../shared/card-studio/boards.ts';
@@ -145,6 +146,8 @@ export class Harness extends EventEmitter {
   }
   snapshot(): AppSnapshot { return structuredClone(this.publicView()); }
   attachStudio(studio: StudioServices): void { this.studio = studio; }
+  /** Desktop studio settings for services that run outside StudioServices (the card runner and prompt builder). */
+  studioPreferences(): StudioPreferences | undefined { return this.studio?.state.preferences; }
   attachCardStudio(service: CardStudioService): void { this.cardStudio = service; }
   attachBrowser(browser: BrowserBridge): void { this.browser = browser; }
   /** The window tells the app what the browser looks like now; the renderer draws the tabs and the address bar. */
@@ -1311,12 +1314,11 @@ export class Harness extends EventEmitter {
     if (!Number.isInteger(next.maxConcurrent) || next.maxConcurrent < 1 || next.maxConcurrent > 8) throw new Error('Concurrent agents must be between 1 and 8.');
     if (typeof next.name !== 'string' || next.name.length > 80 || typeof next.instructions !== 'string' || next.instructions.length > 40_000) throw new Error('Name or instructions are too long.');
     if (!Array.isArray(next.skillPaths) || next.skillPaths.some(p => typeof p !== 'string')) throw new Error('Skill folders must be paths.');
-    if (next.developerMode !== undefined && typeof next.developerMode !== 'boolean') throw new Error('开发者模式只能打开或关闭。');
     for (const key of ['notifyFinished', 'notifyApproval', 'bootSequence', 'quietUpgrade', 'releaseCheck', 'persona'] as const) if (next[key] !== undefined && typeof next[key] !== 'boolean') throw new Error('These switches are on or off.');
     if (next.cardHandoff !== undefined) {
-      const { tokens, windowPercent } = (next.cardHandoff ?? {}) as { tokens?: unknown; windowPercent?: unknown };
+      const { tokens, windowPercent, enabled } = (next.cardHandoff ?? {}) as { tokens?: unknown; windowPercent?: unknown; enabled?: unknown };
       if (!Number.isInteger(tokens) || (tokens as number) < 10_000 || (tokens as number) > 10_000_000 || !Number.isInteger(windowPercent) || (windowPercent as number) < 10 || (windowPercent as number) > 90) throw new Error('换对话阈值要在 1 万到 1000 万 Token、窗口的 10% 到 90% 之间。');
-      next.cardHandoff = { tokens: tokens as number, windowPercent: windowPercent as number };
+      next.cardHandoff = { tokens: tokens as number, windowPercent: windowPercent as number, ...(enabled === false ? { enabled: false } : {}) };
     }
     if (next.cardSquad !== undefined) {
       const squad = next.cardSquad as unknown as Record<string, unknown> | null;

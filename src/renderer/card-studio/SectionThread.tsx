@@ -100,11 +100,11 @@ function ConversationEnd({ task, card }: { task: Task; card: CardProjectView }) 
     </div>;
   }
   const handoff = task.card?.handoff;
-  const offer = handoffOffer({ tokens: task.contextUsage?.tokens, window: task.contextWindow || task.contextUsage?.window || 0, settings: data.preferences.cardHandoff, dispatchDone: false, active: false, handoff });
+  const offer = handoffOffer({ tokens: task.contextUsage?.tokens, window: task.contextWindow || task.contextUsage?.window || 0, settings: data.preferences.cardHandoff, dispatchDone: false, active: false, handoff, optimization: data.studio?.preferences.cardOptimization });
   if (!offer.offer) return null;
   return <div className="cs-end-bar is-offer" role="status">
     <span><MessageSquarePlus size={13} />{t(`Context used: ${tokenCount(offer.used)}. A new conversation is suggested.`, `上下文已用 ${tokenCount(offer.used)}，建议换对话`)}</span>
-    <small>{handoff?.status === 'failed' ? t('The last request returned no summary; try again.', '上次没有拿到交接摘要，可以再试一次。') : t(`Threshold ${tokenCount(offer.threshold)}`, `阈值 ${tokenCount(offer.threshold)}`)}</small>
+    <small>{handoff?.status === 'failed' ? t('The last request returned no summary; try again.', '上次没有拿到交接摘要，可以再试一次。') : t(`Threshold ${tokenCount(offer.threshold ?? 0)}`, `阈值 ${tokenCount(offer.threshold ?? 0)}`)}</small>
     <button type="button" className="cs-btn is-small is-primary" disabled={asking} onClick={() => { setAsking(true); void actions.requestHandoff(task).finally(() => setAsking(false)); }}>{asking ? <LoaderCircle size={13} className="spinning" /> : null}{t('New conversation', '换对话')}</button>
   </div>;
 }

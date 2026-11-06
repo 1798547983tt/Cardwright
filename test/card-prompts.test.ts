@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildMemberPrompt, buildSectionPrompt, readKnowledgeIndex } from '../src/core/card-studio/prompts.ts';
+import { DEFAULT_CARD_OPTIMIZATION } from '../src/shared/card-studio/card-optimization.ts';
 import { SECTION_IDS, targetOf } from '../src/shared/card-studio/boards.ts';
 import { planDispatchBatch } from '../src/shared/card-studio/dispatch.ts';
 import { squadDispatchPrompt } from '../src/shared/card-studio/squad.ts';
@@ -38,6 +39,35 @@ test('world book sections get the common rules, the board rules and their own', 
   const prompt = await buildSectionPrompt(resources, { ...card, sectionId: 'lore-people' });
   for (const expected of ['# 制卡工坊 · 世界书 · 人设', '## 通用规则', '## 世界书通用规则', 'card_new_component', '# 世界书 · 人设', '人物模板', '出处索引']) assert.ok(prompt.includes(expected), expected);
   assert.ok(!prompt.includes('本分区的专用提示词尚未内置'));
+});
+
+test('the optimization switches the one-file rule for the two-file rule', async () => {
+  const current = await buildSectionPrompt(resources, { ...card, sectionId: 'lore-people' });
+  const optimized = await buildSectionPrompt(resources, { ...card, sectionId: 'lore-people' }, { optimization: { ...DEFAULT_CARD_OPTIMIZATION, maxWritesPerRound: 2 } });
+  assert.match(current, /一次只写一个文件/);
+  assert.doesNotMatch(current, /一轮最多写/);
+  assert.match(optimized, /一轮最多写 2 个文件/);
+  assert.doesNotMatch(optimized, /一次只写一个文件/);
+  assert.doesNotMatch(optimized, /cardwright:batch-write/);
+});
+
+test('the section brief replaces the full read-first list only when it is on', async () => {
+  const current = await buildSectionPrompt(resources, { ...card, sectionId: 'lore-people' });
+  const briefed = await buildSectionPrompt(resources, { ...card, sectionId: 'lore-people' }, { optimization: { ...DEFAULT_CARD_OPTIMIZATION, sectionBrief: true } });
+  assert.match(current, /每次开工先读/);
+  assert.doesNotMatch(current, /cardwright:brief-read/);
+  assert.match(briefed, /先读派单里附的「本次派单摘要」和参考行/);
+  assert.doesNotMatch(briefed, /每次开工先读/);
+  assert.doesNotMatch(briefed, /cardwright:brief-read/);
+});
+
+test('a prompt override without the batch markers keeps its own rule', async () => {
+  const read = async (relative: string) => relative === 'prompts/通用规则.md'
+    ? '## 通用规则\n\n- 用户自己的单文件规则。'
+    : readFile(join(resources, ...relative.split('/')), 'utf8');
+  const prompt = await buildSectionPrompt(resources, { ...card, sectionId: 'lore-people' }, { read, optimization: DEFAULT_CARD_OPTIMIZATION });
+  assert.match(prompt, /用户自己的单文件规则/);
+  assert.doesNotMatch(prompt, /一轮最多写/);
 });
 
 // One-click making reads these lines to tell a question or a refusal from a delivery.

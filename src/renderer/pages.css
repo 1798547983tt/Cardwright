@@ -338,7 +338,7 @@ html[data-theme="light"] .composer-box:focus-within::before { border-color: #151
 /* A number field followed by its unit, e.g. the card studio's window share. */
 .number-with-unit { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .setting-control .number-input.is-wide { width: 116px; }
-/* 工作室设置 → 制卡: the built-in prompts developer mode can edit. */
+/* 工作室设置 → 制卡: 内置提示词列表。 */
 .prompt-override-list { display: grid; gap: 14px; margin-top: 8px; }
 .prompt-override-list h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: var(--muted); }
 .prompt-override-list ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }

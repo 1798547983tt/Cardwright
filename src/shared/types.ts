@@ -65,8 +65,6 @@ export interface Preferences {
   quietUpgrade?: boolean;
   /** Card studio: when the app offers a new conversation (tokens, or share of the model window, whichever first). */
   cardHandoff?: { tokens: number; windowPercent: number; enabled?: boolean };
-  /** Card studio: shows and edits the built-in prompts (提示词覆盖). */
-  developerMode?: boolean;
   /** 工坊小队 (spec §5.4): the 子代理 switch and 自行组队; absent means off, with 自行组队 on. */
   cardSquad?: CardSquadSettings;
   /** 桌宠: off by default; the pet, when none is chosen, is the theme's; where its floating window was dragged to. */

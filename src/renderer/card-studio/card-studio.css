@@ -322,7 +322,7 @@ button.cs-path:hover { color: var(--cs-gold-2); }
 .cs-folder { display: flex; gap: 8px; }
 .cs-folder input { font: 12.5px var(--cs-mono) !important; }
 .cs-form-error { padding: 8px 12px; font-size: 13px; color: #f0b8bc; background: rgba(212, 84, 95, .08); border-left: 2px solid var(--cs-err); }
-/* Developer mode: the built-in prompt editor (§5.6). */
+/* 提示词覆盖: the built-in prompt editor (§5.6). */
 .cs-prompt-editor { width: min(920px, calc(100vw - 48px)); }
 .cs-prompt-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--cs-hair); }
 .cs-prompt-tabs button { position: relative; padding: 6px 12px; font-size: 12.5px; color: var(--cs-muted); background: none; border-bottom: 2px solid transparent; }

@@ -21,8 +21,17 @@ export type PlanMode = 'scratch' | 'refine' | 'change';
 export interface CardDispatch {
   id: string; target: string; sectionId: string | null; title: string; requires: string; body: string;
   status: DispatchStatus; createdAt: string; updatedAt: string; sourceTaskId?: string;
+  /** 分区项目摘要: the planning AI's short brief for this dispatch. */
+  brief?: string;
+  /** 分区项目摘要: the project files and line ranges this dispatch uses. */
+  references?: CardDispatchReference[];
   /** A 改动派单: the 改动单 it came from. */ changeId?: string;
 }
+
+/** A line range in a card project file, resolved by the app from a heading or explicit offset. */
+export interface CardDispatchReference { path: string; heading?: string; offset: number; lines: number; summary?: string }
+/** What the planning AI may give; the app resolves it against the files before storing it. */
+export interface CardDispatchReferenceInput { path: string; heading?: string; offset?: number; lines?: number; summary?: string }
 
 /** 改动单 (§5.4): a change asked for in one sentence (`request`), or an error log pasted in (`error`). */
 export type CardChangeKind = 'request' | 'error';
@@ -71,7 +80,7 @@ export interface CardMemberComponent { name: string; paths: string[] }
  */
 export interface CardSquadAssignment { role: CardMemberRole; files: string[]; create: string[]; created?: CardMemberComponent[] }
 
-/** One built-in card studio prompt as developer mode lists it; `stale` means the shipped default changed since the override was saved. */
+/** One built-in card studio prompt as the prompt editor lists it; `stale` means the shipped default changed since the override was saved. */
 export type PromptGroup = 'rules' | 'board' | 'section' | 'kickoff' | 'squad';
 export interface PromptOverrideItem { id: string; label: string; group: PromptGroup; overridden: boolean; stale: boolean }
 export interface PromptOverrideDetail extends PromptOverrideItem { text: string; defaultText: string }

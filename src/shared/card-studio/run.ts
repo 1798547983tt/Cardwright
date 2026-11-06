@@ -1,3 +1,4 @@
+import { effectiveContinueRounds, type CardAgentOptimization } from './card-optimization.ts';
 import { findBoard } from './boards.ts';
 import { componentName } from './components.ts';
 import { stripMarkers } from './markers.ts';
@@ -18,6 +19,12 @@ export const CONTINUE_TEXT = '继续做这条派单，做完按交付格式回�
  * before someone looks. The count starts again whenever the user presses 继续.
  */
 export const CONTINUE_LIMIT = 20;
+
+/** The configuration's automatic rounds; off keeps the shipped limit. */
+export function continueRounds(config?: CardAgentOptimization): number {
+  return effectiveContinueRounds(config) ?? CONTINUE_LIMIT;
+}
+
 /** Why a run paused, as the progress bar and the notification name it. */
 export const RUN_PAUSE_LABELS: Record<CardRunPause, { en: string; zh: string }> = {
   question: { en: 'The section AI asked questions', zh: '分区 AI 提了问题' },
@@ -32,6 +39,12 @@ export const RUN_PAUSE_LABELS: Record<CardRunPause, { en: string; zh: string }> 
   restart: { en: 'The app restarted', zh: '应用重启过' },
   incomplete: { en: 'The squad left gaps', zh: '小队留下了缺口' },
 };
+
+/** The pause label with the configured round count, which the static table cannot know. */
+export function pauseLabel(reason: CardRunPause, rounds = CONTINUE_LIMIT): { en: string; zh: string } {
+  if (reason !== 'continue-limit') return RUN_PAUSE_LABELS[reason];
+  return { en: `The dispatch went on for ${rounds} rounds without finishing`, zh: `派单自动接着做了 ${rounds} 轮还没做完` };
+}
 /** A run that still has work: it holds its conversations and the card waits for it. */
 export function runIsOpen(run: Pick<CardRun, 'status'> | undefined): boolean {
   return !!run && (run.status === 'running' || run.status === 'pausing' || run.status === 'paused');

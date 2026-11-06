@@ -28,6 +28,16 @@ test('accepts full-width colons, padded field names and a later separator inside
   assert.equal(dispatch.body, '第一段\n---\n第二段仍属于正文');
 });
 
+test('the tool carries a brief and references while a block carries the brief', () => {
+  const batch = planDispatchBatch([], [{ target: '世界书/人设', title: '写人设', body: '正文', brief: '先写主角', references: [{ path: '设计书.md', heading: '主角与配角', summary: '人物名单' }] }]);
+  assert.equal(batch.accepted[0].brief, '先写主角');
+  assert.deepEqual(batch.accepted[0].references, [{ path: '设计书.md', heading: '主角与配角', summary: '人物名单' }]);
+  const [parsed] = parseDispatches(`${fence}派单\n目标: 世界书/人设\n标题: 写人设\n前置: 设计书\n摘要: 先写主角\n---\n正文\n${fence}`);
+  assert.ok(!('error' in parsed));
+  assert.equal(parsed.brief, '先写主角');
+  assert.match(formatDispatch(parsed), /摘要: 先写主角/);
+});
+
 test('reports a malformed block instead of throwing', () => {
   const [missingTarget, missingTitle] = parseDispatches(`${fence}派单\n标题: 写设定\n---\n正文\n${fence}\n${fence}派单\n目标: 世界书/设定\n---\n正文\n${fence}`);
   assert.equal('error' in missingTarget && missingTarget.error, '派单缺少目标');

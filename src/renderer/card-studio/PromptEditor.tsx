@@ -5,7 +5,7 @@ import { Modal } from '../primitives';
 import type { PromptOverrideDetail } from '../../shared/card-studio/types';
 
 /**
- * Developer mode: edits built-in card studio prompts as prompt overrides (§5.6). Saving and restoring apply to
+ * Edits built-in card studio prompts as prompt overrides (§5.6). Saving and restoring apply to
  * conversations started afterwards; the shipped default is shown for comparison.
  */
 export function PromptEditor({ ids, onClose }: { ids: string[]; onClose: () => void }) {

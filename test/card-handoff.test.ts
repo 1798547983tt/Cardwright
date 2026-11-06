@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_HANDOFF, formatHandoff, handoffFromReply, handoffOffer, handoffThreshold, parseHandoff } from '../src/shared/card-studio/handoff.ts';
+import { DEFAULT_CARD_OPTIMIZATION } from '../src/shared/card-studio/card-optimization.ts';
+import { DEFAULT_HANDOFF, formatHandoff, handoffFromReply, handoffOffer, handoffThreshold, handoffThresholdFor, parseHandoff } from '../src/shared/card-studio/handoff.ts';
 import { HANDOFF_REQUEST, handoffRequestText, isHandoffRequest } from '../src/shared/card-studio/markers.ts';
 
 const fence = '```';
@@ -42,6 +43,21 @@ test('the threshold is 200K tokens or half the window, whichever comes first', (
   assert.equal(handoffThreshold(128_000, { tokens: 200_000, windowPercent: 50 }), 64_000);
   assert.equal(handoffThreshold(1_000_000, { tokens: 500_000, windowPercent: 80 }), 500_000);
   assert.equal(handoffThreshold(0), DEFAULT_HANDOFF.tokens);
+});
+
+test('the optimization uses the configured tokens and the model window fallback', () => {
+  const on = DEFAULT_CARD_OPTIMIZATION;
+  assert.equal(handoffThresholdFor(1_000_000, DEFAULT_HANDOFF, on), 100_000);
+  assert.equal(handoffThresholdFor(200_000, DEFAULT_HANDOFF, on), 100_000);
+  assert.equal(handoffThresholdFor(100_000, DEFAULT_HANDOFF, on), 80_000);
+  assert.equal(handoffThresholdFor(32_000, DEFAULT_HANDOFF, on), 25_600);
+  assert.equal(handoffThresholdFor(1_000_000, { tokens: 300_000, windowPercent: 50, enabled: false }, on), 100_000, 'the master switch uses the new settings, not the old ones');
+  assert.equal(handoffThresholdFor(1_000_000, DEFAULT_HANDOFF, { ...on, enabled: false }), 200_000, 'off falls back to the old rule');
+  assert.equal(handoffThresholdFor(1_000_000, DEFAULT_HANDOFF, { ...on, handoffEnabled: false }), null, 'off means no offer');
+  assert.equal(handoffThresholdFor(1_000_000, { tokens: 300_000, windowPercent: 50 }, { ...on, handoffEnabled: false }), null);
+  assert.equal(handoffOffer({ tokens: 100_000, window: 1_000_000, dispatchDone: false, active: false, optimization: on }).offer, true);
+  assert.equal(handoffOffer({ tokens: 99_999, window: 1_000_000, dispatchDone: false, active: false, optimization: on }).offer, false);
+  assert.equal(handoffOffer({ tokens: 100_000, window: 1_000_000, dispatchDone: false, active: false, optimization: { ...on, handoffEnabled: false } }).offer, false);
 });
 
 test('a new conversation is offered at the threshold, while the dispatch is open, once', () => {

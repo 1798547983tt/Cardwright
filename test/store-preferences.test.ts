@@ -9,20 +9,18 @@ import { AppStore } from '../src/core/store.ts';
 test('the card studio settings survive a restart', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cardwright-preferences-'));
   try {
-    await writeFile(join(dir, 'state.json'), JSON.stringify({ schemaVersion: 7, preferences: { language: 'zh', cardHandoff: { tokens: 120000, windowPercent: 40 }, developerMode: true } }));
+    await writeFile(join(dir, 'state.json'), JSON.stringify({ schemaVersion: 7, preferences: { language: 'zh', cardHandoff: { tokens: 120000, windowPercent: 40 } } }));
     const store = new AppStore(dir);
     assert.deepEqual(store.state.preferences.cardHandoff, { tokens: 120000, windowPercent: 40 });
-    assert.equal(store.state.preferences.developerMode, true);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
 test('broken card studio settings fall back instead of loading', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cardwright-preferences-'));
   try {
-    await writeFile(join(dir, 'state.json'), JSON.stringify({ schemaVersion: 7, preferences: { cardHandoff: { tokens: 'lots', windowPercent: 400 }, developerMode: 'yes' } }));
+    await writeFile(join(dir, 'state.json'), JSON.stringify({ schemaVersion: 7, preferences: { cardHandoff: { tokens: 'lots', windowPercent: 400 } } }));
     const store = new AppStore(dir);
     assert.equal(store.state.preferences.cardHandoff, undefined);
-    assert.equal(store.state.preferences.developerMode, undefined);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

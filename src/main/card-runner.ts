@@ -4,9 +4,10 @@ import type { Harness } from './harness.ts';
 import type { CardStudioService } from './card-studio.ts';
 import { formatDispatch } from '../shared/card-studio/dispatch.ts';
 import { ACCEPT_ALL_TEXT } from '../shared/card-studio/markers.ts';
-import { DEFAULT_HANDOFF, handoffThreshold } from '../shared/card-studio/handoff.ts';
-import { CONTINUE_LIMIT, CONTINUE_TEXT, RUN_PAUSE_LABELS, carriedOn, changeQueue, dispatchErrors, runIsOpen, runQueue, turnOutcome } from '../shared/card-studio/run.ts';
+import { DEFAULT_HANDOFF, handoffThresholdFor } from '../shared/card-studio/handoff.ts';
+import { CONTINUE_TEXT, carriedOn, changeQueue, continueRounds, dispatchErrors, pauseLabel, runIsOpen, runQueue, turnOutcome } from '../shared/card-studio/run.ts';
 import { squadOf, squadTools } from '../shared/card-studio/view.ts';
+import type { CardAgentOptimization } from '../shared/card-studio/card-optimization.ts';
 import type { CardCheckFinding, CardDispatch, CardRun, CardRunPause, CardRunScope, CardRunSettings } from '../shared/card-studio/types.ts';
 import type { Approval, ChatMessage, Interaction, Project, Task } from '../shared/types.ts';
 
@@ -15,8 +16,8 @@ const SCOPES = new Set<CardRunScope>(['all', 'lore', 'script', 'regex', 'greet',
 const LEVELS = new Set(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
 const stamp = () => new Date().toISOString();
 
-/** What the pause says when 自动按推荐 has answered one dispatch CONTINUE_LIMIT times and the section AI still asks. */
-const answerLimitMessage = (question: string) => `已经自动按推荐答了 ${CONTINUE_LIMIT} 次，分区 AI 还在提问，先停在这里。\n\n${question}`;
+/** What the pause says when 自动按推荐 has answered one dispatch the effective limit and the section AI still asks. */
+const answerLimitMessage = (question: string, limit: number) => `已经自动按推荐答了 ${limit} 次，分区 AI 还在提问，先停在这里。\n\n${question}`;
 
 /** The message that asks for one fix round on this dispatch's check errors. */
 function fixPrompt(errors: CardCheckFinding[]): string {
@@ -243,7 +244,7 @@ export class CardRunner extends EventEmitter {
         if (outcome.kind === 'incomplete') { this.halt(projectId, run, 'incomplete', outcome.text); return; }
         if (outcome.kind === 'question') {
           if (!run.settings.autoAnswer) { this.halt(projectId, run, 'question', outcome.text); return; }
-          if (this.answeredEnough(run)) { this.halt(projectId, run, 'question', answerLimitMessage(outcome.text)); return; }
+          if (this.answeredEnough(run)) { this.halt(projectId, run, 'question', answerLimitMessage(outcome.text, this.rounds())); return; }
           run.autoAnswered.push({ dispatchId: run.current.dispatchId, text: outcome.text });
           if (run.status === 'pausing') { this.halt(projectId, run, 'user', '已在这一轮结束后暂停。'); return; }
           await this.send(projectId, run, task.id, ACCEPT_ALL_TEXT);
@@ -334,7 +335,7 @@ export class CardRunner extends EventEmitter {
     if (!run || (run.status !== 'running' && run.status !== 'pausing') || run.current?.taskId !== interaction.taskId) return;
     const text = [interaction.title, ...(interaction.questions ?? []).map(question => question.question)].join('\n').slice(0, 1200);
     if (!run.settings.autoAnswer) { this.halt(projectId, run, 'question', text); return; }
-    if (this.answeredEnough(run)) { this.halt(projectId, run, 'question', answerLimitMessage(text)); return; }
+    if (this.answeredEnough(run)) { this.halt(projectId, run, 'question', answerLimitMessage(text, this.rounds())); return; }
     const recommended = (options: Array<{ label: string; description?: string }> | undefined) => options?.find(option => /推荐/.test(`${option.label} ${option.description ?? ''}`))?.label ?? options?.[0]?.label ?? '按推荐';
     const answer = interaction.type === 'confirm' ? true
       : interaction.type === 'select' ? interaction.options?.find(option => option.includes('推荐')) ?? interaction.options?.[0] ?? '按推荐'
@@ -349,8 +350,8 @@ export class CardRunner extends EventEmitter {
   private halt(projectId: string, run: CardRun, reason: CardRunPause, message: string): void {
     run.status = 'paused'; run.pause = { reason, message: message.slice(0, 2000), at: stamp() };
     this.save(projectId, run);
-    this.followChange(projectId, run, 'paused', `${RUN_PAUSE_LABELS[reason].zh}：${message}`);
-    this.emit('notify', { title: this.say(`One-click making paused: ${RUN_PAUSE_LABELS[reason].en}`, `一键制作已暂停：${RUN_PAUSE_LABELS[reason].zh}`), body: `${this.project(projectId).name}：${message.split('\n')[0].slice(0, 120)}` });
+    this.followChange(projectId, run, 'paused', `${pauseLabel(reason, this.rounds()).zh}：${message}`);
+    this.emit('notify', { title: this.say(`One-click making paused: ${pauseLabel(reason, this.rounds()).en}`, `一键制作已暂停：${pauseLabel(reason, this.rounds()).zh}`), body: `${this.project(projectId).name}：${message.split('\n')[0].slice(0, 120)}` });
   }
 
   /**
@@ -365,7 +366,8 @@ export class CardRunner extends EventEmitter {
     if (run.status === 'pausing') { this.halt(projectId, run, 'user', '已在这一轮结束后暂停。'); return true; }
     if ((await this.studio.reload(projectId)).dispatches.find(item => item.id === current.dispatchId)?.status === 'done') return false;
     const count = run.continued && run.continued.dispatchId === current.dispatchId ? run.continued.count : 0;
-    if (count >= CONTINUE_LIMIT) { this.halt(projectId, run, 'continue-limit', '为了不一直自动接着做下去，先停在这里。看过对话里写到哪了，点【继续】接着做。'); return true; }
+    const limit = this.rounds();
+    if (count >= limit) { this.halt(projectId, run, 'continue-limit', '为了不一直自动接着做下去，先停在这里。看过对话里写到哪了，点【继续】接着做。'); return true; }
     run.continued = { dispatchId: current.dispatchId, count: count + 1 };
     // What the next rounds write is new: it gets a fix round of its own.
     current.stage = 'work';
@@ -386,7 +388,7 @@ export class CardRunner extends EventEmitter {
    * the same as the automatic 继续): a section AI that keeps asking would be answered for ever, request after request.
    */
   private answeredEnough(run: CardRun): boolean {
-    return run.autoAnswered.filter(item => item.dispatchId === run.current?.dispatchId).length >= CONTINUE_LIMIT;
+    return run.autoAnswered.filter(item => item.dispatchId === run.current?.dispatchId).length >= this.rounds();
   }
 
   /** The conversation a 进行中 dispatch was sent in: the newest one in its section that holds it and is still there (not archived, not a squad member's or the change AI's). */
@@ -396,12 +398,21 @@ export class CardRunner extends EventEmitter {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   }
 
-  /** Whether a conversation's context reached the 换对话 threshold set in the studio settings. */
+  /** Whether a conversation's context reached the threshold set in the studio settings. */
   private pastThreshold(task: Task): boolean {
-    const threshold = handoffThreshold(task.contextWindow || task.contextUsage?.window || 0, this.harness.store.state.preferences.cardHandoff ?? DEFAULT_HANDOFF);
+    const threshold = handoffThresholdFor(
+      task.contextWindow || task.contextUsage?.window || 0,
+      this.harness.store.state.preferences.cardHandoff ?? DEFAULT_HANDOFF,
+      this.optimization(),
+    );
+    if (threshold === null) return false;
     const used = task.contextUsage?.tokens ?? 0;
     return used > 0 && used >= threshold;
   }
+
+  /** 制卡 Agent 优化; absent settings keep the shipped behavior. */
+  private optimization(): CardAgentOptimization | undefined { return this.harness.studioPreferences()?.cardOptimization; }
+  private rounds(): number { return continueRounds(this.optimization()); }
 
   private async send(projectId: string, run: CardRun, taskId: string, text: string): Promise<void> {
     await this.harness.prompt(taskId, text);

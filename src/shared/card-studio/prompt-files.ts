@@ -1,7 +1,7 @@
 import { boardOf } from './boards.ts';
 import type { PlanMode } from './types.ts';
 
-/** Which built-in prompt file each section and board uses; shared so developer mode can open a section's own prompt. */
+/** Which built-in prompt file each section and board uses; shared so the prompt editor can open a section's own prompt. */
 const SECTION_FILES: Partial<Record<string, string>> = {
   'lore-rules': '世界书-叙事规则.md', 'lore-overview': '世界书-总览.md', 'lore-setting': '世界书-设定.md',
   'lore-people': '世界书-人设.md', 'lore-plot': '世界书-剧情.md', 'lore-vars': '世界书-变量.md',

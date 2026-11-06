@@ -9,6 +9,7 @@ import { budgetUsage, exceededBudget } from '../../src/core/task-budget.ts';
 import { Harness } from '../../src/main/harness.ts';
 import { StudioServices } from '../../src/main/studio-services.ts';
 import { Vault, type SecretCodec } from '../../src/main/vault.ts';
+import { DEFAULT_CARD_OPTIMIZATION } from '../../src/shared/card-studio/card-optimization.ts';
 import type { ChatMessage, Task } from '../../src/shared/types.ts';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -178,4 +179,30 @@ test('a 1.2 custom role moved off a reserved id takes its role model choice alon
   await harness!.close();
   await writeFile(join(f.data, 'state.json'), saved12);
   assert.deepEqual(open(), moved, 'a state file still from 1.2 (closed before it was saved) moves the role again, but not its choice');
+});
+
+test('制卡 Agent 优化 is validated and survives a restart', async t => {
+  const f = await setup(t);
+  const next = { enabled: true, maxWritesPerRound: 3, maxContinueRounds: 25, handoffEnabled: true, handoffTokens: 250_000, sectionBrief: true };
+  f.studio.settings({ cardOptimization: next });
+  assert.deepEqual(JSON.parse(await readFile(join(f.data, 'studio.json'), 'utf8')).preferences.cardOptimization, next);
+  assert.throws(() => f.studio.settings({ cardOptimization: { ...next, maxWritesPerRound: 9 } as never }), /制卡 Agent 优化/);
+  assert.throws(() => f.studio.settings({ cardOptimization: { ...next, handoffTokens: 10_000 } as never }), /制卡 Agent 优化/);
+  const reopened = f.open();
+  assert.deepEqual(reopened.studio.state.preferences.cardOptimization, next);
+});
+
+test('the old card switch and 换对话 settings seed the new optimization once, then the saved object wins', async t => {
+  const f = await setup(t);
+  f.harness.savePreferences({ cardHandoff: { tokens: 250_000, windowPercent: 50, enabled: false } });
+  await f.close(f.harness);
+  await writeFile(join(f.data, 'studio.json'), JSON.stringify({ preferences: { cardTokenOptimizer: false, roleModels: {} } }));
+  const reopened = f.open();
+  const expected = { ...DEFAULT_CARD_OPTIMIZATION, enabled: false, handoffTokens: 250_000, handoffEnabled: false };
+  assert.deepEqual(reopened.studio.state.preferences.cardOptimization, expected);
+  const saved = JSON.parse(await readFile(join(f.data, 'studio.json'), 'utf8')).preferences;
+  assert.equal(saved.cardTokenOptimizer, undefined, 'the old switch is not written back');
+  assert.deepEqual(saved.cardOptimization, expected, 'the migrated object is persisted');
+  reopened.studio.settings({ cardOptimization: { ...expected, maxWritesPerRound: 5 } });
+  assert.equal(f.open().studio.state.preferences.cardOptimization?.maxWritesPerRound, 5, 'a saved object wins over the old settings');
 });
