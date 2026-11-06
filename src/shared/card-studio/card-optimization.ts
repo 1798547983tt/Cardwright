@@ -20,7 +20,12 @@ export interface CardAgentOptimization {
   handoffTokens: number;
   /** 分区项目摘要: preload a short project brief and reference lines when a section starts. */
   sectionBrief: boolean;
+  /** Internal: the defaults this object was saved under; older objects are migrated once. */
+  defaultsVersion?: number;
 }
+
+/** Changing a shipped default bumps this so an old saved object can be migrated once. */
+export const CARD_OPTIMIZATION_DEFAULTS_VERSION = 2;
 
 export const CARD_OPTIMIZATION_LIMITS = {
   writesPerRound: { min: 1, max: 8 },
@@ -35,9 +40,10 @@ export const DEFAULT_CARD_OPTIMIZATION: CardAgentOptimization = {
   enabled: true,
   maxWritesPerRound: 2,
   maxContinueRounds: 15,
-  handoffEnabled: true,
+  handoffEnabled: false,
   handoffTokens: 100_000,
   sectionBrief: false,
+  defaultsVersion: CARD_OPTIMIZATION_DEFAULTS_VERSION,
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -51,6 +57,11 @@ export function cardOptimizationFrom(value: unknown, base: CardAgentOptimization
   if (value === undefined) return undefined;
   if (!isRecord(value)) return undefined;
   const next = { ...base };
+  delete next.defaultsVersion;
+  if ('defaultsVersion' in value) {
+    if (!Number.isInteger(value.defaultsVersion) || (value.defaultsVersion as number) < 1) return undefined;
+    next.defaultsVersion = value.defaultsVersion as number;
+  }
   if ('enabled' in value) { if (typeof value.enabled !== 'boolean') return undefined; next.enabled = value.enabled; }
   if ('maxWritesPerRound' in value) {
     const writes = value.maxWritesPerRound;

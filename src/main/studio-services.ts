@@ -19,7 +19,7 @@ import { probeConnection, benchmarkConnection } from './model-lab.ts';
 import { validateAccessRule, ruleMatches } from './access-rules.ts';
 import { UpdateService } from './updates.ts';
 import { APP_VERSION } from '../shared/version.ts';
-import { DEFAULT_CARD_OPTIMIZATION, cardOptimizationFrom, cardOptimizationFromLegacy } from '../shared/card-studio/card-optimization.ts';
+import { CARD_OPTIMIZATION_DEFAULTS_VERSION, DEFAULT_CARD_OPTIMIZATION, cardOptimizationFrom, cardOptimizationFromLegacy } from '../shared/card-studio/card-optimization.ts';
 
 const defaults: StudioPreferences = { sandboxEnabled: true, defaultSquadSize: 6, teamTokenBudget: 0, teamMinutesBudget: 0, teamMoneyBudget: 0, roleModels: {}, updateFeed: '', cardOptimization: { ...DEFAULT_CARD_OPTIMIZATION } };
 const done = (task: Task) => ['idle', 'completed', 'failed', 'cancelled'].includes(task.status);
@@ -48,10 +48,15 @@ export class StudioServices extends EventEmitter {
     const savedPreferences = (saved.preferences ?? {}) as Record<string, unknown>;
     const { cardTokenOptimizer: legacySwitch, ...keptPreferences } = savedPreferences;
     const savedOptimization = cardOptimizationFrom(savedPreferences.cardOptimization);
-    const optimization = savedOptimization ?? cardOptimizationFromLegacy({ tokenOptimizer: legacySwitch, handoff: harness.store.state.preferences.cardHandoff });
+    // The shipped default for 换对话 and 分区项目摘要 changed after their first release: an older saved object keeps its
+    // other choices but takes the new default for 换对话 once, then records the version so this never repeats.
+    const migratedDefaults = savedOptimization?.defaultsVersion !== CARD_OPTIMIZATION_DEFAULTS_VERSION;
+    const optimization = savedOptimization
+      ? { ...savedOptimization, ...(migratedDefaults ? { handoffEnabled: false } : {}), defaultsVersion: CARD_OPTIMIZATION_DEFAULTS_VERSION }
+      : cardOptimizationFromLegacy({ tokenOptimizer: legacySwitch, handoff: harness.store.state.preferences.cardHandoff });
     this.state = { preferences: { ...defaults, ...keptPreferences, cardOptimization: optimization, roleModels: canonicalRoleKeys(roleModels) } as StudioPreferences, rules: saved.rules || [], projectChecks: saved.projectChecks || {} };
     // Written at once: when the moved role or the migrated optimization is saved, no later load can tell which choice was its.
-    if (moved || !savedOptimization || legacySwitch !== undefined) try { this.persist(); } catch { /* Kept for this run; the next settings change writes it. */ }
+    if (moved || migratedDefaults || legacySwitch !== undefined) try { this.persist(); } catch { /* Kept for this run; the next settings change writes it. */ }
   }
   snapshot(): StudioState { return structuredClone(this.state); }
   private persist(): void {
@@ -67,7 +72,7 @@ export class StudioServices extends EventEmitter {
     if (typeof next.sandboxEnabled !== 'boolean' || !Number.isInteger(next.defaultSquadSize) || next.defaultSquadSize < 1 || next.defaultSquadSize > 6) throw new Error('Choose 1–6 squad members.');
     const optimization = cardOptimizationFrom(next.cardOptimization ?? this.state.preferences.cardOptimization ?? DEFAULT_CARD_OPTIMIZATION);
     if (!optimization) throw new Error('制卡 Agent 优化的设置不完整：每轮写入 1–8 或「不限」，自动轮数 10–50，上下文阈值 50K–1000K。');
-    next.cardOptimization = optimization;
+    next.cardOptimization = { ...optimization, defaultsVersion: CARD_OPTIMIZATION_DEFAULTS_VERSION };
     for (const value of [next.teamTokenBudget, next.teamMinutesBudget, next.teamMoneyBudget]) if (!Number.isFinite(value) || value < 0) throw new Error('Budgets must be non-negative; zero means no limit.');
     if (next.updateFeed) { const url = new URL(next.updateFeed); if (url.protocol !== 'https:' || url.username || url.password) throw new Error('The update source must use HTTPS.'); }
     for (const [role, model] of Object.entries(next.roleModels)) { if (!role || !model || !['off', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'].includes(model.thinking)) throw new Error('Invalid role model choice.'); this.harness.connection(model.gatewayId, model.modelId); }

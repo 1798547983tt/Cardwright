@@ -95,7 +95,7 @@ export function CardStudioSettings() {
         <h3 className="settings-section-title">{t('Built-in prompts', '内置提示词')}</h3>
         <p className="settings-intro">{t('Edit the current Agent prompts to tailor them. The knowledge base, style presets and the workbench prompt are not included.', '修改当前Agent提示词，可针对性改造。知识库、风格预设和工作台提示词不在其中。')}</p>
       </div>
-      {prompts && overriddenCount > 0 && <button type="button" className="button small" disabled={resetting} onClick={() => void resetPrompts(prompts.filter(item => item.overridden).map(item => item.id))}>{t('Reset all', '全部重置')}</button>}
+      {prompts && <button type="button" className="button small" disabled={resetting || overriddenCount === 0} onClick={() => void resetPrompts(prompts.filter(item => item.overridden).map(item => item.id))}>{t('Reset all', '全部重置')}</button>}
     </div>
     {prompts === null ? <p className="settings-intro">{t('Loading…', '正在读取…')}</p> : <div className="prompt-override-list">
       {GROUPS.map(group => {
@@ -106,7 +106,7 @@ export function CardStudioSettings() {
           {item.overridden && <em className="is-modified">{t('Modified', '已修改')}</em>}
           {item.stale && <em className="is-stale" title={t('A newer version changed the default this edit was based on.', '新版本改了你修改时依据的默认内容。')}>{t('Default updated', '默认已更新')}</em>}
           <span className="prompt-override-actions">
-            {item.overridden && <button type="button" className="button small" disabled={resetting} aria-label={t(`Reset ${item.label}`, `重置「${item.label}」`)} onClick={() => void resetPrompts([item.id])}>{t('Reset', '重置')}</button>}
+            <button type="button" className="button small" disabled={resetting || !item.overridden} aria-label={t(`Reset ${item.label}`, `重置「${item.label}」`)} onClick={() => void resetPrompts([item.id])}>{t('Reset', '重置')}</button>
             <button type="button" className="button small" onClick={() => setEditing(item.id)}>{t('Edit', '编辑')}</button>
           </span>
         </li>)}</ul></section>;

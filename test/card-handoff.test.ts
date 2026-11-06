@@ -46,7 +46,7 @@ test('the threshold is 200K tokens or half the window, whichever comes first', (
 });
 
 test('the optimization uses the configured tokens and the model window fallback', () => {
-  const on = DEFAULT_CARD_OPTIMIZATION;
+  const on = { ...DEFAULT_CARD_OPTIMIZATION, handoffEnabled: true };
   assert.equal(handoffThresholdFor(1_000_000, DEFAULT_HANDOFF, on), 100_000);
   assert.equal(handoffThresholdFor(200_000, DEFAULT_HANDOFF, on), 100_000);
   assert.equal(handoffThresholdFor(100_000, DEFAULT_HANDOFF, on), 80_000);

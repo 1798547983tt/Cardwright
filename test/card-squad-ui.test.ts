@@ -36,6 +36,8 @@ test('制卡Agent优化 is its own section with every policy and no developer mo
   assert.match(settings, /resetPrompts/);
   assert.match(settings, /t\('Reset all', '全部重置'\)/);
   assert.match(settings, /t\('Reset', '重置'\)/);
+  assert.match(settings, /disabled=\{resetting \|\| overriddenCount === 0\}/, 'reset all stays visible and is disabled when nothing is modified');
+  assert.match(settings, /disabled=\{resetting \|\| !item\.overridden\}/, 'every prompt shows a reset control');
   assert.match(settings, /step=\{0\.01\}/, 'the threshold accepts two decimals');
   assert.match(settings, /\/ 1000/, 'the threshold is shown in K tokens');
 });

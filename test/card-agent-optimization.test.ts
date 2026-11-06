@@ -4,7 +4,7 @@ import { BATCH_WRITE_END, BATCH_WRITE_START, BRIEF_READ_END, BRIEF_READ_START, D
 import { CONTINUE_LIMIT, continueRounds } from '../src/shared/card-studio/run.ts';
 
 test('the shipped optimization is on with two files, 15 rounds, 100K and no brief', () => {
-  assert.deepEqual(DEFAULT_CARD_OPTIMIZATION, { enabled: true, maxWritesPerRound: 2, maxContinueRounds: 15, handoffEnabled: true, handoffTokens: 100_000, sectionBrief: false });
+  assert.deepEqual(DEFAULT_CARD_OPTIMIZATION, { enabled: true, maxWritesPerRound: 2, maxContinueRounds: 15, handoffEnabled: false, handoffTokens: 100_000, sectionBrief: false, defaultsVersion: 2 });
   assert.equal(optimizationActive(DEFAULT_CARD_OPTIMIZATION), true);
   assert.equal(effectiveWritesPerRound(DEFAULT_CARD_OPTIMIZATION), 2);
   assert.equal(effectiveContinueRounds(DEFAULT_CARD_OPTIMIZATION), 15);

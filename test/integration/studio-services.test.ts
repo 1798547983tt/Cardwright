@@ -185,11 +185,11 @@ test('制卡 Agent 优化 is validated and survives a restart', async t => {
   const f = await setup(t);
   const next = { enabled: true, maxWritesPerRound: 3, maxContinueRounds: 25, handoffEnabled: true, handoffTokens: 250_000, sectionBrief: true };
   f.studio.settings({ cardOptimization: next });
-  assert.deepEqual(JSON.parse(await readFile(join(f.data, 'studio.json'), 'utf8')).preferences.cardOptimization, next);
+  assert.deepEqual(JSON.parse(await readFile(join(f.data, 'studio.json'), 'utf8')).preferences.cardOptimization, { ...next, defaultsVersion: 2 });
   assert.throws(() => f.studio.settings({ cardOptimization: { ...next, maxWritesPerRound: 9 } as never }), /制卡 Agent 优化/);
   assert.throws(() => f.studio.settings({ cardOptimization: { ...next, handoffTokens: 10_000 } as never }), /制卡 Agent 优化/);
   const reopened = f.open();
-  assert.deepEqual(reopened.studio.state.preferences.cardOptimization, next);
+  assert.deepEqual(reopened.studio.state.preferences.cardOptimization, { ...next, defaultsVersion: 2 });
 });
 
 test('the old card switch and 换对话 settings seed the new optimization once, then the saved object wins', async t => {
