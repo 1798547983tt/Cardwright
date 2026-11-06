@@ -194,6 +194,9 @@
 .cs-handoff.is-broken p { font-size: 13px; color: #f0b8bc; }
 /* The end of a finished conversation: the app's offer of a new conversation, or the way to the next dispatch. */
 .cs-end-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; border: 1px solid var(--cs-hair-2); background: rgba(156, 127, 79, .04); font-size: 13px; color: var(--cs-text-2); }
+.cs-end-stack { display: grid; gap: 8px; }
+.cs-end-dismiss { flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; color: var(--cs-muted); border: 0; background: none; cursor: pointer; }
+.cs-end-dismiss:hover { color: var(--cs-text); }
 .cs-end-bar > span { display: inline-flex; align-items: center; gap: 8px; }
 .cs-end-bar > span svg { color: var(--cs-gold-2); flex: none; }
 .cs-end-bar small { flex: 1; min-width: 0; color: var(--cs-dim); font-size: 12px; }

@@ -61,14 +61,23 @@ export function handoffThresholdFor(window: number, legacy: HandoffSettings = DE
 }
 
 /**
- * The app, not the AI, decides when to offer a new conversation: the context has reached the threshold, the conversation's
- * dispatch is still open, it is not running, and no handoff is pending or already used. A failed request can be retried.
+ * Whether the context has reached the threshold, regardless of whether the dispatch is still open. The UI may keep the
+ * suggestion after a dispatch is done, so a long conversation does not keep growing in one session.
  */
-export function handoffOffer(input: { tokens: number | null | undefined; window: number; settings?: HandoffSettings; dispatchDone: boolean; active: boolean; handoff?: CardHandoffState; optimization?: CardAgentOptimization }): { offer: boolean; used: number; threshold: number | null } {
+export function handoffSuggested(input: { tokens: number | null | undefined; window: number; settings?: HandoffSettings; handoff?: CardHandoffState; optimization?: CardAgentOptimization }): { suggested: boolean; used: number; threshold: number | null } {
   const threshold = handoffThresholdFor(input.window, input.settings ?? DEFAULT_HANDOFF, input.optimization);
   const used = typeof input.tokens === 'number' && Number.isFinite(input.tokens) ? input.tokens : 0;
   const pending = !!input.handoff && input.handoff.status !== 'failed';
-  return { offer: threshold !== null && used > 0 && used >= threshold && !input.dispatchDone && !input.active && !pending, used, threshold };
+  return { suggested: threshold !== null && used > 0 && used >= threshold && !pending, used, threshold };
+}
+
+/**
+ * The run's rule for offering a new conversation: the context has reached the threshold, the conversation's dispatch is
+ * still open, it is not running, and no handoff is pending or already used. A failed request can be retried.
+ */
+export function handoffOffer(input: { tokens: number | null | undefined; window: number; settings?: HandoffSettings; dispatchDone: boolean; active: boolean; handoff?: CardHandoffState; optimization?: CardAgentOptimization }): { offer: boolean; used: number; threshold: number | null } {
+  const { suggested, used, threshold } = handoffSuggested(input);
+  return { offer: suggested && !input.dispatchDone && !input.active, used, threshold };
 }
 
 /** The handoff summary the AI wrote in reply to the app's request with this message id, if it wrote one. */

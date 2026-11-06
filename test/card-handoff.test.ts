@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_CARD_OPTIMIZATION } from '../src/shared/card-studio/card-optimization.ts';
-import { DEFAULT_HANDOFF, formatHandoff, handoffFromReply, handoffOffer, handoffThreshold, handoffThresholdFor, parseHandoff } from '../src/shared/card-studio/handoff.ts';
+import { DEFAULT_HANDOFF, formatHandoff, handoffFromReply, handoffOffer, handoffSuggested, handoffThreshold, handoffThresholdFor, parseHandoff } from '../src/shared/card-studio/handoff.ts';
 import { HANDOFF_REQUEST, handoffRequestText, isHandoffRequest } from '../src/shared/card-studio/markers.ts';
 
 const fence = '```';
@@ -58,6 +58,19 @@ test('the optimization uses the configured tokens and the model window fallback'
   assert.equal(handoffOffer({ tokens: 100_000, window: 1_000_000, dispatchDone: false, active: false, optimization: on }).offer, true);
   assert.equal(handoffOffer({ tokens: 99_999, window: 1_000_000, dispatchDone: false, active: false, optimization: on }).offer, false);
   assert.equal(handoffOffer({ tokens: 100_000, window: 1_000_000, dispatchDone: false, active: false, optimization: { ...on, handoffEnabled: false } }).offer, false);
+});
+
+test('the UI keeps suggesting a new conversation after the dispatch is done, and a pending handoff hides it', () => {
+  const on = { ...DEFAULT_CARD_OPTIMIZATION, handoffEnabled: true };
+  const base = { tokens: 133_700, window: 1_000_000, optimization: on };
+  assert.deepEqual(handoffSuggested(base), { suggested: true, used: 133_700, threshold: 100_000 });
+  assert.equal(handoffSuggested({ ...base, tokens: 99_999 }).suggested, false);
+  assert.equal(handoffSuggested({ ...base, optimization: { ...on, handoffEnabled: false } }).suggested, false);
+  assert.equal(handoffSuggested({ ...base, handoff: { status: 'requested', at: '' } }).suggested, false);
+  assert.equal(handoffSuggested({ ...base, handoff: { status: 'failed', at: '' } }).suggested, true, 'a failed request can be retried');
+  // The automatic run keeps its own rule, so a finished dispatch is not carried into a new conversation by a run.
+  assert.equal(handoffOffer({ ...base, dispatchDone: true, active: false }).offer, false);
+  assert.equal(handoffOffer({ ...base, dispatchDone: false, active: false }).offer, true);
 });
 
 test('a new conversation is offered at the threshold, while the dispatch is open, once', () => {
