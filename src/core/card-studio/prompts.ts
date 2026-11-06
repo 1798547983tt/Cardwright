@@ -40,9 +40,14 @@ function cardKindLabel(input: Pick<SectionPromptInput, 'cardKind' | 'source'>): 
   return input.cardKind === 'fan' ? `同人卡 · 《${input.source?.trim() || '未填原作名'}》` : '原创卡';
 }
 
-/** The rules a section works by: the common rules, its board's, its own, and for regex sections the card's preset. */
-async function sectionRules(read: (relative: string) => Promise<string>, input: Pick<SectionPromptInput, 'sectionId' | 'mode' | 'stylePreset'>, optimization?: CardAgentOptimization): Promise<string[]> {
-  const shared = sectionBriefRule(optimizedBatchRule(await read('prompts/通用规则.md'), optimization), optimization);
+/**
+ * The rules a section works by: the common rules, its board's, its own, and for regex sections the card's preset.
+ * `attachBrief` is true only when the caller really appends `buildSectionBrief`; otherwise the read-first list stays,
+ * so a planning or member conversation is never told to read a dispatch brief it does not have.
+ */
+async function sectionRules(read: (relative: string) => Promise<string>, input: Pick<SectionPromptInput, 'sectionId' | 'mode' | 'stylePreset'>, optimization?: CardAgentOptimization, attachBrief = false): Promise<string[]> {
+  const briefConfig = attachBrief || !optimization ? optimization : { ...optimization, sectionBrief: false };
+  const shared = sectionBriefRule(optimizedBatchRule(await read('prompts/通用规则.md'), optimization), briefConfig);
   const boardFile = boardPromptFile(input.sectionId);
   const board = boardFile ? await read('prompts/' + boardFile) : '';
   const file = sectionPromptFile(input.sectionId, input.mode);
@@ -51,7 +56,7 @@ async function sectionRules(read: (relative: string) => Promise<string>, input: 
 }
 
 /** `read` lets prompt overrides stand in for the shipped files; without it the shipped files are read. */
-export async function buildSectionPrompt(resourceRoot: string, input: SectionPromptInput, options: { read?: (relative: string) => Promise<string>; optimization?: CardAgentOptimization } = {}): Promise<string> {
+export async function buildSectionPrompt(resourceRoot: string, input: SectionPromptInput, options: { read?: (relative: string) => Promise<string>; optimization?: CardAgentOptimization; attachBrief?: boolean } = {}): Promise<string> {
   const read = options.read ?? (relative => resource(resourceRoot, relative));
   return [
     `# 制卡工坊 · ${sectionLabel(input.sectionId)}`,
@@ -62,7 +67,7 @@ export async function buildSectionPrompt(resourceRoot: string, input: SectionPro
     `- 内置资料根目录（只读）：${resourceRoot}`,
     `- 知识库：${join(resourceRoot, 'knowledge', 'README.md')}`,
     '',
-    ...(await sectionRules(read, input, options.optimization)),
+    ...(await sectionRules(read, input, options.optimization, options.attachBrief)),
   ].join('\n');
 }
 

@@ -516,9 +516,10 @@ export class CardStudioService {
       return { prompt: await buildMemberPrompt(this.resourceRoot, { ...input, ...member }, { read, optimization }), readRoots: [this.resourceRoot], member };
     }
     const dispatch = card.dispatchId ? view.dispatches.find(item => item.id === card.dispatchId) : undefined;
-    const prompt = await buildSectionPrompt(this.resourceRoot, input, { read, optimization });
     // 分区项目摘要: preload the dispatch's brief and line ranges so the section reads only what it needs.
     const brief = sectionBriefEnabled(optimization) ? await buildSectionBrief(view.path, dispatch, card.sectionId) : null;
+    // The brief rule is replaced only when a brief really follows; a planning or manual conversation keeps the read-first list.
+    const prompt = await buildSectionPrompt(this.resourceRoot, input, { read, optimization, attachBrief: !!brief });
     const withBrief = brief ? `${prompt}\n\n${brief}` : prompt;
     // Planning that starts or refines a card registers its dispatches by tool (§5.6, ADR 0024); a member never does, it returned above.
     const registers = mayAddDispatches(card) ? { addDispatches: true } : {};
@@ -963,20 +964,23 @@ export class CardStudioService {
   private async addDispatches(task: Task, items: unknown): Promise<DispatchBatchResult> {
     if (!mayAddDispatches(task.card)) throw new Error('只有规划对话（从零开始制卡、完善优化卡）能登记派单。');
     if (!Array.isArray(items) || items.length < 1 || items.length > DISPATCH_BATCH_LIMIT) throw new Error(`一次登记 1 到 ${DISPATCH_BATCH_LIMIT} 条派单。`);
-    // 分区项目摘要: resolve headings/offsets against this card now; a bad path is dropped instead of stored.
+    // 分区项目摘要: resolve headings/offsets against this card inside the lock, once the design-book guard has passed.
     const root = this.cardProject(task.projectId).path;
-    const references = new Map<string, CardDispatchReference[]>();
-    for (const value of items) {
-      const input = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
-      const given = dispatchReferenceInputs(input.references);
-      if (given) references.set(JSON.stringify(given), await resolveDispatchReferences(root, given));
-    }
+    const resolvedByIndex = new Map<number, CardDispatchReference[]>();
+    const givenByIndex = new Map<number, number>();
     let outcome: DispatchBatchResult = { added: 0, results: [] };
     await this.mutate(task.projectId, file => {
       const batch = planDispatchBatch(file.dispatches, items);
       const at = stamp();
-      for (const item of batch.accepted) {
-        const resolved = item.references ? references.get(JSON.stringify(item.references)) : undefined;
+      let accepted = 0;
+      for (const result of batch.results) {
+        if (!result.ok) continue;
+        const item = batch.accepted[accepted++];
+        if (!item) continue;
+        const resolved = resolvedByIndex.get(result.index);
+        const given = givenByIndex.get(result.index);
+        // The section still reads by its own prompt, but planning should know its references were dropped.
+        if (given && (resolved?.length ?? 0) < given) result.droppedReferences = given - (resolved?.length ?? 0);
         file.dispatches.push({ id: randomUUID(), target: item.target, sectionId: item.sectionId, title: item.title, requires: item.requires, body: item.body, ...(item.brief ? { brief: item.brief } : {}), ...(resolved?.length ? { references: resolved } : {}), status: 'todo', createdAt: at, updatedAt: at, sourceTaskId: task.id });
       }
       outcome = { added: batch.accepted.length, results: batch.results };
@@ -985,6 +989,18 @@ export class CardStudioService {
       const view = await this.reload(task.projectId);
       if (view.error) throw new Error(view.error);
       if (!view.design.exists) throw new Error('先把设计书写入 设计书.md，再登记派单。');
+      // Only the items this batch would accept are read; a refused item never touches the card files.
+      const preview = planDispatchBatch(view.dispatches, items);
+      for (const result of preview.results) {
+        if (!result.ok) continue;
+        const value = items[result.index];
+        const input = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+        const given = dispatchReferenceInputs(input.references);
+        if (!given) continue;
+        givenByIndex.set(result.index, given.length);
+        const resolved = await resolveDispatchReferences(root, given);
+        if (resolved.length) resolvedByIndex.set(result.index, resolved);
+      }
     });
     return outcome;
   }

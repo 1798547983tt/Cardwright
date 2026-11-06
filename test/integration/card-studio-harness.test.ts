@@ -219,7 +219,7 @@ test('the section brief is preloaded into the section prompt with the dispatch�
   const { root, harness, studio } = await setup(t);
   const folder = join(root, 'brief');
   const { card: { projectId } } = await studio.create({ name: '摘要·预载', kind: 'original', folder });
-  await writeFile(join(folder, '设计书.md'), ['# 设计书 · 摘要', '## 3 主角与配角', '- 甲', '## 4 剧情', '- 第一章'].join('\n'));
+  await writeFile(join(folder, '设计书.md'), ['# 设计书 · 摘要', '## 人物名单', '- 甲', '## 卡内历法', '- 第一章'].join('\n'));
   await writeFile(join(folder, '变量表.yaml'), ['version: 1', 'rows:', '  - path: /主角/生命', '    type: 数值'].join('\n'));
   await mkdir(join(folder, '资料'), { recursive: true });
   await writeFile(join(folder, '资料', '索引.md'), '# 资料索引');
@@ -239,7 +239,7 @@ test('the section brief is preloaded into the section prompt with the dispatch�
   assert.match(context.prompt, /本次派单摘要/);
   assert.match(context.prompt, /派单：写人设/);
   assert.match(context.prompt, /规划要点：先写主角/);
-  assert.match(context.prompt, /`设计书\.md` 第 2–3 行：主角与配角/, 'the design book heading is resolved when the brief is built');
+  assert.match(context.prompt, /`设计书\.md` 第 2–3 行：人物名单/, 'the design book heading is resolved when the brief is built');
   assert.match(context.prompt, /`变量表\.yaml` 第 1–4 行：变量表，共 1 个变量/);
   assert.match(context.prompt, /开工时，先读派单里附的「本次派单摘要」和参考行/, 'the read-first rule is replaced');
 

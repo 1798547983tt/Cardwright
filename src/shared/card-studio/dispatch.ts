@@ -39,7 +39,8 @@ export function parseDispatches(text: string): DispatchParse[] {
 /** One reference line, as the dispatch message shows it: the file and the exact lines to read. */
 export function referenceLine(reference: Pick<CardDispatchReference, 'path' | 'offset' | 'lines' | 'summary'> & { heading?: string }): string {
   const range = reference.lines > 1 ? `第 ${reference.offset}–${reference.offset + reference.lines - 1} 行` : `第 ${reference.offset} 行`;
-  const label = reference.summary?.trim() || reference.heading?.trim();
+  // A summary from the tool can carry line breaks; folding them keeps the reference on one list line.
+  const label = (reference.summary?.trim() || reference.heading?.trim() || '').replace(/\s+/g, ' ');
   return `- \`${reference.path}\` ${range}${label ? `：${label}` : ''}`;
 }
 
@@ -77,7 +78,11 @@ export function messageStartsDispatch(text: string, dispatch: { target: string; 
 }
 
 /** One card_add_dispatches item's outcome, in the order the items came (§5.6). */
-export interface DispatchItemResult { index: number; ok: boolean; target: string; title: string; section?: string; error?: string }
+export interface DispatchItemResult {
+  index: number; ok: boolean; target: string; title: string; section?: string; error?: string;
+  /** 分区项目摘要: references planning gave that could not be resolved and were dropped from this dispatch. */
+  droppedReferences?: number;
+}
 /** What card_add_dispatches answers. */
 export interface DispatchBatchResult { added: number; results: DispatchItemResult[] }
 /** card_add_dispatches takes 1 to this many at a time (§5.6): about one board's dispatches. */
@@ -107,8 +112,11 @@ export function dispatchReferenceInputs(value: unknown): CardDispatchReferenceIn
     const item = entry as Record<string, unknown>;
     const path = typeof item.path === 'string' ? item.path.trim() : '';
     if (!path) return [];
-    const heading = typeof item.heading === 'string' && item.heading.trim() ? item.heading.trim().slice(0, 120) : undefined;
-    const summary = typeof item.summary === 'string' && item.summary.trim() ? item.summary.trim().slice(0, 240) : undefined;
+    const fold = (value: string) => value.trim().replace(/\s+/g, ' ');
+    const headingText = typeof item.heading === 'string' ? fold(item.heading) : '';
+    const summaryText = typeof item.summary === 'string' ? fold(item.summary) : '';
+    const heading = headingText ? headingText.slice(0, 120) : undefined;
+    const summary = summaryText ? summaryText.slice(0, 240) : undefined;
     const offset = Number.isInteger(item.offset) ? item.offset as number : undefined;
     const lines = Number.isInteger(item.lines) ? item.lines as number : undefined;
     return [{ path: path.slice(0, 300), ...(heading ? { heading } : {}), ...(offset !== undefined ? { offset } : {}), ...(lines !== undefined ? { lines } : {}), ...(summary ? { summary } : {}) }];

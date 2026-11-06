@@ -51,14 +51,24 @@ test('the optimization switches the one-file rule for the two-file rule', async 
   assert.doesNotMatch(optimized, /cardwright:batch-write/);
 });
 
-test('the section brief replaces the full read-first list only when it is on', async () => {
+test('the section brief replaces the full read-first list only when a brief is attached', async () => {
   const current = await buildSectionPrompt(resources, { ...card, sectionId: 'lore-people' });
-  const briefed = await buildSectionPrompt(resources, { ...card, sectionId: 'lore-people' }, { optimization: { ...DEFAULT_CARD_OPTIMIZATION, sectionBrief: true } });
+  const briefed = await buildSectionPrompt(resources, { ...card, sectionId: 'lore-people' }, { optimization: { ...DEFAULT_CARD_OPTIMIZATION, sectionBrief: true }, attachBrief: true });
   assert.match(current, /每次开工先读/);
   assert.doesNotMatch(current, /cardwright:brief-read/);
   assert.match(briefed, /先读派单里附的「本次派单摘要」和参考行/);
   assert.doesNotMatch(briefed, /每次开工先读/);
   assert.doesNotMatch(briefed, /cardwright:brief-read/);
+  // Planning and manual conversations have no dispatch brief, so they keep the list they can actually follow.
+  const unattached = await buildSectionPrompt(resources, { ...card, sectionId: 'plan', mode: 'scratch' }, { optimization: { ...DEFAULT_CARD_OPTIMIZATION, sectionBrief: true } });
+  assert.match(unattached, /每次开工先读/);
+  assert.doesNotMatch(unattached, /先读派单里附的「本次派单摘要」/);
+});
+
+test('a 写组件 member keeps the read-first list because it never gets a dispatch brief', async () => {
+  const member = await buildMemberPrompt(resources, { ...card, sectionId: 'lore-people', role: 'writer', files: [], create: ['人物模板'] }, { optimization: { ...DEFAULT_CARD_OPTIMIZATION, sectionBrief: true } });
+  assert.match(member, /每次开工先读/);
+  assert.doesNotMatch(member, /先读派单里附的「本次派单摘要」/);
 });
 
 test('a prompt override without the batch markers keeps its own rule', async () => {

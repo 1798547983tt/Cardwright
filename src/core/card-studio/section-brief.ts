@@ -98,23 +98,27 @@ export async function resolveDispatchReferences(root: string, inputs: readonly C
   return output;
 }
 
-/** The design-book headings a section usually needs, in the order they are worth reading. */
-const SECTION_HEADINGS: Record<string, string[]> = {
-  'lore-people': ['主角与配角', '人物名单', '世界观'],
-  'lore-overview': ['作品与范围', '世界观', '玩法'],
-  'lore-setting': ['世界观', '作品与范围'],
-  'lore-plot': ['剧情', '可做清单与顺序', '世界观'],
-  'lore-rules': ['玩法', '剧情', '文风'],
-  'lore-vars': ['变量与脚本', '变量结构', '玩法'],
-  'lore-format': ['正文格式', '文风', '玩法'],
-  'script-schema': ['变量与脚本', '变量结构', '玩法'],
-  'script-controller': ['变量与脚本', '玩法', '变量结构'],
-  'script-mechanism': ['玩法', '变量与脚本', '变量结构'],
-  'regex-update': ['变量与脚本', '前端', '玩法'],
-  'regex-status': ['前端', '变量与脚本', '玩法'],
-  'regex-body': ['正文格式', '文风', '前端'],
-  'regex-start': ['开场白', '前端', '主角与配角'],
-  greet: ['开场白', '主角与配角', '正文格式'],
+/**
+ * The design-book headings a section usually needs, in the order they are worth reading.
+ * They must match the template in card-studio/prompts/规划-从零开始制卡.md (§4.1): 1 作品与范围 … 13 不做清单,
+ * then 卡内历法 / 人物名单 / 派单清单与顺序 / 风格预设.
+ */
+export const SECTION_HEADINGS: Record<string, string[]> = {
+  'lore-people': ['人物名单', '卡内历法'],
+  'lore-overview': ['作品与范围', '世界书规模'],
+  'lore-setting': ['世界书规模', '不做清单'],
+  'lore-plot': ['叙事', '玩法'],
+  'lore-rules': ['叙事', '玩法'],
+  'lore-vars': ['变量', '玩法'],
+  'lore-format': ['正文格式', '叙事'],
+  'script-schema': ['变量', '玩家身份'],
+  'script-controller': ['控制器与机制脚本', '变量'],
+  'script-mechanism': ['控制器与机制脚本', '玩法'],
+  'regex-update': ['变量', '前端'],
+  'regex-status': ['前端', '变量'],
+  'regex-body': ['正文格式', '前端'],
+  'regex-start': ['开场', '玩家身份'],
+  greet: ['开场', '人物名单'],
 };
 
 const countVariables = (lines: readonly string[]): number => lines.filter(line => /^\s*-\s+path\s*:/.test(line)).length;
@@ -124,7 +128,7 @@ async function derivedReferences(root: string, sectionId: string): Promise<CardD
   const references: CardDispatchReference[] = [];
   const design = await fileLines(root, DESIGN_BOOK);
   if (design?.length) {
-    for (const heading of SECTION_HEADINGS[sectionId] ?? ['作品与范围', '世界观']) {
+    for (const heading of SECTION_HEADINGS[sectionId] ?? ['作品与范围', '玩法']) {
       const found = headingAt(design, heading);
       if (!found) continue;
       const range = headingRange(design, found.index, found.level);

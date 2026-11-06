@@ -206,3 +206,16 @@ test('the old card switch and 换对话 settings seed the new optimization once,
   reopened.studio.settings({ cardOptimization: { ...expected, maxWritesPerRound: 5 } });
   assert.equal(f.open().studio.state.preferences.cardOptimization?.maxWritesPerRound, 5, 'a saved object wins over the old settings');
 });
+
+test('an older saved optimization takes the new 换对话 default once, keeping its other choices', async t => {
+  const f = await setup(t);
+  const v1 = { enabled: true, maxWritesPerRound: 4, maxContinueRounds: 30, handoffEnabled: true, handoffTokens: 300_000, sectionBrief: true, defaultsVersion: 1 };
+  await f.close(f.harness);
+  await writeFile(join(f.data, 'studio.json'), JSON.stringify({ preferences: { cardOptimization: v1, roleModels: {} } }));
+  const reopened = f.open();
+  const migrated = { ...v1, handoffEnabled: false, defaultsVersion: 2 };
+  assert.deepEqual(reopened.studio.state.preferences.cardOptimization, migrated, 'only 换对话 changes; the other choices stay');
+  assert.deepEqual(JSON.parse(await readFile(join(f.data, 'studio.json'), 'utf8')).preferences.cardOptimization, migrated, 'the migrated object is written back');
+  reopened.studio.settings({ cardOptimization: { ...migrated, handoffEnabled: true } });
+  assert.equal(f.open().studio.state.preferences.cardOptimization?.handoffEnabled, true, 'a v2 object is never migrated again');
+});

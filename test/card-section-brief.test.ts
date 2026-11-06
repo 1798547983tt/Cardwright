@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { REFERENCES_TOTAL_LINE_LIMIT, REFERENCE_LINE_LIMIT, buildSectionBrief, resolveDispatchReferences } from '../src/core/card-studio/section-brief.ts';
+import { REFERENCES_TOTAL_LINE_LIMIT, REFERENCE_LINE_LIMIT, SECTION_HEADINGS, buildSectionBrief, resolveDispatchReferences } from '../src/core/card-studio/section-brief.ts';
 import { formatDispatch, parseDispatchContent } from '../src/shared/card-studio/dispatch.ts';
 
 async function card(t: test.TestContext): Promise<{ root: string; close: () => Promise<void> }> {
@@ -16,9 +16,9 @@ async function card(t: test.TestContext): Promise<{ root: string; close: () => P
     '## 3 主角与配角',
     '- 甲',
     '- 乙',
-    '## 4 剧情',
-    '- 第一章',
-    '- 第二章',
+    '## 人物名单',
+    '| 序号 | 人物 |',
+    '- 甲',
   ].join('\n'));
   await writeFile(join(root, '变量表.yaml'), ['version: 1', 'rows:', '  - path: /主角/生命', '    type: 数值', '  - path: /主角/好感', '    type: 数值'].join('\n'));
   await writeFile(join(root, '资料', '索引.md'), ['# 资料索引', '1. 第一章'].join('\n'));
@@ -78,9 +78,17 @@ test('without planning references the brief is derived from the design book, var
   const f = await card(t); t.after(f.close);
   const brief = await buildSectionBrief(f.root, { title: '写人设' }, 'lore-people');
   assert.ok(brief);
-  assert.match(brief, /`设计书\.md` 第 4–6 行/);
+  assert.match(brief, /`设计书\.md` 第 7–9 行：人物名单/);
   assert.match(brief, /`变量表\.yaml` 第 1–6 行：变量表，共 2 个变量/);
   assert.match(brief, /`资料\/索引\.md` 第 1–2 行：资料索引/);
+});
+
+test('every configured heading exists in the shipped design-book template', async () => {
+  const template = await readFile(new URL('../card-studio/prompts/规划-从零开始制卡.md', import.meta.url), 'utf8');
+  const headings = template.split(/\r?\n/).filter(line => /^#{2,6}\s+/.test(line));
+  for (const [section, list] of Object.entries(SECTION_HEADINGS)) {
+    for (const heading of list) assert.ok(headings.some(line => line.includes(heading)), `${section} → ${heading}`);
+  }
 });
 
 test('no dispatch or no material means no brief at all', async t => {

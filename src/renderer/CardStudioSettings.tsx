@@ -73,7 +73,12 @@ export function CardStudioSettings() {
       </Row>
 
       <Row title={t('Automatic rounds per dispatch', '自动写卡的最多对话轮数')} description={t('When one-click making has a pending dispatch in any section, the most rounds the Agent runs automatically. Past this number it pauses for your confirmation or intervention. 10–50, default 15.', '一键实现各分区待完成派单时,Agent自动执行的最多轮数，超过该轮数则暂停等待用户确认或干预。可设 10–50，默认 15。')}>
-        <input key={optimization.maxContinueRounds} className="number-input" type="number" min={CARD_OPTIMIZATION_LIMITS.continueRounds.min} max={CARD_OPTIMIZATION_LIMITS.continueRounds.max} step={1} defaultValue={optimization.maxContinueRounds} aria-label={t('Automatic rounds per dispatch', '自动写卡的最多对话轮数')} onBlur={event => saveOptimization({ maxContinueRounds: number(event.target.value, CARD_OPTIMIZATION_LIMITS.continueRounds.min, CARD_OPTIMIZATION_LIMITS.continueRounds.max, optimization.maxContinueRounds) })} />
+        <input key={optimization.maxContinueRounds} className="number-input" type="number" min={CARD_OPTIMIZATION_LIMITS.continueRounds.min} max={CARD_OPTIMIZATION_LIMITS.continueRounds.max} step={1} defaultValue={optimization.maxContinueRounds} aria-label={t('Automatic rounds per dispatch', '自动写卡的最多对话轮数')} onBlur={event => {
+          if (!event.target.value.trim()) { event.target.value = String(optimization.maxContinueRounds); return; }
+          const value = number(event.target.value, CARD_OPTIMIZATION_LIMITS.continueRounds.min, CARD_OPTIMIZATION_LIMITS.continueRounds.max, optimization.maxContinueRounds);
+          event.target.value = String(value);
+          saveOptimization({ maxContinueRounds: value });
+        }} />
       </Row>
 
       <Row title={t('Change conversation at the threshold', '分区上下文达阈值后更换对话')} description={t('When a section conversation’s context reaches the threshold, the app offers a new conversation: the AI writes a handoff summary first, then the new conversation starts.', '分区对话的上下文达到阈值时，应用会提议换对话，AI 会自动撰写先写交接摘要再开新对话。（适合分段计费的高价大模型）')}>
@@ -81,7 +86,12 @@ export function CardStudioSettings() {
       </Row>
 
       {optimization.handoffEnabled && <Row title={t('Conversation threshold', '换对话 Token 阈值')} description={t('50K–1000K, default 100K. The model window’s 80% is the upper limit. (Suited to high-end models billed in segments.)', '可设 50K–1000K，默认 100K。最多不超过窗口的 80% 为上限。（适合分段计费的高价大模型）')}>
-        <span className="number-with-unit"><input key={optimization.handoffTokens} className="number-input is-wide" type="number" min={CARD_OPTIMIZATION_LIMITS.handoffTokens.min / 1000} max={CARD_OPTIMIZATION_LIMITS.handoffTokens.max / 1000} step={0.01} defaultValue={handoffK} aria-label={t('Conversation threshold in K tokens', '换对话 Token 阈值（K）')} onBlur={event => saveOptimization({ handoffTokens: Math.round(decimal(event.target.value, CARD_OPTIMIZATION_LIMITS.handoffTokens.min / 1000, CARD_OPTIMIZATION_LIMITS.handoffTokens.max / 1000, handoffK) * 1000) })} />K</span>
+        <span className="number-with-unit"><input key={optimization.handoffTokens} className="number-input is-wide" type="number" min={CARD_OPTIMIZATION_LIMITS.handoffTokens.min / 1000} max={CARD_OPTIMIZATION_LIMITS.handoffTokens.max / 1000} step={0.01} defaultValue={handoffK} aria-label={t('Conversation threshold in K tokens', '换对话 Token 阈值（K）')} onBlur={event => {
+          if (!event.target.value.trim()) { event.target.value = String(handoffK); return; }
+          const value = decimal(event.target.value, CARD_OPTIMIZATION_LIMITS.handoffTokens.min / 1000, CARD_OPTIMIZATION_LIMITS.handoffTokens.max / 1000, handoffK);
+          event.target.value = String(value);
+          saveOptimization({ handoffTokens: Math.round(value * 1000) });
+        }} />K</span>
       </Row>}
 
       <Row title={t('Section project brief', '分区项目摘要')} description={t('At section start, preloads a short brief and lists the design-book, variable-table and source-index line numbers this dispatch uses, reducing the input tokens the dispatch needs.', '分区开工时先载入一份短摘要，并列出这条派单用到的设计书、变量表和资料索引行号，减少派单实施时的输入Token消耗。')}>
@@ -127,8 +137,8 @@ export function CardStudioSettings() {
     {confirmBrief && <Modal title={t('Turn on the section project brief?', '开启分区项目摘要？')} onClose={() => setConfirmBrief(false)}>
       <p className="settings-intro">{t('The brief reduces the design book, variable table and source index to a few headings and line ranges. Details outside those lines can be missed, so writing quality may drop. Check people, settings and variables after turning it on.', '摘要会把设计书、变量表和资料索引压缩成少量标题和行范围，行之外的细节可能漏掉，写作质量可能下降。开启后建议检查人物、设定和变量是否一致。')}</p>
       <div className="modal-actions">
-        <button type="button" className="cs-btn" onClick={() => setConfirmBrief(false)}>{t('Cancel', '取消')}</button>
-        <button type="button" className="cs-btn is-primary" onClick={() => { setConfirmBrief(false); saveOptimization({ sectionBrief: true }); }}>{t('Turn on', '开启')}</button>
+        <button type="button" className="button" onClick={() => setConfirmBrief(false)}>{t('Cancel', '取消')}</button>
+        <button type="button" className="button primary" onClick={() => { setConfirmBrief(false); saveOptimization({ sectionBrief: true }); }}>{t('Turn on', '开启')}</button>
       </div>
     </Modal>}
   </>;
