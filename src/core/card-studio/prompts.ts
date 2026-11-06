@@ -2,10 +2,11 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { REQUIRED_TOKENS } from '../../shared/card-studio/assembly-sheet.ts';
 import { boardOf, sectionLabel } from '../../shared/card-studio/boards.ts';
+import { sectionBriefRule, optimizedBatchRule, type CardAgentOptimization } from '../../shared/card-studio/card-optimization.ts';
 import { SQUAD_PROMPT_FILES, boardPromptFile, sectionPromptFile } from '../../shared/card-studio/prompt-files.ts';
 import type { CardKind, CardMemberComponent, CardMemberRole, PlanMode } from '../../shared/card-studio/types.ts';
 
-/** Built-in section prompts ship with the application; developer mode can override them (prompt-overrides.ts). */
+/** Built-in section prompts ship with the application; the prompt editor can override them (prompt-overrides.ts). */
 export interface SectionPromptInput {
   sectionId: string; mode?: PlanMode; cardName: string; cardKind: CardKind; source?: string; projectRoot: string;
   /** The preset the design book names; the regex board gets it in the prompt (ADR 0019: skins are compiled in, prose is not read). */
@@ -39,9 +40,14 @@ function cardKindLabel(input: Pick<SectionPromptInput, 'cardKind' | 'source'>): 
   return input.cardKind === 'fan' ? `同人卡 · 《${input.source?.trim() || '未填原作名'}》` : '原创卡';
 }
 
-/** The rules a section works by: the common rules, its board's, its own, and for regex sections the card's preset. */
-async function sectionRules(read: (relative: string) => Promise<string>, input: Pick<SectionPromptInput, 'sectionId' | 'mode' | 'stylePreset'>): Promise<string[]> {
-  const shared = await read('prompts/通用规则.md');
+/**
+ * The rules a section works by: the common rules, its board's, its own, and for regex sections the card's preset.
+ * `attachBrief` is true only when the caller really appends `buildSectionBrief`; otherwise the read-first list stays,
+ * so a planning or member conversation is never told to read a dispatch brief it does not have.
+ */
+async function sectionRules(read: (relative: string) => Promise<string>, input: Pick<SectionPromptInput, 'sectionId' | 'mode' | 'stylePreset'>, optimization?: CardAgentOptimization, attachBrief = false): Promise<string[]> {
+  const briefConfig = attachBrief || !optimization ? optimization : { ...optimization, sectionBrief: false };
+  const shared = sectionBriefRule(optimizedBatchRule(await read('prompts/通用规则.md'), optimization), briefConfig);
   const boardFile = boardPromptFile(input.sectionId);
   const board = boardFile ? await read('prompts/' + boardFile) : '';
   const file = sectionPromptFile(input.sectionId, input.mode);
@@ -50,7 +56,7 @@ async function sectionRules(read: (relative: string) => Promise<string>, input: 
 }
 
 /** `read` lets prompt overrides stand in for the shipped files; without it the shipped files are read. */
-export async function buildSectionPrompt(resourceRoot: string, input: SectionPromptInput, options: { read?: (relative: string) => Promise<string> } = {}): Promise<string> {
+export async function buildSectionPrompt(resourceRoot: string, input: SectionPromptInput, options: { read?: (relative: string) => Promise<string>; optimization?: CardAgentOptimization; attachBrief?: boolean } = {}): Promise<string> {
   const read = options.read ?? (relative => resource(resourceRoot, relative));
   return [
     `# 制卡工坊 · ${sectionLabel(input.sectionId)}`,
@@ -61,14 +67,14 @@ export async function buildSectionPrompt(resourceRoot: string, input: SectionPro
     `- 内置资料根目录（只读）：${resourceRoot}`,
     `- 知识库：${join(resourceRoot, 'knowledge', 'README.md')}`,
     '',
-    ...(await sectionRules(read, input)),
+    ...(await sectionRules(read, input, options.optimization, options.attachBrief)),
   ].join('\n');
 }
 
 export interface MemberPromptInput extends SectionPromptInput { role: CardMemberRole; files: readonly string[]; create: readonly string[]; created?: readonly CardMemberComponent[] }
 
 /** A squad member (spec §6.4): its own prompt; a 写组件 then gets the components it was given and the section's rules. */
-export async function buildMemberPrompt(resourceRoot: string, input: MemberPromptInput, options: { read?: (relative: string) => Promise<string> } = {}): Promise<string> {
+export async function buildMemberPrompt(resourceRoot: string, input: MemberPromptInput, options: { read?: (relative: string) => Promise<string>; optimization?: CardAgentOptimization } = {}): Promise<string> {
   const read = options.read ?? (relative => resource(resourceRoot, relative));
   const writer = input.role === 'writer';
   const lines = [
@@ -93,7 +99,7 @@ export async function buildMemberPrompt(resourceRoot: string, input: MemberPromp
     // Sent again (spec §6.3): what it created in an earlier run is its own to write.
     ...(input.created?.length ? [`- 已经新建好的组件（直接改它们的文件）：${input.created.map(item => `「${item.name}」${item.paths.map(path => `\`${path}\``).join('、')}`).join('；')}`] : []),
     '',
-    ...(await sectionRules(read, input)),
+    ...(await sectionRules(read, input, options.optimization)),
   ].join('\n');
 }
 

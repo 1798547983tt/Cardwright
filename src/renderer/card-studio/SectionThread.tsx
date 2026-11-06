@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Check, ChevronRight, Copy, LoaderCircle, MessageSquarePlus, Pencil, RotateCcw, Terminal, Undo2 } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, Copy, LoaderCircle, MessageSquarePlus, Pencil, RotateCcw, Terminal, Undo2, X } from 'lucide-react';
 import { useApp } from '../context';
 import { Modal } from '../primitives';
 import { groupConversation, ToolRecord } from '../Conversation';
@@ -8,7 +8,7 @@ import { TruncationNotice } from '../Notices';
 import { sectionLabel } from '../../shared/card-studio/boards';
 import { assistantName } from '../../shared/identity';
 import { dispatchKey, formatDispatch, type DispatchParse } from '../../shared/card-studio/dispatch';
-import { handoffOffer, type Handoff } from '../../shared/card-studio/handoff';
+import { handoffSuggested, type Handoff } from '../../shared/card-studio/handoff';
 import { ACCEPT_ALL_TEXT, hidePartialMarker, isHandoffRequest, isKickoff, segmentReply, stripMarkers } from '../../shared/card-studio/markers';
 import { dispatchDone, leadTurnWrites, membersOfTurn, messageAction, nextDispatch, squadOf } from '../../shared/card-studio/view';
 import { runOwns } from '../../shared/card-studio/run';
@@ -85,28 +85,46 @@ function HandoffCard({ handoff, raw, requested }: { handoff: Handoff | null; raw
   </section>;
 }
 
+/** Conversations whose new-conversation hint the user closed; the hint is a suggestion, never a block. */
+const dismissedHandoffHints = new Set<string>();
+
+/** A long conversation's suggestion to start a fresh one, with a way to ignore it. */
+function HandoffHint({ task, card, used, threshold, onDismiss }: { task: Task; card: CardProjectView; used: number; threshold: number | null; onDismiss: () => void }) {
+  const { t } = useApp();
+  const actions = useCardActions(card);
+  const [asking, setAsking] = useState(false);
+  const handoff = task.card?.handoff;
+  return <div className="cs-end-bar is-offer" role="status">
+    <span><MessageSquarePlus size={13} />{t(`Context used: ${tokenCount(used)}. A new conversation is suggested.`, `上下文已用 ${tokenCount(used)}，建议换对话`)}</span>
+    <small>{handoff?.status === 'failed' ? t('The last request returned no summary; try again.', '上次没有拿到交接摘要，可以再试一次。') : t(`Threshold ${tokenCount(threshold ?? 0)}`, `阈值 ${tokenCount(threshold ?? 0)}`)}</small>
+    <button type="button" className="cs-btn is-small is-primary" disabled={asking} onClick={() => { setAsking(true); void actions.requestHandoff(task).finally(() => setAsking(false)); }}>{asking ? <LoaderCircle size={13} className="spinning" /> : null}{t('New conversation', '换对话')}</button>
+    <button type="button" className="cs-end-dismiss" aria-label={t('Dismiss this suggestion', '关闭这个提示')} title={t('Dismiss this suggestion', '关闭这个提示')} onClick={onDismiss}><X size={14} /></button>
+  </div>;
+}
+
 /**
  * The end of a finished conversation: once its dispatch is done, the way to the next dispatch; before that, the app's
- * offer of a new conversation when the context reaches the threshold (§5.2).
+ * offer of a new conversation when the context reaches the threshold (§5.2). Both keep the suggestion after the
+ * dispatch is done, so a long chat can be moved to a new conversation, and either can be closed.
  */
 function ConversationEnd({ task, card }: { task: Task; card: CardProjectView }) {
   const { data, t } = useApp();
   const actions = useCardActions(card);
-  const [asking, setAsking] = useState(false);
+  const [dismissed, setDismissed] = useState(() => dismissedHandoffHints.has(task.id));
+  const suggestion = handoffSuggested({ tokens: task.contextUsage?.tokens, window: task.contextWindow || task.contextUsage?.window || 0, settings: data.preferences.cardHandoff, handoff: task.card?.handoff, optimization: data.studio?.preferences.cardOptimization });
+  const showHint = suggestion.suggested && !dismissed;
+  const dismiss = () => { dismissedHandoffHints.add(task.id); setDismissed(true); };
   if (dispatchDone(card, task)) {
     const next = nextDispatch(card);
-    return <div className="cs-end-bar"><span><Check size={13} />{t('This dispatch is done.', '这条派单已完成。')}</span>
-      {next ? <button type="button" className="cs-btn is-small is-primary" onClick={actions.openNextDispatch}>{t('Next dispatch', '去下一条派单')}<ArrowRight size={13} /></button> : <small>{t('Every dispatch has been sent.', '派单都已经发出去了。')}</small>}
+    return <div className="cs-end-stack">
+      <div className="cs-end-bar"><span><Check size={13} />{t('This dispatch is done.', '这条派单已完成。')}</span>
+        {next ? <button type="button" className="cs-btn is-small is-primary" onClick={actions.openNextDispatch}>{t('Next dispatch', '去下一条派单')}<ArrowRight size={13} /></button> : <small>{t('Every dispatch has been sent.', '派单都已经发出去了。')}</small>}
+      </div>
+      {showHint && <HandoffHint task={task} card={card} used={suggestion.used} threshold={suggestion.threshold} onDismiss={dismiss} />}
     </div>;
   }
-  const handoff = task.card?.handoff;
-  const offer = handoffOffer({ tokens: task.contextUsage?.tokens, window: task.contextWindow || task.contextUsage?.window || 0, settings: data.preferences.cardHandoff, dispatchDone: false, active: false, handoff });
-  if (!offer.offer) return null;
-  return <div className="cs-end-bar is-offer" role="status">
-    <span><MessageSquarePlus size={13} />{t(`Context used: ${tokenCount(offer.used)}. A new conversation is suggested.`, `上下文已用 ${tokenCount(offer.used)}，建议换对话`)}</span>
-    <small>{handoff?.status === 'failed' ? t('The last request returned no summary; try again.', '上次没有拿到交接摘要，可以再试一次。') : t(`Threshold ${tokenCount(offer.threshold)}`, `阈值 ${tokenCount(offer.threshold)}`)}</small>
-    <button type="button" className="cs-btn is-small is-primary" disabled={asking} onClick={() => { setAsking(true); void actions.requestHandoff(task).finally(() => setAsking(false)); }}>{asking ? <LoaderCircle size={13} className="spinning" /> : null}{t('New conversation', '换对话')}</button>
-  </div>;
+  if (!showHint) return null;
+  return <HandoffHint task={task} card={card} used={suggestion.used} threshold={suggestion.threshold} onDismiss={dismiss} />;
 }
 
 /**

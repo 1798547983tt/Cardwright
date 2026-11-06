@@ -6,9 +6,11 @@ import { fileURLToPath } from 'node:url';
 import test, { type TestContext } from 'node:test';
 import { Harness } from '../src/main/harness.ts';
 import { CardStudioService } from '../src/main/card-studio.ts';
+import { StudioServices } from '../src/main/studio-services.ts';
 import { Vault, type SecretCodec } from '../src/main/vault.ts';
 import type { CardRun, CardRunSettings } from '../src/shared/card-studio/types.ts';
 import { CONTINUE_LIMIT, CONTINUE_TEXT } from '../src/shared/card-studio/run.ts';
+import { DEFAULT_CARD_OPTIMIZATION } from '../src/shared/card-studio/card-optimization.ts';
 import { formatDispatch } from '../src/shared/card-studio/dispatch.ts';
 import type { Gateway, Task } from '../src/shared/types.ts';
 
@@ -261,6 +263,24 @@ test('a dispatch that never says it is finished pauses after CONTINUE_LIMIT roun
   await studio.runner.resume(projectId);
   await until(() => continues() === CONTINUE_LIMIT + 1, 'one more round after 继续');
   assert.equal(run(harness, projectId)?.continued?.count, 1, '继续 starts the count again');
+  await studio.runner.stop(projectId);
+});
+
+test('the run follows the configured automatic rounds, not the shipped CONTINUE_LIMIT', { timeout: 120_000 }, async t => {
+  const { root, harness, studio, notices } = await setup(t); cleanup(t, root, harness);
+  const services = new StudioServices(join(root, 'data'), harness, resolve('dist/Cardwright.CommandHost.exe'), buffer => buffer);
+  harness.attachStudio(services);
+  services.settings({ cardOptimization: { ...DEFAULT_CARD_OPTIMIZATION, maxContinueRounds: 10 } });
+  const { projectId } = await card(harness, studio, root, '一键·十轮', [['世界书/人设', '逐个写人物', 'RUN:continue forever']]);
+  await studio.runner.start(projectId, 'lore', settings);
+  await until(() => ['paused', 'completed'].includes(status(harness, projectId) ?? ''), 'the run to stop on its own', 90_000);
+  const paused = run(harness, projectId)!;
+  assert.equal(paused.pause?.reason, 'continue-limit');
+  assert.deepEqual(paused.continued, { dispatchId: 'd1', count: 10 });
+  assert.ok(notices.some(notice => notice.title.includes('10')), JSON.stringify(notices));
+  const conversation = paused.current!.taskId;
+  const continues = () => task(harness, conversation).messages.filter(message => message.role === 'user' && message.text === CONTINUE_TEXT).length;
+  assert.equal(continues(), 10, 'the runner stopped at the configured number');
   await studio.runner.stop(projectId);
 });
 

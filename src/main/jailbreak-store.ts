@@ -12,8 +12,7 @@ const BUILT_IN: Array<{ id: string; file: string }> = [
  * from a SillyTavern preset. Imported packs are written only to the data folder,
  * never into the application or the repository.
  *
- * A user pack whose id matches a built-in one replaces it, which is how the
- * built-in text is edited in developer mode.
+ * A user pack whose id matches a built-in one replaces it.
  */
 export class JailbreakStore {
   constructor(private readonly dataDir: string, private readonly resourceRoot: string) {}

@@ -10,6 +10,7 @@ import { CardStudioService } from '../../src/main/card-studio.ts';
 import { StudioServices } from '../../src/main/studio-services.ts';
 import { Vault, type SecretCodec } from '../../src/main/vault.ts';
 import { COVER_STYLES } from '../../src/core/card-studio/card-project.ts';
+import { DEFAULT_CARD_OPTIMIZATION } from '../../src/shared/card-studio/card-optimization.ts';
 import { formatDispatch } from '../../src/shared/card-studio/dispatch.ts';
 import { KICKOFF, isHandoffRequest } from '../../src/shared/card-studio/markers.ts';
 import { parseHandoff } from '../../src/shared/card-studio/handoff.ts';
@@ -171,10 +172,10 @@ test('planning registers dispatches through a tool, item by item, once the desig
   assert.match(lastReply(harness, plan.id), /card-error:.*设计书/);
   assert.deepEqual(card(harness).dispatches, []);
 
-  await writeFile(join(folder, '设计书.md'), '# 设计书 · 分批·登记\n');
+  await writeFile(join(folder, '设计书.md'), ['# 设计书 · 分批·登记', '## 3 主角与配角', '- 甲', '## 4 剧情', '- 第一章'].join('\n'));
   await harness.prompt(plan.id, request([
     { target: '世界书/叙事规则', title: '写叙事规则', prerequisite: '设计书已确认', body: '写四条叙事规则。' },
-    { target: '世界书 / 人设', title: '写人物模板', body: '量身定做人物模板。' },
+    { target: '世界书 / 人设', title: '写人物模板', body: '量身定做人物模板。', brief: '先写主角', references: [{ path: '设计书.md', heading: '主角与配角', summary: '人物名单' }] },
     { target: '世界书/人物', title: '写点什么', body: '正文' },
     { target: '世界书/人设', title: '写人物模板', body: '同一条又来一次' },
   ]));
@@ -186,6 +187,11 @@ test('planning registers dispatches through a tool, item by item, once the desig
   assert.match(first.results[3].error, /已经有一条叫「写人物模板」的派单/);
   assert.deepEqual(card(harness).dispatches.map(item => [item.sectionId, item.title, item.requires, item.status, item.sourceTaskId]), [
     ['lore-rules', '写叙事规则', '设计书已确认', 'todo', plan.id], ['lore-people', '写人物模板', '', 'todo', plan.id]]);
+  const briefed = card(harness).dispatches.find(item => item.title === '写人物模板')!;
+  assert.equal(briefed.brief, '先写主角');
+  assert.deepEqual(briefed.references, [{ path: '设计书.md', heading: '主角与配角', offset: 2, lines: 2, summary: '人物名单' }], 'the heading is resolved to real lines when it is registered');
+  assert.match(formatDispatch(briefed), /摘要: 先写主角/);
+  assert.match(formatDispatch(briefed), /`设计书\.md` 第 2–3 行：人物名单/, 'the dispatch message carries the line range');
 
   await harness.prompt(plan.id, request([{ target: '世界书/人设', title: '写人物模板', body: '重复' }, { target: '开场白', title: '写开场白', body: '两条普通开场白。' }]));
   await until(() => settled(harness, plan.id) && replies(plan.id) === 3, 'the second batch');
@@ -207,6 +213,40 @@ test('planning registers dispatches through a tool, item by item, once the desig
   await until(() => settled(harness, change.id) && replies(change.id) === 2, 'the change AI trying the tool');
   assert.match(lastReply(harness, change.id), /card-error:只有规划对话/);
   assert.equal(card(harness).dispatches.length, 3);
+});
+
+test('the section brief is preloaded into the section prompt with the dispatch’s reference lines', async t => {
+  const { root, harness, studio } = await setup(t);
+  const folder = join(root, 'brief');
+  const { card: { projectId } } = await studio.create({ name: '摘要·预载', kind: 'original', folder });
+  await writeFile(join(folder, '设计书.md'), ['# 设计书 · 摘要', '## 人物名单', '- 甲', '## 卡内历法', '- 第一章'].join('\n'));
+  await writeFile(join(folder, '变量表.yaml'), ['version: 1', 'rows:', '  - path: /主角/生命', '    type: 数值'].join('\n'));
+  await mkdir(join(folder, '资料'), { recursive: true });
+  await writeFile(join(folder, '资料', '索引.md'), '# 资料索引');
+  const file = JSON.parse(await readFile(join(folder, '卡项目.json'), 'utf8'));
+  const at = new Date().toISOString();
+  file.dispatches = [{ id: 'd1', target: '世界书/人设', sectionId: 'lore-people', title: '写人设', requires: '', body: '正文', brief: '先写主角', status: 'todo', createdAt: at, updatedAt: at }];
+  await writeFile(join(folder, '卡项目.json'), JSON.stringify(file, null, 2));
+  await studio.reload(projectId);
+
+  const services = new StudioServices(join(root, 'data'), harness, resolve('dist/Cardwright.CommandHost.exe'), buffer => buffer);
+  harness.attachStudio(services);
+  services.settings({ cardOptimization: { ...DEFAULT_CARD_OPTIMIZATION, sectionBrief: true } });
+  const started = await studio.startConversation({ projectId, sectionId: 'lore-people', dispatchId: 'd1', title: '写人设', prompt: '写人设' });
+  await until(() => settled(harness, started.id), 'the briefed section conversation');
+
+  const context = await studio.workerContext(task(harness, started.id));
+  assert.match(context.prompt, /本次派单摘要/);
+  assert.match(context.prompt, /派单：写人设/);
+  assert.match(context.prompt, /规划要点：先写主角/);
+  assert.match(context.prompt, /`设计书\.md` 第 2–3 行：人物名单/, 'the design book heading is resolved when the brief is built');
+  assert.match(context.prompt, /`变量表\.yaml` 第 1–4 行：变量表，共 1 个变量/);
+  assert.match(context.prompt, /开工时，先读派单里附的「本次派单摘要」和参考行/, 'the read-first rule is replaced');
+
+  services.settings({ cardOptimization: { ...DEFAULT_CARD_OPTIMIZATION, sectionBrief: false } });
+  const plain = await studio.workerContext(task(harness, started.id));
+  assert.doesNotMatch(plain.prompt, /本次派单摘要/);
+  assert.match(plain.prompt, /每次开工先读/, 'off restores the full read-first list');
 });
 
 test('only planning that starts or refines a card is offered card_add_dispatches', async t => {
@@ -415,11 +455,9 @@ test('the squad settings save only as 关 / 只读 / 可写 with 自行组队 on
   assert.deepEqual(harness.snapshot().preferences.cardSquad, { mode: 'write', selfDispatch: false }, 'a refused change leaves the saved one');
 });
 
-test('developer mode edits the built-in prompts; new conversations get the override, and restoring brings the default back', async t => {
+test('built-in prompt edits need no developer switch; new conversations get the override, and restoring brings the default back', async t => {
   const { root, harness, studio } = await setup(t);
-  const { card: { projectId } } = await studio.create({ name: '雾港·开发者', kind: 'original', folder: join(root, 'developer') });
-  await assert.rejects(studio.savePromptOverride('kickoff/scratch', '【开始规划】改过的开场话'), /开发者模式/);
-  harness.savePreferences({ developerMode: true });
+  const { card: { projectId } } = await studio.create({ name: '雾港·提示词', kind: 'original', folder: join(root, 'developer') });
   await studio.savePromptOverride('kickoff/scratch', '【开始规划】改过的开场话');
   await studio.savePromptOverride('prompts/规划-从零开始制卡.md', '# 规划 · 覆盖版\n只按覆盖版提问。');
   assert.ok((await studio.listPromptOverrides()).filter(item => item.overridden).length === 2);
@@ -432,9 +470,8 @@ test('developer mode edits the built-in prompts; new conversations get the overr
   assert.match(JSON.parse(lastReply(harness, started.id)).prompt, /只按覆盖版提问/);
   await studio.restorePromptOverride('prompts/规划-从零开始制卡.md');
   assert.match(await studio.readPrompt(projectId, 'plan', 'scratch'), /# 规划 · 从零开始制卡/);
-  harness.savePreferences({ developerMode: false });
-  await assert.rejects(studio.restorePromptOverride('kickoff/scratch'), /开发者模式/);
-  assert.throws(() => harness.savePreferences({ developerMode: 'yes' as never }), /开发者模式/);
+  await studio.restorePromptOverride('kickoff/scratch');
+  assert.equal((await studio.readPromptOverride('kickoff/scratch')).overridden, false);
 });
 
 test('each card remembers its permission mode and its kickoff effort and model', async t => {

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const read = (relative: string) => readFileSync(fileURLToPath(new URL(`../src/renderer/${relative}`, import.meta.url)), 'utf8');
 
-test('developer mode lists the squad prompts in a group of their own', () => {
+test('the prompt editor lists the squad prompts in a group of their own', () => {
   assert.match(read('CardStudioSettings.tsx'), /\{ id: 'squad', en: 'Squad prompts', zh: '小队提示词' \}/);
 });
 
@@ -24,6 +24,22 @@ test('工作室设置 → 制卡 has the 子代理 switch, 自行组队 and the 
   const settings = read('CardStudioSettings.tsx');
   for (const text of ['cardSquadSettings(data.preferences)', "t('Squads', '小队')", "zh: '关'", "zh: '只读'", "zh: '可写'", '子代理', '自行组队', '同时运行的 Agent', '成员额度', 'defaultSquadSize', 'cardSquad: { ...squad, ...changes }']) assert.ok(settings.includes(text), text);
   assert.match(settings, /disabled=\{squad\.mode === 'off'\}/);
+});
+
+test('制卡Agent优化 is its own section with every policy and no developer mode', () => {
+  const settings = read('CardStudioSettings.tsx');
+  for (const text of ["t('Card agent optimization', '制卡Agent优化')", 'DEFAULT_CARD_OPTIMIZATION', 'maxWritesPerRound', 'maxContinueRounds', 'handoffEnabled', 'handoffTokens', 'sectionBrief', 'CARD_OPTIMIZATION_LIMITS', 'cardOptimization: { ...optimization, ...changes }', "t('Built-in prompts', '内置提示词')"]) assert.ok(settings.includes(text), text);
+  assert.doesNotMatch(settings, /developerMode|开发者模式/);
+  assert.match(settings, /setConfirmBrief\(true\)/);
+  assert.match(settings, /optimization\.enabled && <>/);
+  assert.match(settings, /optimization\.handoffEnabled && <Row/);
+  assert.match(settings, /resetPrompts/);
+  assert.match(settings, /t\('Reset all', '全部重置'\)/);
+  assert.match(settings, /t\('Reset', '重置'\)/);
+  assert.match(settings, /disabled=\{resetting \|\| overriddenCount === 0\}/, 'reset all stays visible and is disabled when nothing is modified');
+  assert.match(settings, /disabled=\{resetting \|\| !item\.overridden\}/, 'every prompt shows a reset control');
+  assert.match(settings, /step=\{0\.01\}/, 'the threshold accepts two decimals');
+  assert.match(settings, /\/ 1000/, 'the threshold is shown in K tokens');
 });
 
 test('the composer’s squad chip says what this conversation may send now, with 自行组队 and the Ultra exception in its tooltip', () => {

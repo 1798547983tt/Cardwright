@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { KICKOFF } from '../../shared/card-studio/markers.ts';
 
 /**
- * 提示词覆盖: developer-mode edits of the card studio's built-in prompts, kept in the data folder under
+ * 提示词覆盖: edits of the card studio's built-in prompts, kept in the data folder under
  * prompt-overrides/<original relative path> so they survive updates. An override wins over the shipped default; the
  * default's fingerprint at save time tells when a newer version changed the text the override was based on.
  */
@@ -78,7 +78,7 @@ export class PromptOverrides {
   }
 
   private async known(id: string): Promise<void> {
-    if (typeof id !== 'string' || !(await this.ids()).includes(id)) throw new Error('这一项不能修改：开发者模式只能修改制卡的内置提示词和开场话。');
+    if (typeof id !== 'string' || !(await this.ids()).includes(id)) throw new Error('这一项不能修改：只能修改制卡的内置提示词和开场话。');
   }
 
   private async defaultText(id: string): Promise<string> {

@@ -1,3 +1,4 @@
+import { HANDOFF_WINDOW_FALLBACK, type CardAgentOptimization } from './card-optimization.ts';
 import { fenceKind, findFences, normalizeNewlines } from './fences.ts';
 import type { CardHandoffState } from './types.ts';
 
@@ -45,15 +46,38 @@ export function handoffThreshold(window: number, settings: HandoffSettings = DEF
 }
 
 /**
- * The app, not the AI, decides when to offer a new conversation: the context has reached the threshold, the conversation's
- * dispatch is still open, it is not running, and no handoff is pending or already used. A failed request can be retried.
+ * The budget in force. With 制卡 Agent 优化 on, the configured tokens are the ceiling and
+ * the model window's fallback may lower it; off keeps the old tokens-or-window rule.
+ * `null` means the app never offers a new conversation.
  */
-export function handoffOffer(input: { tokens: number | null | undefined; window: number; settings?: HandoffSettings; dispatchDone: boolean; active: boolean; handoff?: CardHandoffState }): { offer: boolean; used: number; threshold: number } {
-  const threshold = handoffThreshold(input.window, input.settings);
+export function handoffThresholdFor(window: number, legacy: HandoffSettings = DEFAULT_HANDOFF, optimization?: CardAgentOptimization): number | null {
+  if (optimization?.enabled) {
+    if (!optimization.handoffEnabled) return null;
+    const share = window > 0 ? Math.floor(window * HANDOFF_WINDOW_FALLBACK) : Infinity;
+    return Math.min(optimization.handoffTokens, share);
+  }
+  if (legacy.enabled === false) return null;
+  return handoffThreshold(window, legacy);
+}
+
+/**
+ * Whether the context has reached the threshold, regardless of whether the dispatch is still open. The UI may keep the
+ * suggestion after a dispatch is done, so a long conversation does not keep growing in one session.
+ */
+export function handoffSuggested(input: { tokens: number | null | undefined; window: number; settings?: HandoffSettings; handoff?: CardHandoffState; optimization?: CardAgentOptimization }): { suggested: boolean; used: number; threshold: number | null } {
+  const threshold = handoffThresholdFor(input.window, input.settings ?? DEFAULT_HANDOFF, input.optimization);
   const used = typeof input.tokens === 'number' && Number.isFinite(input.tokens) ? input.tokens : 0;
   const pending = !!input.handoff && input.handoff.status !== 'failed';
-  const offering = input.settings?.enabled !== false;
-  return { offer: offering && used > 0 && used >= threshold && !input.dispatchDone && !input.active && !pending, used, threshold };
+  return { suggested: threshold !== null && used > 0 && used >= threshold && !pending, used, threshold };
+}
+
+/**
+ * The run's rule for offering a new conversation: the context has reached the threshold, the conversation's dispatch is
+ * still open, it is not running, and no handoff is pending or already used. A failed request can be retried.
+ */
+export function handoffOffer(input: { tokens: number | null | undefined; window: number; settings?: HandoffSettings; dispatchDone: boolean; active: boolean; handoff?: CardHandoffState; optimization?: CardAgentOptimization }): { offer: boolean; used: number; threshold: number | null } {
+  const { suggested, used, threshold } = handoffSuggested(input);
+  return { offer: suggested && !input.dispatchDone && !input.active, used, threshold };
 }
 
 /** The handoff summary the AI wrote in reply to the app's request with this message id, if it wrote one. */

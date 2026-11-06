@@ -1,3 +1,5 @@
+import type { CardAgentOptimization } from './card-studio/card-optimization.ts';
+
 export interface AttachmentInfo { id: string; name: string; mimeType: string; bytes: number; kind: 'image' | 'file' | 'reference'; path?: string; projectId?: string }
 export interface WorkspaceEntry { path: string; name: string; directory: boolean; bytes?: number }
 export interface FilePreview { path: string; name: string; kind: 'text' | 'image' | 'binary'; text?: string; dataUrl?: string; bytes: number; truncated?: boolean }
@@ -5,7 +7,8 @@ export interface CheckDefinition { id: string; name: string; command: string; en
 export interface CheckEvidence { id: string; name: string; command: string; status: 'running' | 'passed' | 'failed' | 'cancelled'; exitCode?: number | null; durationMs?: number; output: string; startedAt: string }
 export interface DeliverySummary { verification: 'not-run' | 'running' | 'passed' | 'failed' | 'stale'; checkpointId?: string; changedFiles: number; checks: CheckEvidence[]; updatedAt: string; error?: string }
 export interface AccessRule { id: string; scope: 'session' | 'project'; projectId: string; taskId?: string; kind: 'read' | 'write' | 'network' | 'command'; target: string; createdAt: string }
-export interface StudioPreferences { sandboxEnabled: boolean; defaultSquadSize: number; teamTokenBudget: number; teamMinutesBudget: number; teamMoneyBudget: number; updateFeed: string; roleModels: Record<string, { gatewayId: string; modelId: string; thinking: string }> }
+
+export interface StudioPreferences { sandboxEnabled: boolean; defaultSquadSize: number; teamTokenBudget: number; teamMinutesBudget: number; teamMoneyBudget: number; updateFeed: string; roleModels: Record<string, { gatewayId: string; modelId: string; thinking: string }>; /** 制卡 Agent 优化: writes per round, automatic rounds, conversation threshold and the section brief. */ cardOptimization?: CardAgentOptimization }
 export interface ModelPricing { currency: string; input: number; output: number; cacheRead: number; cacheWrite: number }
 export interface StudioState { preferences: StudioPreferences; rules: AccessRule[]; projectChecks: Record<string, CheckDefinition[]> }
 export interface CapabilityResult { capability: string; status: 'passed' | 'failed' | 'unknown'; detail: string; at: string }

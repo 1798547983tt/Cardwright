@@ -296,7 +296,7 @@ export function SectionPage({ card, sectionId, conversation }: { card: CardProje
       {sectionId.startsWith('lore-') && <ComponentList card={card} sectionId={sectionId} />}
       {VARIABLE_SECTIONS.has(sectionId) && <VariableTableBrief card={card} />}
       {(board.id === 'regex' || board.id === 'script') && <PieceList card={card} kind={board.id} />}
-      {data.preferences.developerMode && sectionId !== 'source' && sectionId !== 'build' && <section><h3>{t('Built-in prompt', '内置提示词')}</h3><button type="button" className="cs-link" onClick={() => setEditing(true)}><BookOpen size={12} />{t('Edit (developer mode)', '编辑（开发者模式）')}</button></section>}
+      {sectionId !== 'source' && sectionId !== 'build' && <section><h3>{t('Built-in prompt', '内置提示词')}</h3><button type="button" className="cs-link" onClick={() => setEditing(true)}><BookOpen size={12} />{t('Edit', '编辑')}</button></section>}
     </aside>
     {editing && <PromptEditor ids={sectionPromptIds(sectionId, sectionId === 'plan' ? selected?.card?.mode ?? (card.origin === 'import' ? 'refine' : 'scratch') : undefined)} onClose={() => setEditing(false)} />}
   </main>;

@@ -8,7 +8,7 @@ import { thinkingLabel } from '../effort';
 import { selectedModel } from '../model-resolution';
 import { availableEfforts } from '../../shared/effort';
 import { BOARDS, sectionLabel, sortByDependency } from '../../shared/card-studio/boards';
-import { CONTINUE_LIMIT, RUN_PAUSE_LABELS, runIsOpen, runQueue, runUsage, runnableSection } from '../../shared/card-studio/run';
+import { continueRounds, pauseLabel, runIsOpen, runQueue, runUsage, runnableSection } from '../../shared/card-studio/run';
 import { runningConversation } from '../../shared/card-studio/view';
 import type { CardChange, CardPermission, CardProjectView, CardRun, CardRunScope } from '../../shared/card-studio/types';
 import type { ThinkingLevel } from '../../shared/types';
@@ -34,6 +34,7 @@ export function runTitle(scope: CardRunScope, t: (en: string, zh: string) => str
  */
 export function RunDialog({ card, scope, change, onClose }: { card: CardProjectView; scope: CardRunScope; change?: CardChange; onClose: () => void }) {
   const { data, api, t } = useApp();
+  const rounds = continueRounds(data.studio?.preferences.cardOptimization);
   const saved = data.projects.find(project => project.id === card.projectId)?.cardSettings?.run;
   const [choice, setChoice] = useState(() => {
     const fallback = (data.gateways.find(item => item.id === data.preferences.defaultGatewayId) ?? data.gateways[0])?.id ?? '';
@@ -82,8 +83,8 @@ export function RunDialog({ card, scope, change, onClose }: { card: CardProjectV
       'The change dispatches below go to their sections in dependency order, one conversation per section, with the same pause rules as one-click making. When the card has a design book, the change AI first brings it in line with the list. The run ends with the assembly check.',
       '下面的改动派单按分区依赖顺序代发给对应分区，一个分区一个对话，暂停规则和一键制作相同。卡有设计书时，改动 AI 先把设计书改到与清单一致再开跑。全部做完后跑一次拼装检查。')}</p>
       : <p className="modal-intro">{t(
-      `Sends the unsent dispatches below, and any left in progress, to their sections in order, one conversation per section. A dispatch the section AI says is not finished is carried on automatically, up to ${CONTINUE_LIMIT} rounds. A dispatch is marked done once it is delivered and the assembly check finds no errors in what it wrote. Questions, refusals, errors and approvals pause the run and notify you.`,
-      `按派单顺序，把下面这些未派的、和停在「进行中」的派单代发给对应分区，一个分区用一个对话接连做完。分区 AI 说没做完的，自动接着做，最多 ${CONTINUE_LIMIT} 轮。交付后拼装检查没有这条派单的错误，就自动标记完成；遇到提问、拒绝开工、出错或需要批准时暂停，并通知你。`)}{scope === 'all' && t(' The run ends with the assembly check.', '全部做完后再跑一次拼装检查。')}</p>}
+      `Sends the unsent dispatches below, and any left in progress, to their sections in order, one conversation per section. A dispatch the section AI says is not finished is carried on automatically, up to ${rounds} rounds. A dispatch is marked done once it is delivered and the assembly check finds no errors in what it wrote. Questions, refusals, errors and approvals pause the run and notify you.`,
+      `按派单顺序，把下面这些未派的、和停在「进行中」的派单代发给对应分区，一个分区用一个对话接连做完。分区 AI 说没做完的，自动接着做，最多 ${rounds} 轮。交付后拼装检查没有这条派单的错误，就自动标记完成；遇到提问、拒绝开工、出错或需要批准时暂停，并通知你。`)}{scope === 'all' && t(' The run ends with the assembly check.', '全部做完后再跑一次拼装检查。')}</p>}
     {queue.length > 0 && <ol className="cs-run-queue" aria-label={t('Dispatches to do', '将要做的派单')}>
       {queue.slice(0, 8).map(dispatch => <li key={dispatch.id}><span>{dispatch.sectionId ? sectionLabel(dispatch.sectionId) : dispatch.target}</span><b>{dispatch.title}{dispatch.status === 'active' && <small>{t(' · in progress, goes on', '（进行中，接着做）')}</small>}</b></li>)}
       {queue.length > 8 && <li className="is-more">{t(`and ${queue.length - 8} more`, `还有 ${queue.length - 8} 条`)}</li>}
@@ -125,6 +126,7 @@ export function RunDialog({ card, scope, change, onClose }: { card: CardProjectV
 export function RunBar({ card, here }: { card: CardProjectView; here?: string }) {
   const { data, api, t, run: perform } = useApp();
   const studio = useStudio();
+  const rounds = continueRounds(data.studio?.preferences.cardOptimization);
   const [busy, setBusy] = useState(false);
   const run: CardRun | undefined = card.run;
   if (!run) return null;
@@ -165,7 +167,7 @@ export function RunBar({ card, here }: { card: CardProjectView; here?: string })
     <header>
       {paused ? <Pause size={14} className="cs-run-icon" /> : <LoaderCircle size={14} className="cs-run-icon spinning" />}
       <b>{runTitle(run.scope, t)}</b>
-      <span className="cs-run-state">{paused ? t(`Paused: ${RUN_PAUSE_LABELS[paused.reason].en}`, `已暂停：${RUN_PAUSE_LABELS[paused.reason].zh}`) : run.status === 'pausing' ? t('Pausing after this round…', '这一轮做完后暂停…') : t('Running', '进行中')}</span>
+      <span className="cs-run-state">{paused ? t(`Paused: ${pauseLabel(paused.reason, rounds).en}`, `已暂停：${pauseLabel(paused.reason, rounds).zh}`) : run.status === 'pausing' ? t('Pausing after this round…', '这一轮做完后暂停…') : t('Running', '进行中')}</span>
       <span className="cs-run-count">{t(`${position} of ${run.total}`, `第 ${position} / ${run.total} 条`)}</span>
       <span className="cs-run-usage">{usageText}</span>
     </header>
@@ -185,7 +187,7 @@ export function RunBar({ card, here }: { card: CardProjectView; here?: string })
       {paused.reason === 'question' && <small>{t('Answer in the conversation and press Continue, or press Continue to take the recommendations.', '去对话里回答后点【继续】；直接点【继续】就全部按推荐。')}</small>}
       {(paused.reason === 'refusal' || paused.reason === 'tool-failures' || paused.reason === 'model-error' || paused.reason === 'restart') && <small>{t('Continue asks the section AI to go on with this dispatch.', '点【继续】会请分区 AI 接着做这条派单。')}</small>}
       {paused.reason === 'check-errors' && <small>{t('Fix the files yourself or press Continue for another fix round.', '可以自己改好文件，或者点【继续】再修一轮。')}</small>}
-      {paused.reason === 'continue-limit' && <small>{t(`Continue lets it go on for up to ${CONTINUE_LIMIT} more rounds.`, `点【继续】后最多再自动接着做 ${CONTINUE_LIMIT} 轮。`)}</small>}
+      {paused.reason === 'continue-limit' && <small>{t(`Continue lets it go on for up to ${rounds} more rounds.`, `点【继续】后最多再自动接着做 ${rounds} 轮。`)}</small>}
       {paused.reason === 'incomplete' && <small>{t('The squad left gaps. Add what is missing in the conversation and press Continue, or press Continue to let the section AI try again.', '小队留下了没补齐的缺口。可以在对话里补充后点【继续】，或者直接点【继续】让分区 AI 再补一次。')}</small>}
     </div>}
   </section>;

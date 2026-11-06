@@ -81,8 +81,18 @@ export async function createWorkflow(options: WorkflowOptions) {
       execute: async (_id, args, signal) => textResult(await options.card!.searchSources(args as Record<string, unknown>, signal)) }),
     // One-click making sends dispatches in the order they were registered, so two calls in one reply must not run side by side:
     // `executionMode` is the agent loop's own flag and never reaches the model request (pi-agent-core, executeToolCalls).
-    ...(options.card.addDispatches ? [defineTool({ name: 'card_add_dispatches', label: 'Register dispatches', description: `Planning only, after the design book is written: register dispatches for the sections, 1-${DISPATCH_BATCH_LIMIT} per call, one board per call, in the planned order. target is 板块/分区 such as 世界书/人设 (a board with one section: just its name, such as 开场白); title is new within its section; prerequisite is optional; body is everything the section AI needs. Returns a result for each item: fix and resend only the refused ones.`,
-      parameters: Type.Object({ dispatches: Type.Array(Type.Object({ target: Type.String(), title: Type.String(), prerequisite: Type.Optional(Type.String()), body: Type.String() }), { minItems: 1, maxItems: DISPATCH_BATCH_LIMIT }) }),
+    ...(options.card.addDispatches ? [defineTool({ name: 'card_add_dispatches', label: 'Register dispatches', description: `Planning only, after the design book is written: register dispatches for the sections, 1-${DISPATCH_BATCH_LIMIT} per call, one board per call, in the planned order. target is 板块/分区 such as 世界书/人设 (a board with one section: just its name, such as 开场白); title is new within its section; prerequisite is optional; body is everything the section AI needs. brief is a short summary of what this dispatch needs. references name the design book headings, the variable table or the source index the section should read: give path and heading (the app finds the lines) or an explicit offset and lines. Returns a result for each item: fix and resend only the refused ones.`,
+      parameters: Type.Object({ dispatches: Type.Array(Type.Object({
+        target: Type.String(), title: Type.String(), prerequisite: Type.Optional(Type.String()), body: Type.String(),
+        brief: Type.Optional(Type.String({ description: 'Short summary of what this dispatch needs; shown to the section before it reads anything.' })),
+        references: Type.Optional(Type.Array(Type.Object({
+          path: Type.String({ description: 'Project-relative file, such as 设计书.md or 变量表.yaml.' }),
+          heading: Type.Optional(Type.String({ description: 'Heading in that file; the app resolves it to its line range.' })),
+          offset: Type.Optional(Type.Integer({ minimum: 1 })),
+          lines: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })),
+          summary: Type.Optional(Type.String({ description: 'Why the section needs these lines.' })),
+        }), { maxItems: 8 })),
+      }), { minItems: 1, maxItems: DISPATCH_BATCH_LIMIT }) }),
       executionMode: 'sequential',
       execute: async (_id, args, signal) => textResult(await options.card!.addDispatches!(args as Record<string, unknown>, signal)) })] : []),
   ] : [];

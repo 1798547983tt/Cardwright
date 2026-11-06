@@ -96,12 +96,11 @@ function parseState(value: unknown, renamedRoles = new Map<string, string>()): S
   };
   const notice = validNotice(settings.migrationNotice);
   if (notice) safePreferences.migrationNotice = notice;
-  // Card studio settings: the new-conversation threshold and developer mode.
+  // Card studio settings: the old new-conversation threshold, kept as the fallback when 制卡 Agent 优化 is off.
   const handoff = settings.cardHandoff as unknown;
   if (isRecord(handoff) && Number.isInteger(handoff.tokens) && Number.isInteger(handoff.windowPercent) && (handoff.tokens as number) >= 10_000 && (handoff.tokens as number) <= 10_000_000 && (handoff.windowPercent as number) >= 10 && (handoff.windowPercent as number) <= 90) {
     safePreferences.cardHandoff = { tokens: handoff.tokens as number, windowPercent: handoff.windowPercent as number, ...(handoff.enabled === false ? { enabled: false } : {}) };
   }
-  if (typeof settings.developerMode === 'boolean') safePreferences.developerMode = settings.developerMode;
   // 工坊小队 (spec §5.4): kept when the mode is known; a missing 自行组队 is on, anything else means the default.
   const squad = normalizeCardSquad(settings.cardSquad);
   if (squad) safePreferences.cardSquad = squad;
