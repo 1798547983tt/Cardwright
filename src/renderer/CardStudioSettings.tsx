@@ -76,11 +76,11 @@ export function CardStudioSettings() {
         <input key={optimization.maxContinueRounds} className="number-input" type="number" min={CARD_OPTIMIZATION_LIMITS.continueRounds.min} max={CARD_OPTIMIZATION_LIMITS.continueRounds.max} step={1} defaultValue={optimization.maxContinueRounds} aria-label={t('Automatic rounds per dispatch', '自动写卡的最多对话轮数')} onBlur={event => saveOptimization({ maxContinueRounds: number(event.target.value, CARD_OPTIMIZATION_LIMITS.continueRounds.min, CARD_OPTIMIZATION_LIMITS.continueRounds.max, optimization.maxContinueRounds) })} />
       </Row>
 
-      <Row title={t('Change conversation at the threshold', '分区上下文达阈值后更换对话')} description={t('When a section conversation’s context reaches the threshold, the app offers a new conversation: the AI writes a handoff summary first, then the new conversation starts.', '分区对话的上下文达到阈值时，应用会提议换对话，AI 会自动撰写先写交接摘要再开新对话。')}>
+      <Row title={t('Change conversation at the threshold', '分区上下文达阈值后更换对话')} description={t('When a section conversation’s context reaches the threshold, the app offers a new conversation: the AI writes a handoff summary first, then the new conversation starts.', '分区对话的上下文达到阈值时，应用会提议换对话，AI 会自动撰写先写交接摘要再开新对话。（适合分段计费的高价大模型）')}>
         <Toggle checked={optimization.handoffEnabled} label={t('Change conversation at the threshold', '分区上下文达阈值后更换对话')} onChange={value => saveOptimization({ handoffEnabled: value })} />
       </Row>
 
-      {optimization.handoffEnabled && <Row title={t('Conversation threshold', '换对话 Token 阈值')} description={t('50K–1000K, default 100K. The model window’s 80% is the upper limit. (Suited to high-end models billed in segments.)', '可设 50K–1000K，默认 100K。最多不超过窗口的 80% 为上限。（适合分段计费的高端大模型）')}>
+      {optimization.handoffEnabled && <Row title={t('Conversation threshold', '换对话 Token 阈值')} description={t('50K–1000K, default 100K. The model window’s 80% is the upper limit. (Suited to high-end models billed in segments.)', '可设 50K–1000K，默认 100K。最多不超过窗口的 80% 为上限。（适合分段计费的高价大模型）')}>
         <span className="number-with-unit"><input key={optimization.handoffTokens} className="number-input is-wide" type="number" min={CARD_OPTIMIZATION_LIMITS.handoffTokens.min / 1000} max={CARD_OPTIMIZATION_LIMITS.handoffTokens.max / 1000} step={0.01} defaultValue={handoffK} aria-label={t('Conversation threshold in K tokens', '换对话 Token 阈值（K）')} onBlur={event => saveOptimization({ handoffTokens: Math.round(decimal(event.target.value, CARD_OPTIMIZATION_LIMITS.handoffTokens.min / 1000, CARD_OPTIMIZATION_LIMITS.handoffTokens.max / 1000, handoffK) * 1000) })} />K</span>
       </Row>}
 
