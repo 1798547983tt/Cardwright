@@ -31,7 +31,13 @@ test('制卡Agent优化 is its own section with every policy and no developer mo
   for (const text of ["t('Card agent optimization', '制卡Agent优化')", 'DEFAULT_CARD_OPTIMIZATION', 'maxWritesPerRound', 'maxContinueRounds', 'handoffEnabled', 'handoffTokens', 'sectionBrief', 'CARD_OPTIMIZATION_LIMITS', 'cardOptimization: { ...optimization, ...changes }', "t('Built-in prompts', '内置提示词')"]) assert.ok(settings.includes(text), text);
   assert.doesNotMatch(settings, /developerMode|开发者模式/);
   assert.match(settings, /setConfirmBrief\(true\)/);
-  assert.match(settings, /disabled=\{policyDisabled\}/);
+  assert.match(settings, /optimization\.enabled && <>/);
+  assert.match(settings, /optimization\.handoffEnabled && <Row/);
+  assert.match(settings, /resetPrompts/);
+  assert.match(settings, /t\('Reset all', '全部重置'\)/);
+  assert.match(settings, /t\('Reset', '重置'\)/);
+  assert.match(settings, /step=\{0\.01\}/, 'the threshold accepts two decimals');
+  assert.match(settings, /\/ 1000/, 'the threshold is shown in K tokens');
 });
 
 test('the composer’s squad chip says what this conversation may send now, with 自行组队 and the Ultra exception in its tooltip', () => {

@@ -340,10 +340,14 @@ html[data-theme="light"] .composer-box:focus-within::before { border-color: #151
 .setting-control .number-input.is-wide { width: 116px; }
 /* 工作室设置 → 制卡: 内置提示词列表。 */
 .prompt-override-list { display: grid; gap: 14px; margin-top: 8px; }
+.prompt-override-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.prompt-override-head > div { min-width: 0; }
+.prompt-override-head .button { flex: none; margin-top: 30px; }
 .prompt-override-list h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: var(--muted); }
 .prompt-override-list ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .prompt-override-list li { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 10px; border: 1px solid var(--line); background: var(--panel); }
 .prompt-override-name { flex: 1; min-width: 0; font-size: 13px; }
+.prompt-override-actions { display: flex; flex: none; gap: 6px; }
 .prompt-override-list em { font-style: normal; font-size: 11.5px; padding: 1px 7px; border: 1px solid var(--line-strong); }
 .prompt-override-list em.is-modified { color: var(--accent-text, var(--accent)); border-color: var(--accent); }
 .prompt-override-list em.is-stale { color: var(--warning); border-color: var(--warning); }
