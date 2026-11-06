@@ -73,6 +73,10 @@ export function normalizeGatewayModels(gateway: Gateway): GatewayModel[] {
     if (!Number.isInteger(model.maxTokens) || model.maxTokens < 1 || model.maxTokens > model.contextWindow) throw new Error(`Check maximum output tokens and context window for model "${id}".`);
     if (model.nativeSearch !== undefined && (!model.nativeSearch || typeof model.nativeSearch !== 'object' || Array.isArray(model.nativeSearch) || typeof model.nativeSearch.enabled !== 'boolean' || (model.nativeSearch.responsesUrl !== undefined && typeof model.nativeSearch.responsesUrl !== 'string'))) throw new Error('Check the model native search configuration.');
     const normalized = copyModel({ ...model, id, name: model.name?.trim() || undefined });
+    if (normalized.inputModalities) {
+      const modalities = [...new Set(normalized.inputModalities)];
+      normalized.inputModalities = modalities.length ? modalities : ['text'];
+    }
     if (model.pricing && (!/^[A-Z]{3}$/.test(model.pricing.currency) || ['input', 'output', 'cacheRead', 'cacheWrite'].some(key => !Number.isFinite(model.pricing![key as keyof Omit<NonNullable<GatewayModel['pricing']>, 'currency'>]) || Number(model.pricing![key as keyof Omit<NonNullable<GatewayModel['pricing']>, 'currency'>]) < 0))) throw new Error('Model pricing must have a currency and non-negative rates per million tokens.');
     // The protocol is shared; reasoning and search capabilities are model-specific.
     validateGatewayEffort({ ...gateway, ...normalized, id: gateway.id, modelId: normalized.id });

@@ -581,7 +581,9 @@ export class Harness extends EventEmitter {
       if (this.closing || task.status === 'cancelled') return;
       const gateway = this.runtimeGateway(task);
       this.studio?.validateBudgetModel(task);
-      if (!gateway.reasoning) task.thinking = 'off';
+      // A saved task may carry 'off' from a model that no longer reasons; converge to a
+      // level this model declares before validating the request.
+      task.thinking = preferredEffort(gateway, task.thinking);
       effectiveEffort(gateway, task.thinking);
       this.refreshSkills();
       const apiKey = this.vault.get(gateway.id);

@@ -1,4 +1,4 @@
-import type { ModelInputModality, ThinkingLevel } from './types.ts';
+import type { GatewayModel, ModelInputModality, ThinkingLevel } from './types.ts';
 
 /**
  * Model parameters from models.dev, distilled to the fields Cardwright's editor needs.
@@ -71,7 +71,7 @@ const MATCHABLE_EFFORT = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 const DATE_SUFFIX = /-(?:\d{8}|\d{4}-\d{2}-\d{2})$/;
 const TAG_SUFFIX = /-(?:latest|preview)$/;
 
-/** Trim, drop whitespace and newlines, then lowercase: the comparison the requirement asks for. */
+/** models.dev ids ignore case and whitespace, so compare them without either. */
 export function normalizeModelName(value: string): string {
   return value.replace(/[\s\u0000-\u001f\u007f]+/g, '').toLowerCase();
 }
@@ -138,9 +138,43 @@ interface PreparedEntry {
   base: string;
 }
 
+interface PreparedCatalog {
+  entries: PreparedEntry[];
+  full: Map<string, PreparedEntry>;
+  segment: Map<string, PreparedEntry>;
+  base: Map<string, PreparedEntry>;
+}
+
 function prepare(entry: ModelSnapshotEntry): PreparedEntry {
   const segment = normalizeModelName(modelNameSegment(entry.id));
   return { entry, full: normalizeModelName(entry.id), segment, base: withoutSuffix(segment) };
+}
+
+/**
+ * Snapshots are immutable once loaded, so normalizing them on every lookup is wasted
+ * work, especially for the online catalog. `refresh()` replaces the array, which lets
+ * the WeakMap drop the old entry.
+ */
+const preparedCatalogs = new WeakMap<ModelSnapshotEntry[], PreparedCatalog>();
+
+function buildIndex(entries: PreparedEntry[], key: 'full' | 'segment' | 'base'): Map<string, PreparedEntry> {
+  const map = new Map<string, PreparedEntry>();
+  for (const item of entries) if (!map.has(item[key])) map.set(item[key], item);
+  return map;
+}
+
+function preparedCatalog(models: ModelSnapshotEntry[]): PreparedCatalog {
+  const cached = preparedCatalogs.get(models);
+  if (cached) return cached;
+  const entries = models.map(prepare);
+  const catalog: PreparedCatalog = {
+    entries,
+    full: buildIndex(entries, 'full'),
+    segment: buildIndex(entries, 'segment'),
+    base: buildIndex(entries, 'base'),
+  };
+  preparedCatalogs.set(models, catalog);
+  return catalog;
 }
 
 /**
@@ -156,22 +190,29 @@ export function matchModelSnapshot(models: ModelSnapshotEntry[], raw: string): M
   const normalized = normalizeModelName(modelNameSegment(raw));
   if (!normalized) return null;
   const base = withoutSuffix(normalized);
-  const prepared = models.map(prepare);
   const fullNormalized = normalizeModelName(raw);
+  const catalog = preparedCatalog(models);
 
-  const exact = prepared.find(item => item.full === fullNormalized);
+  const exact = catalog.full.get(fullNormalized);
   if (exact) return { entry: exact.entry, confidence: 1, method: 'exact' };
 
-  const segment = prepared.find(item => item.segment === normalized);
+  const segment = catalog.segment.get(normalized);
   if (segment) return { entry: segment.entry, confidence: 1, method: 'segment' };
 
-  const suffix = prepared.find(item => item.base === base);
+  const suffix = catalog.base.get(base);
   if (suffix) return { entry: suffix.entry, confidence: 1, method: 'suffix' };
 
   if (normalized.length < 3) return null;
   let best: { item: PreparedEntry; score: number } | null = null;
-  for (const item of prepared) {
+  // A length difference alone can rule out a candidate: the edit distance needed to
+  // reach MATCH_THRESHOLD is at least the difference in length.
+  const tolerance = 1 - MATCH_THRESHOLD;
+  for (const item of catalog.entries) {
     if (versionConflict(base, item.base)) continue;
+    const segmentSlack = tolerance * Math.max(normalized.length, item.segment.length);
+    const baseSlack = tolerance * Math.max(base.length, item.base.length);
+    if (Math.abs(normalized.length - item.segment.length) > segmentSlack
+      && Math.abs(base.length - item.base.length) > baseSlack) continue;
     const score = Math.max(similarity(normalized, item.segment), similarity(base, item.base));
     if (score < MATCH_THRESHOLD) continue;
     if (!best || score > best.score
@@ -255,5 +296,32 @@ export function toModelMatch(matched: MatchedModel, source: ModelMatch['source']
     source,
     generatedAt,
     release: matched.entry.release,
+  };
+}
+
+/** Apply one match to an editor model. A Codex reverse proxy keeps its own window. */
+export function applyModelMatch(model: GatewayModel, match: ModelMatch): GatewayModel {
+  if (model.autoMatch === false) return model;
+  const contextWindow = model.codexProxy ? CODEX_PROXY_CONTEXT : match.contextWindow;
+  return {
+    ...model,
+    contextWindow,
+    maxTokens: Math.min(match.maxTokens, contextWindow),
+    reasoning: match.reasoning,
+    effortMap: match.effortMap ? { ...match.effortMap } : undefined,
+    inputModalities: match.inputModalities,
+  };
+}
+
+/** Values for a model models.dev does not know: enough for a conversation, editable afterwards. */
+export function unmatchedModelDefaults(model: GatewayModel): GatewayModel {
+  const contextWindow = model.codexProxy ? CODEX_PROXY_CONTEXT : UNMATCHED_CONTEXT;
+  return {
+    ...model,
+    contextWindow,
+    maxTokens: Math.min(UNMATCHED_OUTPUT, contextWindow),
+    reasoning: false,
+    effortMap: undefined,
+    inputModalities: ['text', 'image'],
   };
 }

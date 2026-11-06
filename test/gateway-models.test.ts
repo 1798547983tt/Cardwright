@@ -154,6 +154,12 @@ test('auto-match and Codex metadata survive normalization, cloning and resolutio
   assert.throws(() => normalizeGatewayModels({ ...source, models: [model('m', { inputModalities: ['text', 'audio'] as never })] }), /only be text or image/);
 });
 
+test('input modalities are deduplicated and default to text when empty', () => {
+  const source = gateway({ models: [model('m', { inputModalities: ['text', 'text', 'image'] })] });
+  assert.deepEqual(normalizeGatewayModels(source)[0].inputModalities, ['text', 'image']);
+  assert.deepEqual(normalizeGatewayModels({ ...source, models: [model('m', { inputModalities: [] })] })[0].inputModalities, ['text']);
+});
+
 test('matched effort maps keep nulls, so unsupported levels stay unsupported', () => {
   const effortMap = { off: null, minimal: null, low: 'low', medium: null, high: 'high', xhigh: null, max: null, ultra: null };
   const normalized = normalizeGatewayModels({ ...gateway(), models: [model('m', { effortMap })] });

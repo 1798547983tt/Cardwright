@@ -7,9 +7,10 @@ import { join } from 'node:path';
 import { ModelMetadataService } from '../src/main/model-metadata-service.ts';
 import {
   CODEX_PROXY_CONTEXT, MATCH_THRESHOLD, UNMATCHED_CONTEXT, UNMATCHED_OUTPUT,
-  deriveModelDefaults, looksLikeChatGpt, matchModelSnapshot, modelNameSegment,
-  normalizeModelName, toModelMatch, type ModelSnapshot, type ModelSnapshotEntry,
+  applyModelMatch, deriveModelDefaults, looksLikeChatGpt, matchModelSnapshot, modelNameSegment,
+  normalizeModelName, toModelMatch, unmatchedModelDefaults, type ModelSnapshot, type ModelSnapshotEntry,
 } from '../src/shared/model-metadata.ts';
+import type { GatewayModel } from '../src/shared/types.ts';
 
 const snapshot = JSON.parse(readFileSync(new URL('../src/shared/model-snapshot.json', import.meta.url), 'utf8')) as ModelSnapshot;
 
@@ -214,4 +215,122 @@ test('a fresh cache answers an online lookup without a request', async t => {
   assert.equal(match?.source, 'online');
   assert.equal(match?.contextWindow, 320_000);
   assert.equal(calls, 0);
+});
+
+test('a failed online lookup is retried after the cooldown instead of failing for the session', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'cardwright-model-metadata-retry-'));
+  t.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  let now = Date.parse('2026-11-05T00:00:00.000Z');
+  let calls = 0;
+  let offline = true;
+  const fetchImpl = (async () => {
+    calls++;
+    if (offline) throw new Error('offline');
+    return new Response(JSON.stringify({
+      openai: { models: { 'future-model': { name: 'Future Model', limit: { context: 500_000, output: 64_000 } } } },
+    }), { status: 200 });
+  }) as typeof fetch;
+
+  const service = new ModelMetadataService(directory, fetchImpl, () => now);
+  assert.equal(await service.matchModel('future-model', true), null);
+  assert.equal(calls, 1);
+  // Inside the cooldown the failed attempt is not repeated.
+  assert.equal(await service.matchModel('future-model', true), null);
+  assert.equal(calls, 1);
+
+  offline = false;
+  now += 10 * 60 * 1000;
+  const match = await service.matchModel('future-model', true);
+  assert.equal(match?.source, 'online');
+  assert.equal(match?.matchedId, 'openai/future-model');
+  assert.equal(calls, 2);
+});
+
+test('a stale cache answers during the cooldown and a later lookup retries the download', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'cardwright-model-metadata-stale-retry-'));
+  t.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  let now = Date.parse('2026-11-05T00:00:00.000Z');
+  let calls = 0;
+  let offline = true;
+  const fetchImpl = (async () => {
+    calls++;
+    if (offline) throw new Error('offline');
+    return new Response(JSON.stringify({
+      openai: { models: { 'fresh-model': { name: 'Fresh Model', limit: { context: 400_000, output: 32_000 } } } },
+    }), { status: 200 });
+  }) as typeof fetch;
+  await writeFile(join(directory, 'model-metadata-cache.json'), JSON.stringify({
+    version: 1, fetchedAt: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    models: [entry({ id: 'vendor/cache-only', name: 'Cache only', context: 320_000, output: 16_000 })],
+  }));
+
+  const service = new ModelMetadataService(directory, fetchImpl, () => now);
+  // The stale cache answers even though the refresh failed, and the request was attempted once.
+  assert.equal((await service.matchModel('cache-only', true))?.source, 'online');
+  assert.equal(calls, 1);
+  assert.equal((await service.matchModel('cache-only', true))?.source, 'online');
+  assert.equal(calls, 1);
+
+  offline = false;
+  now += 10 * 60 * 1000;
+  assert.equal((await service.matchModel('fresh-model', true))?.source, 'online');
+  assert.equal(calls, 2);
+});
+
+test('refresh waits for an in-flight lookup and then forces a new download', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'cardwright-model-metadata-refresh-'));
+  t.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  let calls = 0;
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const fetchImpl = (async () => {
+    calls++;
+    if (calls === 1) await gate;
+    return new Response(JSON.stringify({
+      openai: { models: { 'future-model': { name: 'Future Model', limit: { context: 500_000, output: 64_000 } } } },
+    }), { status: 200 });
+  }) as typeof fetch;
+
+  const service = new ModelMetadataService(directory, fetchImpl);
+  const first = service.matchModel('future-model', true);
+  const refreshed = service.refresh();
+  release();
+  await first;
+  const result = await refreshed;
+  assert.equal(result.ok, true);
+  assert.equal(calls, 2);
+});
+
+const gatewayModel = (changes: Partial<GatewayModel> = {}): GatewayModel => ({
+  id: 'vendor/model-a', reasoning: false, contextWindow: 128_000, maxTokens: 8_192, autoMatch: true, ...changes,
+});
+
+test('applying a match respects Codex proxies and leaves unchecked models alone', () => {
+  const matched = matchModelSnapshot([entry({ context: 200_000, output: 16_000, input: ['text'] })], 'model-a');
+  const match = toModelMatch(matched!, 'bundled', '2026-11-05T00:00:00.000Z');
+
+  const plain = applyModelMatch(gatewayModel(), match);
+  assert.equal(plain.contextWindow, 200_000);
+  assert.equal(plain.maxTokens, 16_000);
+  assert.deepEqual(plain.inputModalities, ['text']);
+
+  const codex = applyModelMatch(gatewayModel({ codexProxy: true, contextWindow: 300_000 }), match);
+  assert.equal(codex.contextWindow, CODEX_PROXY_CONTEXT);
+  assert.equal(codex.maxTokens, Math.min(16_000, CODEX_PROXY_CONTEXT));
+
+  const manual = gatewayModel({ autoMatch: false, contextWindow: 300_000 });
+  assert.equal(applyModelMatch(manual, match), manual);
+});
+
+test('unmatched defaults keep a Codex window and clear reasoning', () => {
+  const plain = unmatchedModelDefaults(gatewayModel({ contextWindow: 300_000 }));
+  assert.equal(plain.contextWindow, UNMATCHED_CONTEXT);
+  assert.equal(plain.maxTokens, Math.min(UNMATCHED_OUTPUT, UNMATCHED_CONTEXT));
+  assert.equal(plain.reasoning, false);
+  assert.equal(plain.effortMap, undefined);
+  assert.deepEqual(plain.inputModalities, ['text', 'image']);
+
+  const codex = unmatchedModelDefaults(gatewayModel({ codexProxy: true }));
+  assert.equal(codex.contextWindow, CODEX_PROXY_CONTEXT);
+  assert.equal(codex.maxTokens, Math.min(UNMATCHED_OUTPUT, CODEX_PROXY_CONTEXT));
 });

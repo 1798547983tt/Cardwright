@@ -23,6 +23,8 @@ test('preferred effort keeps the chosen level or falls back to one the model dec
   assert.equal(preferredEffort(gateway, 'medium'), 'medium');
   assert.equal(preferredEffort({ ...gateway, effortMap: { low: 'low', high: 'high', medium: null } }, 'medium'), 'high');
   assert.equal(preferredEffort({ ...gateway, effortMap: { low: 'low', medium: null, high: null, xhigh: null, max: null, ultra: null } }, 'ultra'), 'low');
+  // A matched model that documents no "none" level marks Off as null, so a saved Off must move to a declared level.
+  assert.equal(preferredEffort({ ...gateway, effortMap: { off: null, medium: null, high: 'high' } }, 'off'), 'high');
   assert.equal(preferredEffort({ ...gateway, reasoning: false }, 'medium'), 'off');
   // Legacy Anthropic has no xhigh/max/ultra, so Ultra falls back to Medium.
   assert.equal(preferredEffort({ ...gateway, protocol: 'anthropic-messages' }, 'ultra'), 'medium');

@@ -8,6 +8,7 @@
  * Run with: npm run snapshot:models
  */
 import { writeFile } from 'node:fs/promises';
+import { EFFORT_ORDER, REFERENCE_PROVIDERS, clampContext, clampOutput, effortValues } from '../src/shared/models-dev.ts';
 
 const MODELS_URL = 'https://models.dev/models.json';
 const API_URL = 'https://models.dev/api.json';
@@ -26,13 +27,8 @@ const FAMILIES = [
 /** Non-chat endpoints that share a model family name but cannot be used in a conversation. */
 const EXCLUDED = /(?:embedding|reranker|tts|transcribe|live-translate|computer-use|robotics|nano-banana|veo|imagen|realtime|whisper|-image)/;
 
-/**
- * Effort values come from a reference provider rather than from the union of every
- * reseller, so the snapshot never promises a level the official API rejects.
- */
-const REFERENCE_PROVIDERS = ['openai', 'anthropic', 'google', 'deepseek', 'zhipuai', 'zai', 'moonshotai', 'alibaba'];
-const EFFORT_ORDER = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
-
+// The bundled snapshot keeps a more generous output default than the editor's unmatched
+// fallback, because a snapshot row has a real context window to fill into.
 const DEFAULT_CONTEXT = 128_000;
 const DEFAULT_OUTPUT = 32_768;
 
@@ -55,15 +51,6 @@ async function readJson(url) {
     }
   }
   throw lastError;
-}
-
-function effortValues(model) {
-  const values = new Set();
-  for (const option of model?.reasoning_options ?? []) {
-    if (option?.type !== 'effort') continue;
-    for (const value of option.values ?? []) values.add(value);
-  }
-  return EFFORT_ORDER.filter(value => values.has(value));
 }
 
 /** Every api.json entry that describes this catalog row, including dated aliases. */
@@ -99,9 +86,8 @@ function referenceEffort(api, key, name) {
 }
 
 function clampLimit(limit) {
-  const context = Number.isFinite(limit?.context) && limit.context >= 1024 ? Math.min(limit.context, 10_000_000) : DEFAULT_CONTEXT;
-  const output = Number.isFinite(limit?.output) && limit.output > 0 ? limit.output : DEFAULT_OUTPUT;
-  return { context, output: Math.min(output, context) };
+  const context = clampContext(limit?.context, DEFAULT_CONTEXT);
+  return { context, output: clampOutput(limit?.output, context, DEFAULT_OUTPUT) };
 }
 
 const [catalog, api] = await Promise.all([readJson(MODELS_URL), readJson(API_URL)]);

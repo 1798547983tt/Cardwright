@@ -39,7 +39,7 @@ export function availableEfforts(gateway: Gateway): ThinkingLevel[] {
 export function preferredEffort(gateway: Gateway, preferred: ThinkingLevel): ThinkingLevel {
   const available = availableEfforts(gateway);
   if (available.includes(preferred)) return preferred;
-  const fallbackOrder: ThinkingLevel[] = ['medium', 'high', 'low', 'xhigh', 'max', 'minimal', 'off'];
+  const fallbackOrder: ThinkingLevel[] = ['medium', 'high', 'low', 'xhigh', 'max', 'off'];
   return fallbackOrder.find(level => available.includes(level)) ?? available[0] ?? 'off';
 }
 
