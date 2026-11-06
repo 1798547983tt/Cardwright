@@ -10,7 +10,7 @@ import { thinkingLabel } from '../effort';
 import { selectedModel } from '../model-resolution';
 import { useNetStatusText } from '../net-status';
 import { playCue } from '../sound';
-import { availableEfforts } from '../../shared/effort';
+import { availableEfforts, preferredEffort } from '../../shared/effort';
 import { sectionOf } from '../../shared/card-studio/boards';
 import { cardDispatchRoles, cardSquadSettings } from '../../shared/card-studio/squad';
 import { runningConversation } from '../../shared/card-studio/view';
@@ -59,7 +59,7 @@ export function StudioComposer({ card, sectionId, task }: { card: CardProjectVie
   const efforts = gateway ? availableEfforts(gateway) : ['off' as ThinkingLevel];
   const permission: PermissionMode = task ? task.permission : settings?.permission ?? 'edit';
   const labels = cardPermissionLabels(t);
-  const currentThinking = task ? task.thinking : efforts.includes(thinking) ? thinking : efforts.includes('medium') ? 'medium' : efforts[0];
+  const currentThinking = task ? task.thinking : gateway ? preferredEffort(gateway, thinking) : 'off';
   const webOn = task ? !!task.card?.web : web;
   const high = !!sectionOf(sectionId)?.high || sectionId === 'plan';
   // 小队 (spec §6.1): what this conversation may send now, by the 子代理 switch, its section and its effort.

@@ -142,6 +142,8 @@ async function initialize(): Promise<void> {
   handle('claudeCodeHooks', async projectId => service.claudeHooks(projectId));
   handle('testHook', async (event, command, timeout, projectId) => service.testHook(event as Parameters<typeof service.testHook>[0], command, timeout, projectId));
   handle('fetchModels', async (input, key) => service.fetchModels(input, key));
+  handle('matchModel', async input => service.matchModel(input));
+  handle('refreshModelMetadata', async () => service.refreshModelMetadata());
   handle('createTask', async input => service.createTask(input));
   handle('prompt', async (id, text, behavior, attachments) => service.prompt(id, text, behavior, attachments));
   handle('studioSettings', async changes => studio.settings(changes));

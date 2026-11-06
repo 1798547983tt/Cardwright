@@ -1,0 +1,2457 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-05T13:59:23.734Z",
+  "source": "https://models.dev",
+  "models": [
+    {
+      "id": "alibaba/qwen3.7-flash",
+      "name": "Qwen3.7 Flash",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-07-15",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.7-max",
+      "name": "Qwen3.7 Max",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-05-21",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.7-plus",
+      "name": "Qwen3.7 Plus",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-06-02",
+      "context": 1000000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.8-2.4t-a95b",
+      "name": "Qwen3.8 2.4T A95B",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-08-12",
+      "context": 262144,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.8-27b",
+      "name": "Qwen3.8 27B",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-08-14",
+      "context": 262144,
+      "output": 32768,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.8-flash",
+      "name": "Qwen3.8 Flash",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-08-26",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.8-flash-next",
+      "name": "Qwen3.8 Flash Next",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-08-27",
+      "context": 262144,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.8-max",
+      "name": "Qwen3.8 Max",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-08-03",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "pdf"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.8-max-0902",
+      "name": "Qwen3.8 Max 0902",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-09-02",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "pdf"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.8-max-preview",
+      "name": "Qwen3.8 Max Preview",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-07-19",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.8-max-prime",
+      "name": "Qwen 3.8 Max Prime",
+      "group": "qwen",
+      "family": "qwen3.8-max",
+      "release": "2026-09-23",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "alibaba/qwen3.8-omni-flash",
+      "name": "Qwen3.8 Omni Flash",
+      "group": "qwen",
+      "family": "qwen",
+      "release": "2026-09-17",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ]
+    },
+    {
+      "id": "anthropic/claude-fable-5",
+      "name": "Claude Fable 5",
+      "group": "claude",
+      "family": "claude-fable",
+      "release": "2026-06-09",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-fable-5-1",
+      "name": "Claude Fable 5.1",
+      "group": "claude",
+      "family": "claude-fable",
+      "release": "2026-09-01",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-haiku-4-5",
+      "name": "Claude Haiku 4.5 (latest)",
+      "group": "claude",
+      "family": "claude-haiku",
+      "release": "2025-10-15",
+      "context": 200000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-haiku-4-5-20251001",
+      "name": "Claude Haiku 4.5",
+      "group": "claude",
+      "family": "claude-haiku",
+      "release": "2025-10-15",
+      "context": 200000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-haiku-5-5",
+      "name": "Claude Haiku 5.5",
+      "group": "claude",
+      "family": "claude-haiku",
+      "release": "2026-10-07",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-mythos-5",
+      "name": "Claude Mythos 5",
+      "group": "claude",
+      "family": "claude-mythos",
+      "release": "2026-06-09",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-mythos-5-1",
+      "name": "Claude Mythos 5.1",
+      "group": "claude",
+      "family": "claude-mythos",
+      "release": "2026-09-01",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-4-0",
+      "name": "Claude Opus 4 (latest)",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2025-05-22",
+      "context": 200000,
+      "output": 32000,
+      "reasoning": true,
+      "effort": [],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-4-1",
+      "name": "Claude Opus 4.1 (latest)",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2025-08-05",
+      "context": 200000,
+      "output": 32000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-4-1-20250805",
+      "name": "Claude Opus 4.1",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2025-08-05",
+      "context": 200000,
+      "output": 32000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-4-20250514",
+      "name": "Claude Opus 4",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2025-05-22",
+      "context": 200000,
+      "output": 32000,
+      "reasoning": true,
+      "effort": [],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-4-5",
+      "name": "Claude Opus 4.5 (latest)",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2025-11-24",
+      "context": 200000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-4-5-20251101",
+      "name": "Claude Opus 4.5",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2025-11-24",
+      "context": 200000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-4-6",
+      "name": "Claude Opus 4.6",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2026-02-05",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-4-7",
+      "name": "Claude Opus 4.7",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2026-04-16",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-4-8",
+      "name": "Claude Opus 4.8",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2026-05-28",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-5",
+      "name": "Claude Opus 5",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2026-07-24",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-opus-5-5",
+      "name": "Claude Opus 5.5",
+      "group": "claude",
+      "family": "claude-opus",
+      "release": "2026-09-22",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-sonnet-4-0",
+      "name": "Claude Sonnet 4 (latest)",
+      "group": "claude",
+      "family": "claude-sonnet",
+      "release": "2025-05-22",
+      "context": 200000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-sonnet-4-20250514",
+      "name": "Claude Sonnet 4",
+      "group": "claude",
+      "family": "claude-sonnet",
+      "release": "2025-05-22",
+      "context": 200000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-sonnet-4-5",
+      "name": "Claude Sonnet 4.5 (latest)",
+      "group": "claude",
+      "family": "claude-sonnet",
+      "release": "2025-09-29",
+      "context": 200000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-sonnet-4-5-20250929",
+      "name": "Claude Sonnet 4.5",
+      "group": "claude",
+      "family": "claude-sonnet",
+      "release": "2025-09-29",
+      "context": 200000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-sonnet-4-6",
+      "name": "Claude Sonnet 4.6",
+      "group": "claude",
+      "family": "claude-sonnet",
+      "release": "2026-02-17",
+      "context": 1000000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-sonnet-5",
+      "name": "Claude Sonnet 5",
+      "group": "claude",
+      "family": "claude-sonnet",
+      "release": "2026-06-30",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "anthropic/claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5",
+      "group": "claude",
+      "family": "claude-sonnet",
+      "release": "2026-09-28",
+      "context": 1000000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-chat",
+      "name": "DeepSeek Chat",
+      "group": "deepseek",
+      "family": "deepseek",
+      "release": "2025-12-01",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": false,
+      "effort": [
+        "none",
+        "low",
+        "high"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-chat-v3-0324",
+      "name": "DeepSeek V3 0324",
+      "group": "deepseek",
+      "family": "deepseek",
+      "release": "2025-03-24",
+      "context": 163840,
+      "output": 147456,
+      "reasoning": false,
+      "effort": [],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-chat-v3.1",
+      "name": "DeepSeek V3.1",
+      "group": "deepseek",
+      "family": "deepseek",
+      "release": "2025-08-21",
+      "context": 163840,
+      "output": 32768,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "high"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-reasoner",
+      "name": "DeepSeek Reasoner",
+      "group": "deepseek",
+      "family": "deepseek-thinking",
+      "release": "2025-12-01",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v3",
+      "name": "DeepSeek-V3",
+      "group": "deepseek",
+      "family": "deepseek",
+      "release": "2024-12-26",
+      "context": 131072,
+      "output": 8192,
+      "reasoning": false,
+      "effort": [],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v3-0324",
+      "name": "DeepSeek V3 0324",
+      "group": "deepseek",
+      "family": "deepseek",
+      "release": "2025-03-24",
+      "context": 163840,
+      "output": 163840,
+      "reasoning": false,
+      "effort": [],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v3.1",
+      "name": "DeepSeek-V3.1",
+      "group": "deepseek",
+      "family": "deepseek",
+      "release": "2025-08-21",
+      "context": 131072,
+      "output": 8192,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v3.2",
+      "name": "DeepSeek V3.2",
+      "group": "deepseek",
+      "family": "deepseek",
+      "release": "2025-12-01",
+      "context": 128000,
+      "output": 64000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v4-flash",
+      "name": "DeepSeek V4 Flash",
+      "group": "deepseek",
+      "family": "deepseek-flash",
+      "release": "2026-04-24",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v4-flash-0423",
+      "name": "DeepSeek V4 Flash 0423",
+      "group": "deepseek",
+      "family": "deepseek-flash",
+      "release": "2026-04-23",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v4-flash-0731",
+      "name": "DeepSeek V4 Flash 0731",
+      "group": "deepseek",
+      "family": "deepseek-flash",
+      "release": "2026-07-31",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v4-flash-vision-exp",
+      "name": "DeepSeek V4 Flash Vision Exp",
+      "group": "deepseek",
+      "family": "deepseek-flash",
+      "release": "2026-08-21",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v4-pro",
+      "name": "DeepSeek V4 Pro",
+      "group": "deepseek",
+      "family": "deepseek-thinking",
+      "release": "2026-04-24",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v4-pro-0423",
+      "name": "DeepSeek V4 Pro 0423",
+      "group": "deepseek",
+      "family": "deepseek-thinking",
+      "release": "2026-04-23",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v4-pro-0813",
+      "name": "DeepSeek V4 Pro 0813",
+      "group": "deepseek",
+      "family": "deepseek-thinking",
+      "release": "2026-08-13",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v4.1-flash",
+      "name": "DeepSeek V4.1 Flash",
+      "group": "deepseek",
+      "family": "deepseek-flash",
+      "release": "2026-09-10",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "deepseek/deepseek-v4.1-flash-1017",
+      "name": "DeepSeek V4.1 Flash 1017",
+      "group": "deepseek",
+      "family": "deepseek-flash",
+      "release": "2026-10-17",
+      "context": 1000000,
+      "output": 384000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "google/gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "group": "gemini",
+      "family": "gemini-flash",
+      "release": "2025-06-17",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash-Lite",
+      "group": "gemini",
+      "family": "gemini-flash-lite",
+      "release": "2025-06-17",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-2.5-flash-lite-preview-06-17",
+      "name": "Gemini 2.5 Flash-Lite Preview 06-17",
+      "group": "gemini",
+      "family": "gemini-flash-lite",
+      "release": "2025-06-17",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-2.5-flash-lite-preview-09-2025",
+      "name": "Gemini 2.5 Flash-Lite Preview 09-2025",
+      "group": "gemini",
+      "family": "gemini-flash-lite",
+      "release": "2025-09-25",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-2.5-flash-preview-05-20",
+      "name": "Gemini 2.5 Flash Preview 05-20",
+      "group": "gemini",
+      "family": "gemini-flash",
+      "release": "2025-05-20",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro",
+      "group": "gemini",
+      "family": "gemini-pro",
+      "release": "2025-06-17",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-2.5-pro-preview",
+      "name": "Gemini 2.5 Pro Preview 06-05",
+      "group": "gemini",
+      "family": "gemini",
+      "release": "2025-06-05",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "pdf",
+        "image",
+        "text",
+        "audio"
+      ]
+    },
+    {
+      "id": "google/gemini-3-flash-preview",
+      "name": "Gemini 3 Flash Preview",
+      "group": "gemini",
+      "family": "gemini-flash",
+      "release": "2025-12-17",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-3-pro-preview",
+      "name": "Gemini 3 Pro Preview",
+      "group": "gemini",
+      "family": "gemini-pro",
+      "release": "2025-11-18",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-3.1-flash-lite",
+      "name": "Gemini 3.1 Flash Lite",
+      "group": "gemini",
+      "family": "gemini-flash-lite",
+      "release": "2026-05-07",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-3.1-flash-lite-preview",
+      "name": "Gemini 3.1 Flash Lite Preview",
+      "group": "gemini",
+      "family": "gemini-flash-lite",
+      "release": "2026-03-03",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-3.1-flash-live-preview",
+      "name": "Gemini 3.1 Flash Live Preview",
+      "group": "gemini",
+      "family": "gemini-flash",
+      "release": "2026-03-26",
+      "context": 131072,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio"
+      ]
+    },
+    {
+      "id": "google/gemini-3.1-pro-preview",
+      "name": "Gemini 3.1 Pro Preview",
+      "group": "gemini",
+      "family": "gemini-pro",
+      "release": "2026-02-19",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-3.1-pro-preview-customtools",
+      "name": "Gemini 3.1 Pro Preview Custom Tools",
+      "group": "gemini",
+      "family": "gemini-pro",
+      "release": "2026-02-19",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-3.5-flash",
+      "name": "Gemini 3.5 Flash",
+      "group": "gemini",
+      "family": "gemini-flash",
+      "release": "2026-05-19",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-3.5-flash-lite",
+      "name": "Gemini 3.5 Flash Lite",
+      "group": "gemini",
+      "family": "gemini-flash-lite",
+      "release": "2026-07-21",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-3.6-flash",
+      "name": "Gemini 3.6 Flash",
+      "group": "gemini",
+      "family": "gemini-flash",
+      "release": "2026-07-21",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-3.7-flash",
+      "name": "Gemini 3.7 Flash",
+      "group": "gemini",
+      "family": "gemini-flash",
+      "release": "2026-08-13",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-3.8-flash",
+      "name": "Gemini 3.8 Flash",
+      "group": "gemini",
+      "family": "gemini-flash",
+      "release": "2026-09-02",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "google/gemini-4-argon",
+      "name": "Gemini 4 Argon",
+      "group": "gemini",
+      "family": "gemini",
+      "release": "2026-10-13",
+      "context": 1048576,
+      "output": 65536,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ]
+    },
+    {
+      "id": "moonshotai/kimi-k2.5",
+      "name": "Kimi K2.5",
+      "group": "kimi",
+      "family": "kimi-k2",
+      "release": "2026-01-27",
+      "context": 262144,
+      "output": 262144,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "moonshotai/kimi-k2.6",
+      "name": "Kimi K2.6",
+      "group": "kimi",
+      "family": "kimi-k2",
+      "release": "2026-04-20",
+      "context": 262144,
+      "output": 262144,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "moonshotai/kimi-k2.7-code",
+      "name": "Kimi K2.7 Code",
+      "group": "kimi",
+      "family": "kimi-k2",
+      "release": "2026-06-12",
+      "context": 262144,
+      "output": 262144,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "moonshotai/kimi-k2.7-code-highspeed",
+      "name": "Kimi K2.7 Code Highspeed",
+      "group": "kimi",
+      "family": "kimi-k2",
+      "release": "2026-06-12",
+      "context": 262144,
+      "output": 262144,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "moonshotai/kimi-k2.8-preview",
+      "name": "Kimi K2.8 Preview",
+      "group": "kimi",
+      "family": "kimi-k2",
+      "release": "2026-09-11",
+      "context": 1048576,
+      "output": 32768,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "moonshotai/kimi-k3",
+      "name": "Kimi K3",
+      "group": "kimi",
+      "family": "kimi-k3",
+      "release": "2026-07-16",
+      "context": 1048576,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "moonshotai/kimi-k3.1-pro",
+      "name": "Kimi K3.1 Pro",
+      "group": "kimi",
+      "family": "kimi-k3",
+      "release": "2026-10-23",
+      "context": 1048576,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video"
+      ]
+    },
+    {
+      "id": "openai/gpt-5",
+      "name": "GPT-5",
+      "group": "openai",
+      "family": "gpt",
+      "release": "2025-08-07",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5-chat-latest",
+      "name": "GPT-5 Chat (latest)",
+      "group": "openai",
+      "family": "gpt",
+      "release": "2025-08-07",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5-codex",
+      "name": "GPT-5-Codex",
+      "group": "openai",
+      "family": "gpt-codex",
+      "release": "2025-09-15",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5-mini",
+      "name": "GPT-5 Mini",
+      "group": "openai",
+      "family": "gpt-mini",
+      "release": "2025-08-07",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5-nano",
+      "name": "GPT-5 Nano",
+      "group": "openai",
+      "family": "gpt-nano",
+      "release": "2025-08-07",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5-pro",
+      "name": "GPT-5 Pro",
+      "group": "openai",
+      "family": "gpt-pro",
+      "release": "2025-10-06",
+      "context": 400000,
+      "output": 272000,
+      "reasoning": true,
+      "effort": [
+        "high"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.1",
+      "name": "GPT-5.1",
+      "group": "openai",
+      "family": "gpt",
+      "release": "2025-11-13",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.1-chat-latest",
+      "name": "GPT-5.1 Chat",
+      "group": "openai",
+      "family": "gpt",
+      "release": "2025-11-13",
+      "context": 128000,
+      "output": 16384,
+      "reasoning": true,
+      "effort": [
+        "medium"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.1-codex",
+      "name": "GPT-5.1 Codex",
+      "group": "openai",
+      "family": "gpt-codex",
+      "release": "2025-11-13",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.1-codex-max",
+      "name": "GPT-5.1 Codex Max",
+      "group": "openai",
+      "family": "gpt-codex",
+      "release": "2025-11-13",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.1-codex-mini",
+      "name": "GPT-5.1 Codex mini",
+      "group": "openai",
+      "family": "gpt-codex",
+      "release": "2025-11-13",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.2",
+      "name": "GPT-5.2",
+      "group": "openai",
+      "family": "gpt",
+      "release": "2025-12-11",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.2-chat-latest",
+      "name": "GPT-5.2 Chat",
+      "group": "openai",
+      "family": "gpt",
+      "release": "2025-12-11",
+      "context": 128000,
+      "output": 16384,
+      "reasoning": true,
+      "effort": [
+        "medium"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.2-codex",
+      "name": "GPT-5.2 Codex",
+      "group": "openai",
+      "family": "gpt-codex",
+      "release": "2025-12-11",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.2-pro",
+      "name": "GPT-5.2 Pro",
+      "group": "openai",
+      "family": "gpt-pro",
+      "release": "2025-12-11",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.3-chat-latest",
+      "name": "GPT-5.3 Chat (latest)",
+      "group": "openai",
+      "family": "gpt",
+      "release": "2026-03-03",
+      "context": 128000,
+      "output": 16384,
+      "reasoning": false,
+      "effort": [],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.3-codex",
+      "name": "GPT-5.3 Codex",
+      "group": "openai",
+      "family": "gpt-codex",
+      "release": "2026-02-05",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.3-codex-spark",
+      "name": "GPT-5.3 Codex Spark",
+      "group": "openai",
+      "family": "gpt-codex-spark",
+      "release": "2026-02-05",
+      "context": 128000,
+      "output": 32000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.4",
+      "name": "GPT-5.4",
+      "group": "openai",
+      "family": "gpt",
+      "release": "2026-03-05",
+      "context": 1050000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.4-mini",
+      "name": "GPT-5.4 mini",
+      "group": "openai",
+      "family": "gpt-mini",
+      "release": "2026-03-17",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.4-nano",
+      "name": "GPT-5.4 nano",
+      "group": "openai",
+      "family": "gpt-nano",
+      "release": "2026-03-17",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.4-pro",
+      "name": "GPT-5.4 Pro",
+      "group": "openai",
+      "family": "gpt-pro",
+      "release": "2026-03-05",
+      "context": 1050000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.5",
+      "name": "GPT-5.5",
+      "group": "openai",
+      "family": "gpt",
+      "release": "2026-04-23",
+      "context": 1050000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.5-instant",
+      "name": "GPT-5.5 Instant",
+      "group": "openai",
+      "family": "openai",
+      "release": "2026-05-05",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.5-pro",
+      "name": "GPT-5.5 Pro",
+      "group": "openai",
+      "family": "gpt-pro",
+      "release": "2026-04-23",
+      "context": 1050000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.6-cyber",
+      "name": "GPT-5.6 Cyber",
+      "group": "openai",
+      "family": "gpt",
+      "release": "2026-08-07",
+      "context": 400000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.6-luna",
+      "name": "GPT-5.6 Luna",
+      "group": "openai",
+      "family": "gpt-luna",
+      "release": "2026-07-09",
+      "context": 1050000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.6-sol",
+      "name": "GPT-5.6 Sol",
+      "group": "openai",
+      "family": "gpt-sol",
+      "release": "2026-07-09",
+      "context": 1050000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "openai/gpt-5.6-terra",
+      "name": "GPT-5.6 Terra",
+      "group": "openai",
+      "family": "gpt-terra",
+      "release": "2026-07-09",
+      "context": 1050000,
+      "output": 128000,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "pdf"
+      ]
+    },
+    {
+      "id": "zhipuai/glm-5",
+      "name": "GLM-5",
+      "group": "glm",
+      "family": "glm",
+      "release": "2026-02-12",
+      "context": 204800,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "zhipuai/glm-5-turbo",
+      "name": "GLM-5-Turbo",
+      "group": "glm",
+      "family": "glm",
+      "release": "2026-03-16",
+      "context": 200000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "zhipuai/glm-5.1",
+      "name": "GLM-5.1",
+      "group": "glm",
+      "family": "glm",
+      "release": "2026-04-07",
+      "context": 200000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "zhipuai/glm-5.2",
+      "name": "GLM-5.2",
+      "group": "glm",
+      "family": "glm",
+      "release": "2026-06-13",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "high",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "zhipuai/glm-5.3",
+      "name": "GLM-5.3",
+      "group": "glm",
+      "family": "glm",
+      "release": "2026-08-14",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text"
+      ]
+    },
+    {
+      "id": "zhipuai/glm-5.3-flash",
+      "name": "GLM-5.3-Flash",
+      "group": "glm",
+      "family": "glm-flash",
+      "release": "2026-08-26",
+      "context": 1000000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "low",
+        "high",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "pdf"
+      ]
+    },
+    {
+      "id": "zhipuai/glm-5v-turbo",
+      "name": "GLM-5V-Turbo",
+      "group": "glm",
+      "family": "glm",
+      "release": "2026-04-01",
+      "context": 200000,
+      "output": 131072,
+      "reasoning": true,
+      "effort": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "input": [
+        "text",
+        "image",
+        "video",
+        "pdf"
+      ]
+    }
+  ]
+}

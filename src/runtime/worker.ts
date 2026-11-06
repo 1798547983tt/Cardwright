@@ -322,7 +322,7 @@ export class WorkerRuntime {
         id: init.gateway.modelId, name: init.gateway.modelId, reasoning: init.gateway.reasoning,
         thinkingLevelMap,
         ...(Object.keys(compat).length ? { compat } : {}),
-        input: ['text', 'image'], contextWindow: init.gateway.contextWindow, maxTokens: init.gateway.maxTokens,
+        input: init.gateway.inputModalities ?? ['text', 'image'], contextWindow: init.gateway.contextWindow, maxTokens: init.gateway.maxTokens,
         cost: init.gateway.pricing ? { input: init.gateway.pricing.input, output: init.gateway.pricing.output, cacheRead: init.gateway.pricing.cacheRead, cacheWrite: init.gateway.pricing.cacheWrite } : { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       }],
     });

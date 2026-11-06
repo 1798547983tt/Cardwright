@@ -27,6 +27,7 @@ export function defaultPreferences(): Preferences {
     defaultGatewayId: '', defaultModelId: '', defaultContextWindow: 300000,
     defaultThinking: 'medium', skillPaths: [], disabledSkillIds: [], disabledAgentIds: [], enabledAgentIds: [], browserAllowed: [], avatars: {},
     soundEnabled: false, soundVolume: 40, bootSequence: false, releaseCheck: true, persona: true,
+    modelAutoMatch: 'online',
   };
 }
 
@@ -93,6 +94,8 @@ function parseState(value: unknown, renamedRoles = new Map<string, string>()): S
     soundVolume: Number.isInteger(settings.soundVolume) && settings.soundVolume >= 0 && settings.soundVolume <= 100 ? settings.soundVolume : defaults.soundVolume,
     // 小绘的性格: absent or unreadable means on (§5.4).
     persona: typeof settings.persona === 'boolean' ? settings.persona : true,
+    // models.dev auto-match: an unknown mode falls back to the default, online.
+    modelAutoMatch: settings.modelAutoMatch === 'local' || settings.modelAutoMatch === 'off' ? settings.modelAutoMatch : 'online',
   };
   const notice = validNotice(settings.migrationNotice);
   if (notice) safePreferences.migrationNotice = notice;

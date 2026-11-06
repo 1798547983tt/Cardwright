@@ -20,14 +20,16 @@ import { validateAvatars } from '../core/avatar.ts';
 import { ecosystemSearch, nativeSearchEndpoint } from '../runtime/ecosystem-web.ts';
 import { MEMORY_CATEGORIES, ProjectMemory } from '../runtime/ecosystem-memory.ts';
 import { discoverSkills, skillsForProject } from '../core/skills.ts';
-import { defaultEffortMap, effectiveEffort, validateGatewayEffort } from '../shared/effort.ts';
-import { gatewayModels, normalizeGatewayModels, resolveGatewayModel } from '../shared/gateway-models.ts';
+import { defaultEffortMap, effectiveEffort, preferredEffort, validateGatewayEffort } from '../shared/effort.ts';
+import { gatewayModels, modelRuntimeParameters, normalizeGatewayModels, resolveGatewayModel } from '../shared/gateway-models.ts';
 import { isGatewayUpstream } from '../shared/gateway-upstream.ts';
 import { keepLocalTraffic, trafficSettings, validRateLimit, validRetry, validStall } from '../shared/gateway-traffic.ts';
 import { mergeUsageLedger, summarizeTaskUsage } from '../shared/usage.ts';
 import { buildTranscript, transcriptFileName } from '../shared/transcript.ts';
 import { JailbreakStore } from './jailbreak-store.ts';
 import { RateLimiter } from './rate-limiter.ts';
+import { ModelMetadataService } from './model-metadata-service.ts';
+import type { ModelMatch } from '../shared/model-metadata.ts';
 import type { JailbreakChoice } from '../shared/jailbreak.ts';
 import { fetchModelCatalog, modelCatalogUrl, tinyCompletion } from '../core/model-catalog.ts';
 import { assertWithdrawable, selectRevision, startRevision, withdrawTurn, type Withdrawal } from '../core/conversation-revisions.ts';
@@ -104,6 +106,8 @@ export class Harness extends EventEmitter {
   private browserState?: BrowserState;
   private streaming = new Map<string, string>();
   private timer: ReturnType<typeof setInterval>;
+  /** models.dev lookups: bundled snapshot first, one cached online attempt for anything newer. */
+  private modelMetadata: ModelMetadataService;
   private lastTick = 0;
   private tickRunning = false;
   private admittingSchedules = new Set<string>();
@@ -115,6 +119,7 @@ export class Harness extends EventEmitter {
     super();
     this.bootPaused = !!options.paused;
     this.dataDir = dataDir;
+    this.modelMetadata = new ModelMetadataService(dataDir);
     this.jailbreak = new JailbreakStore(dataDir, options.resourceRoot ?? join(dataDir, 'card-studio'));
     this.workerPath = workerPath;
     this.vault = vault;
@@ -436,7 +441,7 @@ export class Harness extends EventEmitter {
     const preferredModel = input.modelId || (parent?.gatewayId === gatewayId ? parent.modelId : undefined) || (gatewayId === this.store.state.preferences.defaultGatewayId ? this.store.state.preferences.defaultModelId : undefined);
     const preferredContext = input.contextWindow ?? parent?.contextWindow ?? (!input.gatewayId && !input.modelId ? this.store.state.preferences.defaultContextWindow : undefined);
     const configured = savedGateway ? resolveGatewayModel(savedGateway, preferredModel, preferredContext) : undefined;
-    const thinking = configured && !configured.reasoning ? 'off' : selectedThinking;
+    const thinking = configured ? (configured.reasoning ? preferredEffort(configured, selectedThinking) : 'off') : selectedThinking;
     if (!levels.has(thinking)) throw new Error('Unknown reasoning level.');
     if (input.parentId) {
       const parent = this.task(input.parentId);
@@ -576,7 +581,9 @@ export class Harness extends EventEmitter {
       if (this.closing || task.status === 'cancelled') return;
       const gateway = this.runtimeGateway(task);
       this.studio?.validateBudgetModel(task);
-      if (!gateway.reasoning) task.thinking = 'off';
+      // A saved task may carry 'off' from a model that no longer reasons; converge to a
+      // level this model declares before validating the request.
+      task.thinking = preferredEffort(gateway, task.thinking);
       effectiveEffort(gateway, task.thinking);
       this.refreshSkills();
       const apiKey = this.vault.get(gateway.id);
@@ -1219,7 +1226,7 @@ export class Harness extends EventEmitter {
     if (changes.archived !== undefined) next.archived = changes.archived;
     if (changes.pinned !== undefined) next.pinned = changes.pinned;
     if (changes.jailbreak !== undefined) { if (changes.jailbreak) next.jailbreak = { pack: changes.jailbreak.pack }; else delete next.jailbreak; }
-    if (selected) { next.gatewayId = selected.id; next.modelId = selected.modelId; next.contextWindow = selected.contextWindow; next.contextUsage = undefined; next.contextCompacting = false; if (!selected.reasoning) next.thinking = 'off'; }
+    if (selected) { next.gatewayId = selected.id; next.modelId = selected.modelId; next.contextWindow = selected.contextWindow; next.contextUsage = undefined; next.contextCompacting = false; next.thinking = selected.reasoning ? preferredEffort(selected, next.thinking) : 'off'; }
     const previous = { ...task };
     Object.assign(task, next);
     try { this.changed(); } catch (error) { Object.assign(task, previous); throw error; }
@@ -1313,6 +1320,7 @@ export class Harness extends EventEmitter {
     if (!Array.isArray(next.skillPaths) || next.skillPaths.some(p => typeof p !== 'string')) throw new Error('Skill folders must be paths.');
     if (next.developerMode !== undefined && typeof next.developerMode !== 'boolean') throw new Error('开发者模式只能打开或关闭。');
     for (const key of ['notifyFinished', 'notifyApproval', 'bootSequence', 'quietUpgrade', 'releaseCheck', 'persona'] as const) if (next[key] !== undefined && typeof next[key] !== 'boolean') throw new Error('These switches are on or off.');
+    if (next.modelAutoMatch !== undefined && !['online', 'local', 'off'].includes(next.modelAutoMatch)) throw new Error('Unknown model auto-match mode.');
     if (next.cardHandoff !== undefined) {
       const { tokens, windowPercent } = (next.cardHandoff ?? {}) as { tokens?: unknown; windowPercent?: unknown };
       if (!Number.isInteger(tokens) || (tokens as number) < 10_000 || (tokens as number) > 10_000_000 || !Number.isInteger(windowPercent) || (windowPercent as number) < 10 || (windowPercent as number) > 90) throw new Error('换对话阈值要在 1 万到 1000 万 Token、窗口的 10% 到 90% 之间。');
@@ -1399,7 +1407,7 @@ export class Harness extends EventEmitter {
     if (apiKey !== undefined && (typeof apiKey !== 'string' || apiKey.length > 8192)) throw new Error('Invalid API key.');
     const baseUrl = input.protocol === 'anthropic-messages' ? input.baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '') : input.baseUrl.replace(/\/+$/, '');
     const proposed: Gateway = { ...input, baseUrl, hasKey: false, defaultsVersion: 6 };
-    const models = normalizeGatewayModels(proposed).map(model => input.protocol !== 'anthropic-messages' || model.adaptiveThinking ? { ...model, effortMap: { ...model.effortMap, ultra: 'max' } } : model);
+    const models = normalizeGatewayModels(proposed);
     const defaultId = input.modelId?.trim() || models[0].id;
     if (!models.some(model => model.id === defaultId)) throw new Error('Choose a default model included in this gateway.');
     const selected = resolveGatewayModel({ ...proposed, models }, defaultId);
@@ -1416,7 +1424,9 @@ export class Harness extends EventEmitter {
       if (active.length && (previous.baseUrl !== gateway.baseUrl || previous.protocol !== gateway.protocol)) throw new Error('Stop tasks using this connection before changing its address or protocol.');
       for (const task of active) {
         const id = task.modelId || previous.modelId;
-        if (JSON.stringify(gatewayModels(previous).find(model => model.id === id)) !== JSON.stringify(models.find(model => model.id === id))) throw new Error('Stop tasks using this model before changing its parameters. Other models can still be added.');
+        const before = gatewayModels(previous).find(model => model.id === id);
+        const after = models.find(model => model.id === id);
+        if (!before || !after || modelRuntimeParameters(before) !== modelRuntimeParameters(after)) throw new Error('Stop tasks using this model before changing its parameters. Other models can still be added.');
       }
     }
     if (apiKey !== undefined) this.vault.set(input.id, apiKey.trim());
@@ -1455,6 +1465,19 @@ export class Harness extends EventEmitter {
     }
     try { return await fetchModelCatalog(input, key); }
     catch (error) { let message = error instanceof Error ? error.message : String(error); if (key) message = message.split(key).join('[redacted]'); throw new Error(this.redactString(message)); }
+  }
+  /**
+   * Auto-match (1.3.4): resolves one model id against the bundled models.dev snapshot and,
+   * when the user's entry is newer, one cached online catalog. A miss returns null so the
+   * editor can fall back to safe defaults instead of surfacing an error.
+   */
+  async matchModel(input: { modelId: string; allowNetwork?: boolean }): Promise<ModelMatch | null> {
+    if (typeof input?.modelId !== 'string' || !input.modelId.trim() || input.modelId.length > 200) return null;
+    return this.modelMetadata.matchModel(input.modelId, input.allowNetwork !== false);
+  }
+  /** Forces a models.dev download and reports the refreshed row count. Failures stay silent. */
+  async refreshModelMetadata(): Promise<{ ok: boolean; models: number; generatedAt?: string }> {
+    return this.modelMetadata.refresh();
   }
   /**
    * 一键自检 (handoff §5.8): the gateway's model list, then one completion of a single token to the chosen model. Both

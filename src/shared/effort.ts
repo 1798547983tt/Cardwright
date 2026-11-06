@@ -29,6 +29,20 @@ export function availableEfforts(gateway: Gateway): ThinkingLevel[] {
   });
 }
 
+/**
+ * Picks a level the gateway actually declares.
+ *
+ * The global default is Medium, but a matched model may only support Low/High. Falling
+ * back here keeps `createTask` and the composer slider from selecting a level that
+ * `effectiveEffort` would reject.
+ */
+export function preferredEffort(gateway: Gateway, preferred: ThinkingLevel): ThinkingLevel {
+  const available = availableEfforts(gateway);
+  if (available.includes(preferred)) return preferred;
+  const fallbackOrder: ThinkingLevel[] = ['medium', 'high', 'low', 'xhigh', 'max', 'off'];
+  return fallbackOrder.find(level => available.includes(level)) ?? available[0] ?? 'off';
+}
+
 /** Ultra reuses the runtime's max slot in this task's private model registration. */
 export function effectiveEffort(gateway: Gateway, selected: ThinkingLevel): { level: RuntimeEffort; providerValue?: string } {
   validateGatewayEffort(gateway);

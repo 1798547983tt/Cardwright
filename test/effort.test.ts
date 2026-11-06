@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { completeSimple, type Model } from '@earendil-works/pi-ai/compat';
-import { availableEfforts, defaultEffortMap, effectiveEffort, validateGatewayEffort } from '../src/shared/effort.ts';
+import { availableEfforts, defaultEffortMap, effectiveEffort, preferredEffort, validateGatewayEffort } from '../src/shared/effort.ts';
 import type { Gateway, ThinkingLevel } from '../src/shared/types.ts';
 
 const gateway: Gateway = { id: 'probe', name: 'Probe gateway', modelId: 'configured-model', baseUrl: 'https://invalid.example/v1', protocol: 'openai-completions', reasoning: true, maxTokens: 24000, contextWindow: 64000, hasKey: false };
@@ -17,6 +17,18 @@ test('all six reasoning tiers have request defaults, Ultra shares max and saved 
   assert.throws(() => validateGatewayEffort({ ...gateway, effortMap: { ultra: 'bad\nvalue' } }), /provider value/);
   assert.throws(() => effectiveEffort({ ...gateway, effortMap: { high: null } }, 'high'), /does not declare support/);
   assert.deepEqual(availableEfforts({ ...gateway, reasoning: false }), ['off']);
+});
+
+test('preferred effort keeps the chosen level or falls back to one the model declares', () => {
+  assert.equal(preferredEffort(gateway, 'medium'), 'medium');
+  assert.equal(preferredEffort({ ...gateway, effortMap: { low: 'low', high: 'high', medium: null } }, 'medium'), 'high');
+  assert.equal(preferredEffort({ ...gateway, effortMap: { low: 'low', medium: null, high: null, xhigh: null, max: null, ultra: null } }, 'ultra'), 'low');
+  // A matched model that documents no "none" level marks Off as null, so a saved Off must move to a declared level.
+  assert.equal(preferredEffort({ ...gateway, effortMap: { off: null, medium: null, high: 'high' } }, 'off'), 'high');
+  assert.equal(preferredEffort({ ...gateway, reasoning: false }, 'medium'), 'off');
+  // Legacy Anthropic has no xhigh/max/ultra, so Ultra falls back to Medium.
+  assert.equal(preferredEffort({ ...gateway, protocol: 'anthropic-messages' }, 'ultra'), 'medium');
+  assert.equal(preferredEffort({ ...gateway, protocol: 'anthropic-messages', adaptiveThinking: true }, 'ultra'), 'ultra');
 });
 
 test('legacy Anthropic remains budget based; extended tiers require explicit adaptive mode', () => {

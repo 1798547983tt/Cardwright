@@ -1,4 +1,5 @@
 import type { AttachmentInfo, DeliverySummary, ModelPricing, StudioBridge, StudioState } from './studio-types.ts';
+import type { ModelMatch } from './model-metadata.ts';
 import type { AppUpdate } from './app-updates.ts';
 import type { RoleSummary } from './agents.ts';
 import type { RendererErrorReport } from './diagnostics.ts';
@@ -14,11 +15,19 @@ import type { CardChange, NewCardChange, CardRun, CardRunScope, CardRunSettings,
 export type PermissionMode = 'ask' | 'edit' | 'full';
 export type TaskStatus = 'idle' | 'queued' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled';
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
+/** Inputs the pi-ai runtime understands. models.dev's pdf/audio/video are deliberately not included. */
+export type ModelInputModality = 'text' | 'image';
 export interface GatewayModel {
   id: string; name?: string; reasoning: boolean; contextWindow: number; maxTokens: number;
   effortMap?: Partial<Record<ThinkingLevel, string | null>>; adaptiveThinking?: boolean;
   nativeSearch?: { enabled: boolean; responsesUrl?: string };
   pricing?: ModelPricing;
+  /** Auto-fill context, output, reasoning and input modalities from models.dev. Absent on models saved before 1.3.4. */
+  autoMatch?: boolean;
+  /** The model is reached through a Codex reverse proxy, so its context window is user-editable and defaults to 258K. */
+  codexProxy?: boolean;
+  /** Resolved from the snapshot; drives what the runtime registers for this model. */
+  inputModalities?: ModelInputModality[];
 }
 export interface Gateway {
   id: string; name: string; baseUrl: string; modelId: string;
@@ -34,10 +43,14 @@ export interface Gateway {
   reasoning: boolean; contextWindow: number; maxTokens: number; hasKey: boolean;
   nativeSearch?: { enabled: boolean; responsesUrl?: string };
   effortMap?: Partial<Record<ThinkingLevel, string | null>>; adaptiveThinking?: boolean;
+  /** Copied from the selected model by resolveGatewayModel; also the value the runtime registers. */
+  inputModalities?: ModelInputModality[];
   defaultsVersion?: number;
   models?: GatewayModel[];
   pricing?: ModelPricing;
 }
+/** How a newly added model gets its parameters: from models.dev online, from local data only, or not at all. */
+export type ModelAutoMatchMode = 'online' | 'local' | 'off';
 export interface Preferences {
   /** 主题: 'system', a built-in id (dark, light, sakura) or a theme pack's id; a pack that has gone shows as dark. */
   name: string; theme: string; language: 'en' | 'zh';
@@ -75,6 +88,8 @@ export interface Preferences {
   releaseCheck?: boolean;
   /** 小绘的性格 (1.3.0 §4.5): on unless false. Her name and the honest answer about the model stay either way. */
   persona?: boolean;
+  /** Automatically fill a new model's parameters from models.dev; online unless the user chooses local-only or off. */
+  modelAutoMatch?: ModelAutoMatchMode;
 }
 /** 一键自检 of a gateway: the model list, then one completion of a single token; each step on its own. */
 export interface GatewaySelfTest { ok: boolean; steps: Array<{ step: 'models' | 'completion'; ok: boolean; detail: string; ms: number }> }
@@ -261,6 +276,10 @@ export interface Bridge extends StudioBridge {
   selfTestGateway(input: { id?: string; baseUrl: string; protocol: Gateway['protocol']; modelId: string }, apiKey?: string): Promise<GatewaySelfTest>;
   testGateway(id: string): Promise<{ ok: boolean; message: string }>;
   fetchModels(input: { id?: string; baseUrl: string; protocol: Gateway['protocol'] }, apiKey?: string): Promise<Array<{ id: string; name?: string }>>;
+  /** Matches one model id against the bundled models.dev snapshot; `allowNetwork` adds one online attempt. */
+  matchModel(input: { modelId: string; allowNetwork?: boolean }): Promise<ModelMatch | null>;
+  /** Re-downloads models.dev in the desktop process and reports the refreshed row count. */
+  refreshModelMetadata(): Promise<{ ok: boolean; models: number; generatedAt?: string }>;
   diff(taskId: string): Promise<DiffResult>;
   mergeTask(taskId: string): Promise<{ message: string }>;
   createSchedule(input: NewSchedule): Promise<Schedule>;

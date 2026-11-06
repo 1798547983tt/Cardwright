@@ -115,3 +115,17 @@
 .gateway-self-test p span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text); }
 .gateway-self-test p small { color: var(--muted); font: 11px var(--font-code); }
 .gateway-self-test svg { flex: none; }
+/* 1.3.4 models.dev auto-match: read-only parameter block, Codex proxy, and match hints. */
+.model-auto-match { display: grid; gap: 6px; margin: 10px 0 14px; padding: 10px 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius); }
+.model-match-note { margin: 0; font-size: 11.5px; line-height: 1.6; color: var(--muted); }
+.model-match-note.is-miss { color: var(--warning, var(--muted)); }
+.model-match-hint { margin: 6px 0 0; font-size: 11.5px; color: var(--muted); }
+.model-match-hint strong { font: 11.5px var(--font-code); color: var(--text); }
+/* A low-opacity deep-brown wash over parameters models.dev filled in. Square, with room around the
+   fields so it reads as a sealed panel rather than a second disabled control. */
+.model-auto-locked { position: relative; }
+.model-auto-locked > * { opacity: .9; user-select: none; }
+.model-auto-locked::after {
+  content: ''; position: absolute; inset: -6px -8px; border: 1px solid var(--auto-match-line, rgba(88, 62, 30, .28));
+  background: var(--auto-match-veil, rgba(88, 62, 30, .14)); pointer-events: auto; cursor: not-allowed;
+}

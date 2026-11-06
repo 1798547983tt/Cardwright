@@ -10,7 +10,26 @@ function copyModel(model: GatewayModel): GatewayModel {
     adaptiveThinking: model.adaptiveThinking,
     nativeSearch: model.nativeSearch ? { enabled: model.nativeSearch.enabled, responsesUrl: model.nativeSearch.responsesUrl } : undefined,
     pricing: model.pricing ? { currency: model.pricing.currency, input: model.pricing.input, output: model.pricing.output, cacheRead: model.pricing.cacheRead, cacheWrite: model.pricing.cacheWrite } : undefined,
+    // Auto-match metadata: kept so the editor can reopen a matched model without losing its state.
+    autoMatch: model.autoMatch, codexProxy: model.codexProxy,
+    inputModalities: model.inputModalities ? [...model.inputModalities] : undefined,
   };
+}
+
+/**
+ * The fields that change how a request is sent.
+ *
+ * `harness.saveGateway` compares this snapshot, not the whole model, so flipping an
+ * editor-only switch (auto-match, Codex proxy) does not look like a parameter change
+ * that would require stopping running tasks.
+ */
+export function modelRuntimeParameters(model: GatewayModel): string {
+  return JSON.stringify({
+    id: model.id, reasoning: model.reasoning, contextWindow: model.contextWindow, maxTokens: model.maxTokens,
+    effortMap: model.effortMap ?? null, adaptiveThinking: model.adaptiveThinking ?? null,
+    nativeSearch: model.nativeSearch ?? null, pricing: model.pricing ?? null,
+    inputModalities: model.inputModalities ?? ['text', 'image'],
+  });
 }
 
 /** Read old single-model gateways without mutating the saved object. */
@@ -47,10 +66,17 @@ export function normalizeGatewayModels(gateway: Gateway): GatewayModel[] {
     seen.add(id);
     if (model.name !== undefined && (typeof model.name !== 'string' || model.name.trim().length > 120)) throw new Error('Model display names must contain at most 120 characters.');
     if (typeof model.reasoning !== 'boolean') throw new Error('Declare whether each model supports reasoning.');
+    if (model.autoMatch !== undefined && typeof model.autoMatch !== 'boolean') throw new Error('Check the automatic model matching setting.');
+    if (model.codexProxy !== undefined && typeof model.codexProxy !== 'boolean') throw new Error('Check the Codex reverse-proxy setting.');
+    if (model.inputModalities !== undefined && (!Array.isArray(model.inputModalities) || model.inputModalities.some(value => value !== 'text' && value !== 'image'))) throw new Error('Model input modalities may only be text or image.');
     validateContext(model.contextWindow);
     if (!Number.isInteger(model.maxTokens) || model.maxTokens < 1 || model.maxTokens > model.contextWindow) throw new Error(`Check maximum output tokens and context window for model "${id}".`);
     if (model.nativeSearch !== undefined && (!model.nativeSearch || typeof model.nativeSearch !== 'object' || Array.isArray(model.nativeSearch) || typeof model.nativeSearch.enabled !== 'boolean' || (model.nativeSearch.responsesUrl !== undefined && typeof model.nativeSearch.responsesUrl !== 'string'))) throw new Error('Check the model native search configuration.');
     const normalized = copyModel({ ...model, id, name: model.name?.trim() || undefined });
+    if (normalized.inputModalities) {
+      const modalities = [...new Set(normalized.inputModalities)];
+      normalized.inputModalities = modalities.length ? modalities : ['text'];
+    }
     if (model.pricing && (!/^[A-Z]{3}$/.test(model.pricing.currency) || ['input', 'output', 'cacheRead', 'cacheWrite'].some(key => !Number.isFinite(model.pricing![key as keyof Omit<NonNullable<GatewayModel['pricing']>, 'currency'>]) || Number(model.pricing![key as keyof Omit<NonNullable<GatewayModel['pricing']>, 'currency'>]) < 0))) throw new Error('Model pricing must have a currency and non-negative rates per million tokens.');
     // The protocol is shared; reasoning and search capabilities are model-specific.
     validateGatewayEffort({ ...gateway, ...normalized, id: gateway.id, modelId: normalized.id });
@@ -74,5 +100,6 @@ export function resolveGatewayModel(gateway: Gateway, modelId?: string, contextW
     contextWindow: window, maxTokens: Math.min(selected.maxTokens, window),
     effortMap: selected.effortMap, adaptiveThinking: selected.adaptiveThinking,
     nativeSearch: selected.nativeSearch, pricing: selected.pricing,
+    inputModalities: selected.inputModalities,
   };
 }

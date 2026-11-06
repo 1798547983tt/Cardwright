@@ -10,6 +10,7 @@
     "build": "node scripts/build.mjs",
     "start": "electron .",
     "check": "tsc --noEmit",
+    "snapshot:models": "node --import tsx scripts/build-model-snapshot.mjs",
     "test": "node --import tsx --test --test-timeout=30000 --test-force-exit test/*.test.ts",
     "test:fast": "node --import tsx --test --experimental-test-isolation=none --test-timeout=30000 --test-force-exit test/*.test.ts",
     "test:integration": "node --import tsx --test --test-timeout=120000 --test-force-exit test/integration/*.test.ts",
